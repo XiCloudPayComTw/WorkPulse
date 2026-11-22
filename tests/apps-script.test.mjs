@@ -204,3 +204,44 @@ test('explicit v2-to-v3 migration retains employee IDs and populates departments
  assert.match(h.scope.upgradeWorkPulseV3_(),/已是 v3/);
  h.as('alice@example.com');assert.throws(()=>h.scope.upgradeWorkPulseV3_(),/管理員/);
 });
+
+test('report API only returns authorized staff and refuses guessed employee scope',()=>{
+ const h=harness();h.as('admin@example.com');
+ h.scope.wpSaveJournal(h.submission('emp-a'));
+ h.scope.wpSaveJournal({...h.submission('emp-b',0,'request-unique-0030'),date:'2026-11-23'});
+ const range={startDate:'2026-11-01',endDate:'2026-11-30'};
+ h.as('alice@example.com');const own=h.scope.wpQueryReport(range);
+ assert.equal(own.journals.length,1);assert.equal(own.employees.length,1);
+ assert.throws(()=>h.scope.wpQueryReport({...range,employeeId:'emp-b'}),/沒有權限/);
+ assert.throws(()=>h.scope.wpQueryReport({...range,departmentId:'team-b'}),/沒有權限/);
+ h.as('carol@example.com');assert.equal(h.scope.wpQueryReport(range).journals.length,1);
+ h.as('admin@example.com');assert.equal(h.scope.wpQueryReport(range).journals.length,2);
+});
+test('report API filters tasks and excludes superseded revisions',()=>{
+ const h=harness();h.as('alice@example.com');
+ h.scope.wpSaveJournal(h.submission());
+ const revised={...h.submission('emp-a',1,'request-unique-0040'),tasks:[{...h.submission().tasks[0],hours:4,status:'doing'}]};
+ h.scope.wpSaveJournal(revised);
+ const base={startDate:'2026-11-01',endDate:'2026-11-30'};
+ assert.equal(h.scope.wpQueryReport(base).journals[0].tasks.length,1);
+ assert.equal(h.scope.wpQueryReport(base).journals[0].tasks[0].hours,4);
+ assert.equal(h.scope.wpQueryReport({...base,status:'done'}).journals.length,0);
+ assert.equal(h.scope.wpQueryReport({...base,status:'doing',project:'WorkPulse'}).journals.length,1);
+ assert.equal(h.scope.wpQueryReport({...base,category:'展店設計'}).journals.length,0);
+});
+test('report enforces valid dates, max 366 days and approved filters',()=>{
+ const h=harness();h.as('alice@example.com');
+ assert.throws(()=>h.scope.wpQueryReport({startDate:'2026-11-31',endDate:'2026-12-01'}),/日期不存在/);
+ assert.throws(()=>h.scope.wpQueryReport({startDate:'2026-12-01',endDate:'2026-11-01'}),/正序/);
+ assert.throws(()=>h.scope.wpQueryReport({startDate:'2025-01-01',endDate:'2026-11-30'}),/366 天/);
+ assert.throws(()=>h.scope.wpQueryReport({startDate:'2026-11-01',endDate:'2026-11-30',status:'invalid'}),/未知/);
+ assert.throws(()=>h.scope.wpQueryReport({startDate:'2026-11-01',endDate:'2026-11-30',departmentId:'unknown'}),/沒有權限/);
+});
+test('report covers cross-month range with inclusive endpoints',()=>{
+ const h=harness();h.as('admin@example.com');
+ h.scope.wpSaveJournal({...h.submission('emp-a',0,'request-unique-0050'),date:'2026-10-31'});
+ h.scope.wpSaveJournal({...h.submission('emp-b',0,'request-unique-0051'),date:'2026-11-01'});
+ h.scope.wpSaveJournal({...h.submission('emp-b',0,'request-unique-0052'),date:'2026-12-01'});
+ assert.equal(h.scope.wpQueryReport({startDate:'2026-10-31',endDate:'2026-11-01'}).journals.length,2);
+ assert.equal(h.scope.wpQueryReport({startDate:'2026-11-02',endDate:'2026-11-30'}).journals.length,0);
+});

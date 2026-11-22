@@ -84,3 +84,19 @@
 
 - 月度彙總、部門與人員統計、查詢與 Excel / CSV 匯出；先確認資料存取政策與效能。
 - 管理員稽核檢視、主管審核需求評估、支援多人使用的資料備份及跨月索引優化。
+
+## v0.4.0 — 月度報表／進階查詢／Excel 匯出（獨立 PR）
+
+- 先核對 PR #3 已合併至 `main`（起始 commit `21cf751ce61cedb1bf936002c1c3861ff12f60dd`），當時沒有其他開啟中的 PR。本批從該合併版本的獨立分支開發。
+- `apps-script/Code.gs`：新增 `wpQueryReport` 唯讀報表 API，沿用 schema v3、伺服端 OAuth Session / Employee allowlist / role+department 權限；支援最多 366 天跨月日期、員工/部門/專案/類型/狀態篩選，排除舊版 Tasks revision。超過 1,500 份日誌或 10,000 項工作時拒絕大型回傳。
+- `src/reports.js`：純函式計算工時、件數、完成率、日期、員工／部門／專案彙總，CSV 純文字安全匯出。
+- `src/xlsx.js`：零相依真正 XLSX/OOXML 多工作表輸出（含凍結首列、標題底色、欄寬與欄位篩選）；文字一律用 inlineStr，防止公式被當指令。
+- `src/report-ui.js` + `src/app.js`：統計分析頁改成可選日期區間／跨月／員工／部門／專案／狀態，支援本月／上月／近 90 天快捷、重新查詢與 CSV/XLSX 下載。雲端篩選變更後，直到 API 成功回傳前不可匯出舊結果；GitHub Pages 仍本機演示。
+- `src/cloud.js`：增加 `wpQueryReport` 白名單。`scripts/build-gas.mjs` 加入新模組。新增 `docs/REPORTS.md` 操作／權限與驗收指南。
+- 驗證：`npm run verify` 通過 **33/33**；Python `openpyxl` 成功讀取六張 XLSX 工作表、繁體中文、凍結標題、篩選及公式純文字；Chromium 使用離線載入與模擬登入測試，於 320/375/390/768/1024/1440/1920px 沒有水平溢出；雲端模擬確認查詢參數與匯出行為。
+- **沒有對正式 Google Sheets 進行寫入或部署**；schema v3 不變，若已是 v3 不需執行資料遷移。
+
+### 後續 v0.5.0 候選
+
+- 下班草稿自動儲存、快速複製昨日工作、常用項目、鍵盤操作與低階手機效能。
+- 大量工作日誌的索引／分頁／快取評估，主管審核操作及資料備份排程；視公司授權情況再決定正式部署與審核流程。
