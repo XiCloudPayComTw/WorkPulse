@@ -38,3 +38,27 @@
 - 320px、375px、390px、768px、1024px、1440px、1920px 檢查導覽和水平溢出。
 - 新增、修改、跨日期切換、工時範圍、空表單、瀏覽器重整、匯出 CSV/JSON、還原、篩選及收合。
 - Lighthouse／Performance 面板評估首次載入與輸入回饋；實測無框架，但不保證所有裝置都達固定 FPS。
+
+## v0.2.0 — Google Sheets / Apps Script 雲端層（獨立 PR）
+
+- `main` 確認已合併 v0.1.0 PR #1，開發分支單獨提交，**未替使用者 Merge**。
+- GitHub Pages 繼續是 `localStorage` 本機展示版；公司雲端版需部署到 Apps Script HTMLService，*不能*把 Apps Script 私密設定貼到 GitHub Pages。
+- `apps-script/Code.gs`：7 個分頁的 schema v2、手動初始化、`Session.getActiveUser` 同網域 email 身分與 Employees allowlist、staff / manager / admin 查閱／編輯規則、按月讀取、LockService 寫入鎖、expectedRevision 樂觀鎖、requestId 去重、工作細節 append-only 版本與 Audit。
+- `src/cloud.js` + `src/app.js`：當 `google.script.run` 存在時啟動雲端模式；登入中／失敗狀態、儲存同步、更新、跨月讀取。雲端錯誤保留草稿，不能用本機寫入或 JSON 匯入偷渡資料。
+- `scripts/build-gas.mjs`：將零相依 ES modules 轉成 `dist-gas/Index.html`，另附 `Code.gs`／`appsscript.json`。此檔案不需加入版控，建置產出即可。
+- `tests/apps-script.test.mjs`：使用 Node vm + Sheets/Session 模擬驗證權限、資料衝突、重試、日誌讀寫及注入過濾。完整驗證 `npm run verify`。
+- 正式部署及現場驗收：[`docs/GOOGLE_SHEETS_DEPLOYMENT.md`](GOOGLE_SHEETS_DEPLOYMENT.md)。
+
+### 尚未完成／不得宣稱完成
+
+1. **未在公司 Google Workspace 實際授權或部署**，無真實 Spreadsheet ID；未進行端對端 Google 身分驗證或正式環境效能驗證。
+2. 個人 Gmail、跨公司網域或空 `Session.getActiveUser().getEmail()` 都不能用身分下拉選單代替，必須使用可驗證的授權方式才能上線。
+3. 使用 Sheets 進行大量月度讀取並非資料庫最佳化；本批適合低量員工紀錄試行，資料量增長時評估分頁、索引或專用資料庫。
+4. 管理員新增員工／專案仍需由受控 Sheets 操作，不提供公開前端編輯名單的寫入端點；資料備份政策需公司自行確認。
+
+### 後續 v0.3.0 候選
+
+- 完成真實 Workspace 帳號／角色／網域驗收後再提升管理 UI。
+- 安全的管理員專案／員工維護流程、部門權限、離職停用。
+- 版本衝突前端差異顯示、同步載入體驗、時區與操作稽核強化。
+- 備份／匯入遷移、月度大資料量效能測試與部署自動化。
