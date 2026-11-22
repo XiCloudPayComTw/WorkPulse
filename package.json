@@ -1,0 +1,15 @@
+{
+  "name": "workpulse",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Lightweight work journal with a calm neumorphic interface",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "node --check src/app.js && node --check src/data.js && node --check src/icons.js && node --check src/utils.js",
+    "test": "node --test tests/*.test.mjs",
+    "verify": "npm run check && npm run test && npm run build"
+  },
+  "engines": { "node": ">=20" }
+}
