@@ -89,3 +89,7 @@ Google 官方文件：
 - [ ] 手機 320–390px 與桌面確認排版，執行 Lighthouse 或 DevTools 效能抽查。
 
 > 現階段 `npm run verify` 會執行 Apps Script 邏輯的 **Node 模擬環境測試**，不等於公司帳號的真實授權或雲端端對端驗收。
+
+## v0.4.0 報表功能補充
+
+報表使用新端點 `wpQueryReport`，部署方式維持原架構，資料表仍是 schema v3，**不需要從 v3 再遷移**。但必須同時更新 `Code.gs` 和 `Index.html`，讓伺服端支援報表請求。請依 [`REPORTS.md`](REPORTS.md) 測試員工、部門主管與管理員的查詢及 Excel 匯出權限。
