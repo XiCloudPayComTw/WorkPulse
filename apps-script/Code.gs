@@ -1,15 +1,16 @@
 /**
- * WorkPulse v0.2.0 — Google Apps Script back-end.
+ * WorkPulse v0.3.0 — Google Apps Script back-end.
  * Deploy as an HTMLService web app. This file is intentionally unbundled and
  * contains no hard-coded spreadsheet ID, domain, email, password or token.
  *
  * Script properties required before setupWorkPulse_() is run manually:
  * WORKPULSE_SHEET_ID, WORKPULSE_ALLOWED_DOMAIN, WORKPULSE_ADMIN_EMAIL.
  */
-var WP_SCHEMA = '2';
+var WP_SCHEMA = '3';
 var WP_HEADERS = {
-  Employees:['employeeId','email','name','role','departmentId','active'],
-  Projects:['projectId','name','active'],
+  Employees:['employeeId','email','name','role','departmentId','active','revision','updatedAt','updatedBy'],
+  Departments:['departmentId','name','active','revision','updatedAt','updatedBy'],
+  Projects:['projectId','name','active','revision','updatedAt','updatedBy'],
   Journals:['journalId','date','employeeId','revision','updatedAt','updatedBy','requestId','note','tomorrow'],
   Tasks:['taskId','journalId','revision','position','project','category','title','description','result','status','hours'],
   Requests:['requestId','actorEmail','journalId','revision','createdAt'],
@@ -49,13 +50,15 @@ function setupWorkPulse_() {
       sheet.getRange(1,1,sheet.getMaxRows(),headers.length).setNumberFormat('@');
     });
     var meta = wpSheet_(book,'Meta');
-    if (!wpRows_(meta).some(function(r){return r.key==='schemaVersion';})) meta.appendRow(['schemaVersion',WP_SCHEMA]);
+    var existingSchema = wpRows_(meta).find(function(r){return r.key==='schemaVersion';});
+    if (existingSchema && String(existingSchema.value)!==WP_SCHEMA) throw Error('版本不相容；v2 請先執行 upgradeWorkPulseV3_。');
+    if (!existingSchema) meta.appendRow(['schemaVersion',WP_SCHEMA]);
     var employees = wpSheet_(book,'Employees');
     if (!wpRows_(employees).some(function(r){return String(r.email).toLowerCase()===cfg.adminEmail;})) {
-      employees.appendRow(['admin-'+Utilities.getUuid(),cfg.adminEmail,'系統管理員','admin','',true]);
+      employees.appendRow(['admin-'+Utilities.getUuid(),cfg.adminEmail,'系統管理員','admin','',true,1,new Date().toISOString(),cfg.adminEmail]);
     }
     var projects = wpSheet_(book,'Projects');
-    if (!wpRows_(projects).length) projects.appendRow([Utilities.getUuid(),'一般專案',true]);
+    if (!wpRows_(projects).length) projects.appendRow([Utilities.getUuid(),'一般專案',true,1,new Date().toISOString(),cfg.adminEmail]);
     SpreadsheetApp.flush();
     return '初始化完成。請在 Employees 加入員工信箱與部門，並限制試算表共用權限。';
   } finally {lock.releaseLock();}
@@ -146,6 +149,12 @@ function wpContext_() {
     employeeId:String(r.employeeId),email:String(r.email).toLowerCase().trim(),name:String(r.name),
     role:String(r.role).toLowerCase(),departmentId:String(r.departmentId),active:wpActive_(r.active)
   };});
+  var ids={},emails={};
+  users.forEach(function(u){
+    if (!u.employeeId || !u.email || ids[u.employeeId] || emails[u.email])
+      throw Error('員工名冊有重複或空白的員工識別碼／電子郵件，請由管理員檢查資料表。');
+    ids[u.employeeId]=true;emails[u.email]=true;
+  });
   var actor=users.find(function(u){return u.email===email && u.active;});
   if (!actor || ['staff','manager','admin'].indexOf(actor.role)<0) throw Error('此帳號尚未獲得 WorkPulse 使用權限。');
   var visible=users.filter(function(u){return wpCanRead_(actor,u);});
@@ -154,9 +163,11 @@ function wpContext_() {
 }
 function wpActive_(v) { return v===true || String(v).toLowerCase()==='true'; }
 function wpCanRead_(actor,target) {
-  if (!target || !target.active) return false;
+  // A deactivated account cannot log in, but its historical journals remain
+  // readable to authorized supervisors/admins for audit and month-end review.
+  if (!target) return false;
   if (actor.role==='admin') return true;
-  if (actor.employeeId===target.employeeId) return true;
+  if (actor.employeeId===target.employeeId) return !!target.active;
   return actor.role==='manager' && !!actor.departmentId && actor.departmentId===target.departmentId;
 }
 function wpCanWrite_(actor,target) {
@@ -244,3 +255,156 @@ function wpRecord_(j,tasks) {
        title:wpPlainText_(t.title),description:wpPlainText_(t.description),result:wpPlainText_(t.result),
        status:String(t.status),hours:Number(t.hours)||0};})};
 }
+
+/** Explicit, repeatable v2 -> v3 migration. Admin must run this in Apps Script editor. */
+function upgradeWorkPulseV3_() {
+  var cfg=wpConfig_();
+  var email=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
+  if (email!==cfg.adminEmail) throw Error('只有設定的管理員可執行版本遷移。');
+  var lock=LockService.getScriptLock();lock.waitLock(30000);
+  try {
+    var book=SpreadsheetApp.openById(cfg.sheetId);
+    var meta=wpSheet_(book,'Meta');
+    var version=wpRows_(meta).find(function(r){return r.key==='schemaVersion';});
+    if (!version) throw Error('找不到 schemaVersion，拒絕推測資料結構。');
+    if (String(version.value)==='3') return '已是 v3，不需遷移';
+    if (String(version.value)!=='2') throw Error('僅支援從 v2 遷移到 v3，停止操作');
+    [['Employees',['employeeId','email','name','role','departmentId','active']],
+     ['Projects',['projectId','name','active']]].forEach(function(entry){
+      var sheet=wpSheet_(book,entry[0]);
+      var current=sheet.getRange(1,1,1,WP_HEADERS[entry[0]].length).getValues()[0];
+      var prefix=current.slice(0,entry[1].length);
+      if (JSON.stringify(prefix)!==JSON.stringify(entry[1])) throw Error(entry[0]+' 結構不符合 v2，停止遷移');
+      if (current.slice(entry[1].length).some(function(x){return x!=='';}) && JSON.stringify(current)!==JSON.stringify(WP_HEADERS[entry[0]]))
+        throw Error(entry[0]+' 發現未知欄位，停止遷移');
+    });
+    // Existing department IDs are preserved; historical employee references never change.
+    var employeeSheet=wpSheet_(book,'Employees');
+    var oldEmployees=employeeSheet.getLastRow()>1 ? employeeSheet.getRange(2,1,employeeSheet.getLastRow()-1,6).getValues() : [];
+    var departments=book.getSheetByName('Departments')||book.insertSheet('Departments');
+    if (departments.getLastRow()===0) {
+      departments.getRange(1,1,1,WP_HEADERS.Departments.length).setValues([WP_HEADERS.Departments]);
+      departments.setFrozenRows(1);
+    } else if(JSON.stringify(departments.getRange(1,1,1,WP_HEADERS.Departments.length).getValues()[0])!==JSON.stringify(WP_HEADERS.Departments)) {
+      throw Error('Departments 結構不一致');
+    }
+    var known={};wpRows_(departments).forEach(function(d){known[String(d.departmentId)]=true;});
+    var now=new Date().toISOString();
+    oldEmployees.forEach(function(row){
+      var dept=String(row[4]||'').trim();
+      if(dept && !known[dept]){
+        if(!/^[a-zA-Z0-9_-]{1,100}$/.test(dept)) throw Error('既有部門 ID 格式不安全：'+dept);
+        departments.appendRow([dept,wpText_(dept,80),true,1,now,email]);known[dept]=true;
+      }
+    });
+    [['Employees',6],['Projects',3]].forEach(function(entry){
+      var sheet=wpSheet_(book,entry[0]);var headers=WP_HEADERS[entry[0]];
+      sheet.getRange(1,1,1,headers.length).setValues([headers]);
+      sheet.getRange(1,1,sheet.getMaxRows(),headers.length).setNumberFormat('@');
+      for(var row=2;row<=sheet.getLastRow();row++){
+        var old=sheet.getRange(row,entry[1]+1,1,3).getValues()[0];
+        if(!old[0]) sheet.getRange(row,entry[1]+1,1,3).setValues([[1,now,email]]);
+      }
+    });
+    departments.getRange(1,1,departments.getMaxRows(),WP_HEADERS.Departments.length).setNumberFormat('@');
+    meta.getRange(version.__row,2).setValues([['3']]);
+    SpreadsheetApp.flush();
+    return 'v2 -> v3 遷移完成。請核對 Departments 與員工角色。';
+  } finally {lock.releaseLock();}
+}
+
+/** Administrator-only listing. Inactive staff never leak into ordinary bootstrap. */
+function wpAdminBootstrap() {
+  var ctx=wpContext_();wpRequireAdmin_(ctx);
+  return {employees:wpRows_(wpSheet_(ctx.book,'Employees')).map(wpAdminEmployee_),
+    departments:wpRows_(wpSheet_(ctx.book,'Departments')).map(wpAdminDepartment_),
+    projects:wpRows_(wpSheet_(ctx.book,'Projects')).map(wpAdminProject_),
+    viewer:ctx.actor.email, schema:WP_SCHEMA};
+}
+function wpRequireAdmin_(ctx){if(ctx.actor.role!=='admin')throw Error('沒有團隊管理權限');}
+function wpAdminEmployee_(r){return {id:String(r.employeeId),email:String(r.email),name:wpPlainText_(r.name),role:String(r.role),departmentId:String(r.departmentId),active:wpActive_(r.active),revision:Number(r.revision)||0};}
+function wpAdminDepartment_(r){return {id:String(r.departmentId),name:wpPlainText_(r.name),active:wpActive_(r.active),revision:Number(r.revision)||0};}
+function wpAdminProject_(r){return {id:String(r.projectId),name:wpPlainText_(r.name),active:wpActive_(r.active),revision:Number(r.revision)||0};}
+function wpAdminId_(v){var id=String(v||'').trim();if(id&&!/^[a-zA-Z0-9_-]{1,120}$/.test(id))throw Error('識別碼格式錯誤');return id;}
+function wpAdminFlag_(v){if(v!==true && v!==false)throw Error('啟用狀態必須為布林值');return v;}
+function wpAdminEmail_(value,domain){
+  var s=String(value||'').toLowerCase().trim();
+  if(s.length>180||!/^[a-z0-9._%+-]+@[a-z0-9.-]+$/.test(s)||!s.endsWith('@'+domain))throw Error('請輸入公司網域內有效的電子郵件');
+  return s;
+}
+function wpAdminBase_(payload,ctx){
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('資料格式不正確');
+  var id=wpAdminId_(payload.id);
+  var expectedRevision=Number(payload.expectedRevision);
+  if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0)throw Error('版本格式錯誤');
+  var requestId=String(payload.requestId||'');
+  if(!/^[a-zA-Z0-9-]{12,120}$/.test(requestId))throw Error('請求識別碼無效');
+  return {id:id,expectedRevision:expectedRevision,requestId:requestId,active:wpAdminFlag_(payload.active),
+    name:wpText_(payload.name,80)};
+}
+function wpAdminSaveEmployee(payload){return wpAdminSave_('Employees',payload);}
+function wpAdminSaveDepartment(payload){return wpAdminSave_('Departments',payload);}
+function wpAdminSaveProject(payload){return wpAdminSave_('Projects',payload);}
+function wpAdminSave_(kind,payload){
+  if(['Employees','Departments','Projects'].indexOf(kind)<0)throw Error('不支援管理的資料種類');
+  var ctx=wpContext_();wpRequireAdmin_(ctx);
+  var cfg=wpConfig_();
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try {
+    ctx=wpContext_();wpRequireAdmin_(ctx);
+    var p=wpAdminBase_(payload,ctx);
+    if(!p.name)throw Error('名稱不得空白');
+    var book=ctx.book,sheet=wpSheet_(book,kind),rows=wpRows_(sheet);
+    var idColumn={Employees:'employeeId',Departments:'departmentId',Projects:'projectId'}[kind];
+    var existing=p.id?rows.find(function(r){return String(r[idColumn])===p.id;}):null;
+    if(p.id&&!existing)throw Error('找不到要修改的資料');
+    var revision=existing?Number(existing.revision)||0:0;
+    var requests=wpRows_(wpSheet_(book,'Requests'));
+    var previous=requests.find(function(r){return r.requestId===p.requestId && r.actorEmail===ctx.actor.email;});
+    if(previous){
+      // Reject accidental re-use of the same request ID for a different entity.
+      if(!String(previous.journalId).startsWith(kind+':'))throw Error('請求識別碼重複使用');
+      var savedId=String(previous.journalId).slice(kind.length+1);
+      if(p.id && savedId!==p.id)throw Error('請求識別碼已用於其他紀錄');
+      var snapshot=rows.find(function(r){return String(r[idColumn])===savedId;});
+      if(!snapshot)throw Error('請求紀錄與資料不一致');
+      return {ok:true,deduplicated:true,entity:wpAdminPublic_(kind,snapshot)};
+    }
+    if(revision!==p.expectedRevision)throw Error('CONFLICT:這筆資料已被其他管理員更新，請重新整理再編輯');
+    var now=new Date().toISOString(), id=p.id||Utilities.getUuid();
+    var values;
+    if(kind==='Employees') {
+      var email=wpAdminEmail_(payload.email,cfg.domain),role=String(payload.role||'').toLowerCase(),departmentId=wpAdminId_(payload.departmentId);
+      if(['staff','manager','admin'].indexOf(role)<0)throw Error('角色類型無效');
+      if(role==='manager'&&!departmentId)throw Error('主管必須指定部門');
+      if(rows.some(function(e){return e.email && String(e.email).trim().toLowerCase()===email && e.employeeId!==id;}))throw Error('員工電子郵件已被使用');
+      var depts=wpRows_(wpSheet_(book,'Departments'));
+      if(departmentId && !depts.some(function(d){return String(d.departmentId)===departmentId && wpActive_(d.active);}) && p.active)throw Error('員工只能指派至啟用中的部門');
+      if(existing && (existing.email===ctx.actor.email||String(existing.email).toLowerCase()===cfg.adminEmail)){
+        if(!p.active||role!=='admin'||email!==String(existing.email).toLowerCase())throw Error('不可停用或降權目前管理員與系統管理員');
+      }
+      if(email===cfg.adminEmail&&(!p.active||role!=='admin'))throw Error('系統管理員必須保留啟用及管理員權限');
+      if(existing && existing.email===cfg.adminEmail && email!==cfg.adminEmail)throw Error('不得轉移系統管理員信箱');
+      if(existing&&existing.role==='admin'&&wpActive_(existing.active)&&(role!=='admin'||!p.active)) {
+        var count=rows.filter(function(r){return r.role==='admin'&&wpActive_(r.active);}).length;
+        if(count<=1)throw Error('不可停用最後一位管理員');
+      }
+      values=[id,email,p.name,role,departmentId,p.active,revision+1,now,ctx.actor.email];
+    } else if(kind==='Departments') {
+      if(!p.active && rows.length && wpRows_(wpSheet_(book,'Employees')).some(function(e){return String(e.departmentId)===id&&wpActive_(e.active);}))throw Error('此部門仍有在職員工，請先重新指派或停用員工');
+      if(rows.some(function(r){return wpPlainText_(r.name)===wpPlainText_(p.name) && String(r.departmentId)!==id;}))throw Error('部門名稱已存在');
+      values=[id,p.name,p.active,revision+1,now,ctx.actor.email];
+    } else {
+      if(rows.some(function(r){return wpPlainText_(r.name)===wpPlainText_(p.name) && String(r.projectId)!==id;}))throw Error('專案名稱已存在');
+      values=[id,p.name,p.active,revision+1,now,ctx.actor.email];
+    }
+    if(existing)sheet.getRange(existing.__row,1,1,values.length).setValues([values]);
+    else sheet.appendRow(values);
+    wpSheet_(book,'Requests').appendRow([p.requestId,ctx.actor.email,kind+':'+id,revision+1,now]);
+    wpSheet_(book,'Audit').appendRow([Utilities.getUuid(),now,ctx.actor.email,kind+':'+(existing?'update':'create'),kind+':'+id,revision+1,p.requestId]);
+    SpreadsheetApp.flush();
+    var entity=wpAdminPublic_(kind,values.reduce(function(a,v,i){a[WP_HEADERS[kind][i]]=v;return a;},{}));
+    return {ok:true,deduplicated:false,entity:entity};
+  } finally {lock.releaseLock();}
+}
+function wpAdminPublic_(kind,row){return kind==='Employees'?wpAdminEmployee_(row):kind==='Departments'?wpAdminDepartment_(row):wpAdminProject_(row);}
