@@ -62,3 +62,25 @@
 - 安全的管理員專案／員工維護流程、部門權限、離職停用。
 - 版本衝突前端差異顯示、同步載入體驗、時區與操作稽核強化。
 - 備份／匯入遷移、月度大資料量效能測試與部署自動化。
+
+## v0.3.0 — 團隊管理與角色權限（獨立 PR）
+
+- 已核對 v0.2.0 PR #2 合併至 `main`，無開啟中的 PR；從合併 commit `ec9cf253844adae8891f72271d72eee07a415b35` 繼續。
+- `apps-script/Code.gs`：schema v3；Departments、新增員工/部門/專案的 CRUD（soft deactivate）、admin-only 伺服端 API、角色權限與部門可見範圍、ID／email 唯一、防最後管理員鎖死、衝突／重送保護、Audit 記錄。
+- **資料遷移是明確操作**：既有 schema v2 必須先備份，使用公司管理員在 Apps Script 編輯器執行 `upgradeWorkPulseV3_()`，再發布新版；不會自動重設或刪除既有工作日誌。新公司可以執行 `setupWorkPulse_()` 建 v3。
+- `src/admin.js`：雲端管理員專用的員工／部門／專案維護 UI；載入、建立、編輯、停用、同步、錯誤保留、角色選擇、部門指定。原本 GitHub Pages localStorage 展示功能不更動。權限仍由後端檢查，不信任 UI 隱藏。
+- `scripts/build-gas.mjs`：加入 `admin.js` 打包；修正 HTMLService 初始 script 位置，避免 DOM 尚未存在就初始化。
+- `tests/apps-script.test.mjs`：原本 9 個後端測試 + 新增 7 個管理、遷移、權限測試，連同 7 個前端資料測試共 **23 個**。`npm run verify` 通過；Chromium 離線載入 Apps Script HTML + 模擬 `google.script.run`，檢查管理員流程和七種螢幕寬度。
+- 部署／角色／遷移詳見 [TEAM_ADMIN.md](TEAM_ADMIN.md)、[GOOGLE_SHEETS_DEPLOYMENT.md](GOOGLE_SHEETS_DEPLOYMENT.md)。
+
+### v0.3.0 尚未完成（不可宣稱正式上線）
+
+1. 未取得公司 Google Workspace 身分驗證或正式試算表 ID，尚未做真實雲端端對端測試；模擬 API 不代表真實 Google 授權已通過。
+2. 版本遷移尚未在公司真實既有表格執行；正式環境執行前必須備份。
+3. 尚未實作細緻的「主管審核日誌」、「多層部門管理」、批次人員匯入、人事歷史快照或大量工作日誌優化。
+4. 團隊管理只在 Apps Script 雲端模式可用；GitHub Pages 仍為本機原型。
+
+### 後續 v0.4.0 建議
+
+- 月度彙總、部門與人員統計、查詢與 Excel / CSV 匯出；先確認資料存取政策與效能。
+- 管理員稽核檢視、主管審核需求評估、支援多人使用的資料備份及跨月索引優化。
