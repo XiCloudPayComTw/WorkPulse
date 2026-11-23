@@ -1,6 +1,6 @@
 import { icon } from './icons.js';
 import { CATEGORIES, STATUSES } from './data.js';
-import { esc, formatDate, formatHours } from './utils.js';
+import { esc, formatDate, formatHours, localISODate, shiftDate } from './utils.js';
 
 const options=(rows,value)=>rows.map(([id,name])=>`<option value="${esc(id)}" ${String(value)===String(id)?'selected':''}>${esc(name)}</option>`).join('');
 function filterSelect(label,field,values,selected){return `<label class="form-group"><span class="field-label">${label}</span><select class="input" data-report-filter="${field}">${options([['all','全部'],...values],selected)}</select></label>`;}
@@ -17,11 +17,15 @@ function detailTable(rows){return `<section class="soft-card report-panel report
 export function renderReportWorkspace({filters,phase,error,report,meta,cloud,stale}) {
  const personOpts=(meta.employees||[]).map(e=>[e.id,e.name]);
  const deptOpts=(meta.departments||[]).map(d=>[d.id,d.name]);
+ const now=localISODate();const [year,month]=now.slice(0,7).split('-').map(Number);
+ const currentActive=filters.startDate===now.slice(0,7)+'-01'&&filters.endDate===now;
+ const lastActive=filters.startDate===localISODate(new Date(year,month-2,1))&&filters.endDate===localISODate(new Date(year,month-1,0));
+ const ninetyActive=filters.startDate===shiftDate(now,-89)&&filters.endDate===now;
  const projectNames=[...new Set([...(meta.projects||[]),...(report?.byProject||[]).map(x=>x.id)])].filter(x=>x && x!=='未指定專案').sort();
  return `<div class="report-screen">
  <section class="soft-card card-pad-lg report-toolbar">
   <div class="row-between report-toolbar-heading"><div><div class="overline">MONTHLY & CUSTOM REPORTS</div><h2 class="card-title">工作成果報表</h2><p class="card-sub">查閱每日進展，按人員、部門或專案分析實際工作內容。</p></div><span class="report-scope-tag">${icon('shield',15)} ${cloud?'依登入權限查詢':'本機展示資料'}</span></div>
-  <div class="report-quick-range" role="group" aria-label="快速設定日期區間"><button class="soft-button sm" data-action="report-period" data-period="month">本月</button><button class="soft-button sm" data-action="report-period" data-period="previous">上個月</button><button class="soft-button sm" data-action="report-period" data-period="quarter">近 90 天</button></div>
+  <div class="report-quick-range" role="group" aria-label="快速設定日期區間"><button class="soft-button sm ${currentActive?'active':''}" aria-pressed="${currentActive}" data-action="report-period" data-period="month">本月</button><button class="soft-button sm ${lastActive?'active':''}" aria-pressed="${lastActive}" data-action="report-period" data-period="previous">上個月</button><button class="soft-button sm ${ninetyActive?'active':''}" aria-pressed="${ninetyActive}" data-action="report-period" data-period="quarter">近 90 天</button></div>
   <div class="report-filter-grid">
    <label class="form-group"><span class="field-label">起始日期</span><input class="input" data-report-filter="startDate" type="date" value="${esc(filters.startDate)}" /></label>
    <label class="form-group"><span class="field-label">結束日期</span><input class="input" data-report-filter="endDate" type="date" value="${esc(filters.endDate)}" /></label>
