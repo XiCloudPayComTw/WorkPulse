@@ -344,6 +344,27 @@ root.addEventListener('click', event=>{
    render();return;
  }
  if(state.cloud.phase==='error' || state.cloud.phase==='loading')return;
+ if(action==='admin-delete-journal'){
+   if(!isCloud||state.cloud.user?.role!=='admin'||state.cloud.saving)return;
+   const j=state.store.journals.find(x=>x.id===button.dataset.id);
+   if(!j){notify('此日誌已不存在，請重新整理',true);return;}
+   const name=employeeName(j.employeeId);
+   if(!confirm(`確定刪除「${name}」在 ${j.date} 的整日工作日誌（${j.tasks.length} 項）？刪除後一般使用者將無法查閱。`))return;
+   if(prompt('為避免誤刪，請輸入「刪除」確認：')!=='刪除')return;
+   state.cloud.saving=true;render();
+   cloudCall('wpOwnerDeleteJournal',{journalId:j.id,expectedRevision:j.revision,requestId:uid()})
+    .then(result=>{
+      if(!result?.ok)throw Error('刪除結果未確認');
+      state.store={...state.store,journals:state.store.journals.filter(x=>x.id!==j.id)};
+      if(state.draft?.date===j.date&&state.draft?.employeeId===j.employeeId){
+        state.draft=makeDraft(j.date,j.employeeId);state.dirty=false;
+      }
+      state.report.payload=null;state.report.phase='idle';state.report.applied=null;
+      notify('工作日誌已刪除，後端稽核紀錄仍會保留');
+    }).catch(e=>notify('刪除失敗：'+e.message,true))
+      .finally(()=>{state.cloud.saving=false;render();});
+   return;
+ }
  if(action==='report-run'){if(isCloud)loadCloudReport();else {const err=reportDateError();if(err)notify(err,true);else {render();notify('報表已更新');}}return;}
  if(action==='report-period'){selectReportPeriod(button.dataset.period);render();return;}
  if(action==='report-export-csv'){exportReport('csv');return;}
@@ -435,7 +456,7 @@ root.addEventListener('change',event=>{
    flushQuickDraft();const date=field==='date'?value:state.draft.date;const employee=field==='employeeId'?value:state.draft.employeeId;
    state.saveRequestId=null;
    if(isCloud && date.slice(0,7)!==state.month){loadCloudMonth(date.slice(0,7),date,employee);return;}
-   state.draft=makeDraft(date,employee);state.dirty=false;render();return;
+   state.draft=makeDraft(date,employee);state.templates=readTemplates(draftStorage(),draftAccount());state.dirty=false;render();return;
  }
  if(el.matches('[data-filter]')){state.filters[el.dataset.filter]=el.value;render();return;}
  if(el.matches('[data-month]')){const month=el.value||currentMonth();if(isCloud){loadCloudMonth(month);return;}state.month=month;render();return;}
