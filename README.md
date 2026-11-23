@@ -4,7 +4,7 @@
 
 **WorkPulse** 是一個以手機／桌面皆適用的單頁式日誌原型。視覺靈感來自柔和的灰藍色階與 Neumorphism 浮凸表面，重點是讓員工在下班前輕鬆整理多項工作，也讓管理者按日期快速閱讀。
 
-## 功能（v0.7.0）
+## 功能（v0.8.0）
 
 - **共用姓名填寫（雲端模式）**：一般使用者不必登入 Google，選擇姓名即可填寫、修改及查閱工作日誌。這是共用填寫而非個人身分驗證。
 - **工作總覽**：當月項目、總工時、完成數與紀錄天數；近期紀錄依日期分組。
@@ -14,11 +14,19 @@
 - **系統設定**：編輯人員與專案選單、JSON 備份／還原、CSV（Excel 可開啟）匯出、重設資料。
 - **介面**：擴大文字尺寸、固定導覽欄與卡片約束、加強選取狀態；灰藍柔和陰影、Hover／Pressed 微位移、`prefers-reduced-motion`、手機底部導覽。
 
+### v0.8.0：公司 Google Drive 分月存檔與正式部署準備
+
+- 已新增「管理者 Google Drive 控制試算表」與月份索引。每個月份第一次儲存工作日誌時，自動建立 WorkPulse_YYYY-MM 原生 Google Sheets；跨月報表會由各月份讀取，查詢不存在的月份不會建立空白檔案。
+- 產生**兩套獨立 Apps Script 部署包**：dist-gas/public 為一般使用者入口，**不包含管理員新增／刪除 API**；dist-gas/admin 為私人管理入口，需公司帳號驗證。
+- 私人管理員可從 Apps Script 編輯器執行 workPulseInitialize 初始化 WorkPulse 資料夾與控制試算表。既有單一 v4 工作簿必須先完整備份，再透過 workPulseMigrateLegacy 遷移；資料不會自動清空。
+- **尚未於 hello.murui.lab@xicloudpay.com.tw 真正建立或部署**。目前連接的 Google Drive 是其他帳號，不能把個人 Drive 當作公司資料庫。公司帳號登入、授權與真實端對端測試仍是正式啟用的必要條件。
+- 實際部署步驟、兩個專案的檔案清單、Script Properties、備份與正式驗收詳見 [docs/DEPLOYMENT_V080.md](docs/DEPLOYMENT_V080.md)。
+
 ### v0.7.0：簡化工作日誌與管理員功能
 
 - 移除主管角色、送審及退回流程。一般員工選姓名填寫；管理員可新增、修改、停用使用者，並在確認視窗中刪除日誌。
 - 管理員權限必須由 Google Script 後端驗證指定擁有者帳號；若部署環境無法辨識，就拒絕管理請求。
-- v0.7.0 **仍使用原來單一 v4 Google Sheets**。下一批 v0.8.0 才會建立每月一份原生 Google 試算表。公司 Google Drive 尚未連接或建立，不能把本機 GitHub Pages 當成已同步。
+- v0.7.0 歷史版本仍使用單一 v4 Google Sheets；從 v0.8.0 起改為控制表與月份個別檔案。公司 Google Drive 尚未連接或建立，不能把本機 GitHub Pages 當成已同步。
 - 目前沒有驗證公司真實 Google Workspace；清楚的部署與安全限制見 [`docs/SIMPLIFIED_WORKFLOW.md`](docs/SIMPLIFIED_WORKFLOW.md)。
 
 ### v0.6.0（已停用的歷史功能）：可選式主管審核
@@ -78,6 +86,6 @@ npm run gas:build # 輸出 dist-gas/（Apps Script 公司雲端版）
 
 前端維持原生 HTML、CSS 與 JavaScript ES modules，無外部 runtime 依賴。GitHub Pages 使用模組檔案；Apps Script 則由離線建置腳本將相同前端整合成 HTMLService 的 `Index.html`，確保視覺與工作流程一致。
 
-既有員工／部門／專案權限與統計匯出仍適用，**仍須由公司管理員實際部署與驗收後才能多人使用**。v0.6.0 仍相容舊 Sheets schema v4，但公司部署時改為加入 Simple.gs，不再部署 Review.gs；既有 v3 資料先備份再升級。後續可評估通知、集中跨月待辦、大量資料效能與正式部署備份策略。
+目前實際使用的是簡化的姓名填寫模式，不再提供主管審核。正式雲端部署採雙 Apps Script 專案，並由公司管理者帳號擁有資料。完整部署、安全與遷移方式以 v0.8.0 的 DEPLOYMENT_V080.md 為準；舊版角色／審核章節僅供歷史參考。
 
 開發交接請閱讀 [`docs/PROJECT_HANDOFF.md`](docs/PROJECT_HANDOFF.md)。
