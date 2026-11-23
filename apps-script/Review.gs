@@ -104,7 +104,7 @@ function wpReviewQueue(month) {
   var records=wpMonthRecords_(ctx,m).filter(function(j){
     return j.employeeId!==ctx.actor.employeeId&&j.review.status==='submitted';
   });
-  return {month:m,enabled:config.enabled,records:records,count:records.length};
+  return {month:m,enabled:config.enabled,records:records.map(function(j){var person=ctx.visible.find(function(e){return e.employeeId===j.employeeId;});return Object.assign({},j,{employeeName:person?wpPlainText_(person.name):j.employeeId});}),count:records.length};
 }
 function wpReviewHistory(journalId) {
   var ctx=wpContext_();
