@@ -128,7 +128,7 @@ function wpSaveJournal(payload) {
     SpreadsheetApp.flush();
     return {ok:true,deduplicated:false,requestId:input.requestId,journal:{
       id:journalId,date:input.date,employeeId:input.employeeId,revision:next,updatedAt:now,
-      note:input.note,tomorrow:input.tomorrow,tasks:input.tasks
+      note:input.note,tomorrow:input.tomorrow,tasks:input.tasks,review:wpReviewPublic_(wpReviewMap_(book)[journalId])
     }};
   } finally {lock.releaseLock();}
 }
