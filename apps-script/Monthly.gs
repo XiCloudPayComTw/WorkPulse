@@ -219,6 +219,13 @@ function wpPrivateMigrateLegacyMonthly_(){
       return {ok:true,alreadyMigrated:true};
     wpMonthFolder_();
     var journals=wpRows_(wpSheet_(control,'Journals'));
+    var backupJournals=wpRows_(wpSheet_(backup,'Journals'));
+    var backupById={};backupJournals.forEach(function(r){backupById[String(r.journalId)]=r;});
+    if(backupJournals.length!==journals.length || journals.some(function(r){
+      var saved=backupById[String(r.journalId)];
+      return !saved || String(saved.date)!==String(r.date) ||
+        Number(saved.revision)!==Number(r.revision);
+    }))throw Error('備份與目前控制表工作日誌不一致，已停止遷移');
     var tasks=wpRows_(wpSheet_(control,'Tasks'));
     var requests=wpRows_(wpSheet_(control,'Requests'));
     var audit=wpRows_(wpSheet_(control,'Audit'));
