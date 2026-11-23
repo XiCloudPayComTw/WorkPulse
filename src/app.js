@@ -7,6 +7,7 @@ import { buildReport, reportCsv, reportSheets } from './reports.js';
 import { buildXlsx } from './xlsx.js';
 import { renderReportWorkspace } from './report-ui.js';
 import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemplate, removeTemplate, newTaskFromTemplate, recentPriorJournal } from './quick-entry.js';
+import { reviewState, REVIEW_NAMES, reviewBadge, loadReviewQueue, renderReviewWorkspace, setReviewReason, decideReview } from './review-ui.js';
 
 const root = document.querySelector('#app');
 const NAV = [
@@ -14,6 +15,7 @@ const NAV = [
   {id:'entry',label:'填寫日誌',symbol:'pen'},
   {id:'history',label:'歷史紀錄',symbol:'calendar'},
   {id:'insights',label:'統計分析',symbol:'chart'},
+  {id:'reviews',label:'主管審核',symbol:'checkCircle'},
   {id:'settings',label:'系統設定',symbol:'settings'},
   {id:'team',label:'團隊管理',symbol:'users'}
 ];
@@ -23,7 +25,7 @@ const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
   filters:{query:'',employee:'all',status:'all'},
   expanded:new Set([today,shiftDate(today,-1)]),draft:null,dirty:false,draftRestored:false,draftStatus:'未有暫存草稿',templates:[],
-  toast:null,cloud:{phase:isCloud?'loading':'local',user:null,error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
+  toast:null,cloud:{phase:isCloud?'loading':'local',user:null,review:{enabled:false,revision:1},error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
   report:{filters:{startDate:today.slice(0,7)+'-01',endDate:today,employeeId:'all',departmentId:'all',project:'all',category:'all',status:'all'},phase:'idle',error:'',payload:null,applied:null,token:0}
 };
 state.draft = makeDraft(today, state.store.employees[0]?.id);
@@ -62,7 +64,7 @@ function appendReusableTasks(rows){
 }
 if(!isCloud)restoreQuickDraft();
 function fromHash(){const key = location.hash.replace(/^#\/?/,'');return NAV.some(n=>n.id===key)?key:'overview';}
-function visibleNav(){return NAV.filter(n=>n.id!=='team'||(isCloud&&state.cloud.user?.role==='admin'));}
+function visibleNav(){return NAV.filter(n=>(n.id!=='team'||(isCloud&&state.cloud.user?.role==='admin')) && (n.id!=='reviews'||(isCloud&&['manager','admin'].includes(state.cloud.user?.role))));}
 function makeItem(source={}) {return {id:source.id||uid(),project:source.project||'',category:source.category||'前端開發',title:source.title||'',description:source.description||'',result:source.result||'',status:source.status||'doing',hours:source.hours??0};}
 function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord=null) {
   const record = fromRecord ?? (state.store.mode==='demo'?null:journalFor(state.store,date,employeeId));
@@ -72,14 +74,14 @@ function canEditJournal(employeeId){return !isCloud || Boolean(state.cloud.user?
 function employeeName(id){return state.store.employees.find(e=>e.id===id)?.name || '未指定人員';}
 function navButton(n, mobile=false){return `<button type="button" class="nav-link ${state.view===n.id?'active':''}" data-action="navigate" data-view="${n.id}" aria-current="${state.view===n.id?'page':'false'}">${icon(n.symbol,mobile?18:19)}<span>${n.label}</span></button>`;}
 function renderShell(){
- const head = {overview:['工作總覽','掌握每一天的工作節奏'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','資料管理與雲端狀態'],team:['團隊管理','維護員工、部門和專案權限']}[state.view];
+ const head = {overview:['工作總覽','掌握每一天的工作節奏'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','資料管理與雲端狀態'],reviews:['主管審核','檢視待審核日誌與處理退回意見'],team:['團隊管理','維護員工、部門和專案權限']}[state.view];
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'由公司 Google 帳號驗證身分，工作紀錄儲存在受控試算表。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.5.0</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'由公司 Google 帳號驗證身分，工作紀錄儲存在受控試算表。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.6.0</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button><span class="avatar" title="${esc(isCloud?(state.cloud.user?.email||'Google 帳號驗證中'):'展示模式，尚無登入機制')}">${esc(isCloud?(state.cloud.user?.name||'雲').slice(0,1):'示')}</span></div></header>
-   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.5.0</footer></main>
+   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.6.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${visibleNav().length}" aria-label="手機導覽">${visibleNav().map(n=>navButton(n,true)).join('')}</nav>
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
@@ -89,7 +91,7 @@ function renderShell(){
 function renderCloudWaiting(){return `<section class="soft-card card-pad-lg sync-stage" role="status" aria-live="polite"><span class="sync-dot loading"></span><h2>正在確認公司帳號與工作資料</h2><p>僅在 Google Workspace 驗證通過後載入雲端紀錄。</p></section>`;}
 function renderCloudError(){return `<section class="soft-card card-pad-lg sync-stage" role="alert"><span class="sync-dot failed"></span><h2>無法連接雲端工作日誌</h2><p>${esc(state.cloud.error)}</p><button class="soft-button" data-action="retry-cloud">${icon('arrowRight',16)} 重新驗證與載入</button><p class="xs muted">存取失敗時不會自動切換為本機資料，避免誤以為已同步。</p></section>`;}
 function syncBanner(){if(!isCloud)return '';const status=state.cloud.saving?'saving':state.cloud.loadingMonth?'saving':state.cloud.phase==='ready'?'ready':'error';const label=status==='ready'?'Google Sheets 已連線':status==='saving'?'正在與 Google Sheets 同步':'同步失敗';return `<div class="sync-banner ${status}" role="status"><span class="sync-dot ${status}"></span><span>${label}</span><span class="xs muted">${esc(state.cloud.user?.email||'')}</span><button class="soft-button ghost mini" data-action="refresh-cloud" ${status==='saving'?'disabled':''}>重新整理</button></div>`;}
-function renderPage(){switch(state.view){case 'entry':return renderEntry();case 'history':return renderHistory();case 'insights':return renderInsights();case 'settings':return renderSettings();case 'team':return `${syncBanner()}${renderTeam(state.cloud.user)}`;default:return renderOverview();}}
+function renderPage(){switch(state.view){case 'entry':return renderEntry();case 'history':return renderHistory();case 'insights':return renderInsights();case 'settings':return renderSettings();case 'reviews':return `${syncBanner()}${renderReviewWorkspace(state.cloud.user)}`;case 'team':return `${syncBanner()}${renderTeam(state.cloud.user)}`;default:return renderOverview();}}
 function summaryTiles(stats){
  return `<div class="stats-grid section-space flash-delay">
  ${[
@@ -263,7 +265,7 @@ function renderSettings(){
 }
 function empty(symbol,title,body,button,action){return `<div class="empty"><div class="empty-orb">${icon(symbol,28)}</div><h3>${title}</h3><p>${body}</p><button class="soft-button sm" data-action="${action}">${icon('plus',15)} ${button}</button></div>`;}
 function render(){renderShell();}
-function changeView(view){if(!visibleNav().some(n=>n.id===view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
+function changeView(view){if(!visibleNav().some(n=>n.id===view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='reviews'&&isCloud&&state.cloud.phase==='ready'){loadReviewQueue(state.month).then(render);}if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;const promise=loadAdmin();render();await promise;render();}
 function notify(text,error=false){state.toast={text,error};showToast(text,error);}
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
@@ -281,10 +283,11 @@ async function initCloud(){
   const payload=await cloudCall('wpBootstrap',state.month);
   if(!payload?.store || !payload?.user)throw Error('雲端回應格式不完整');
   state.store={...payload.store,mode:'cloud'};
-  state.cloud.user=payload.user;state.cloud.phase='ready';
+  state.cloud.user=payload.user;state.cloud.review=payload.review||{enabled:false,revision:1};state.cloud.phase='ready';
   state.draft=makeDraft(today,payload.user.id);
-  state.dirty=false;restoreQuickDraft();if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
+  state.dirty=false;restoreQuickDraft();if((state.view==='team' && payload.user.role!=='admin') || (state.view==='reviews'&&!['manager','admin'].includes(payload.user.role)))state.view='overview';render();
   if(state.view==='team'&&payload.user.role==='admin')refreshTeam();
+  if(state.view==='reviews')loadReviewQueue(state.month).then(render);
   if(state.view==='insights'&&state.report.phase==='idle')loadCloudReport();
  }catch(e){state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';render();}
 }
@@ -295,7 +298,7 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  try{
   const result=await cloudCall('wpLoadMonth',month);
   if(token!==state.cloud.monthToken)return;
-  state.store={...state.store,journals:result.journals};state.month=month;
+  state.store={...state.store,journals:result.journals};state.month=month;state.cloud.review=result.review||state.cloud.review;
   if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.cloud.user?.id);state.dirty=false;}
  }catch(e){notify('雲端讀取失敗：'+(e.message||'未知錯誤'),true);}
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
@@ -462,7 +465,7 @@ root.addEventListener('change',async event=>{
    if(saveStore(payload)){state.draft=makeDraft();state.dirty=false;state.filters={query:'',employee:'all',status:'all'};render();notify('備份資料匯入成功');}
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
-window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
+window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='reviews'&&isCloud&&state.cloud.phase==='ready')loadReviewQueue(state.month).then(render);if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
 window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();
