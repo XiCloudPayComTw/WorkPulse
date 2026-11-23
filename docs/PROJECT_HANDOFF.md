@@ -129,3 +129,14 @@
 - 由既有 v3 資料升級**必須先備份**、管理員從 Apps Script 編輯器手動執行 `upgradeWorkPulseV4_()`；v2 應先經 v3。新公司可用 v4 初始化。流程見 [REVIEWS.md](REVIEWS.md)。
 - GitHub Pages 不具公司身分與後端寫入，**沒有真實主管審核能力**；Google Workspace 真實授權、多人端對端與資料備份仍未正式驗收。
 - 完成後以 `npm run verify`（54 項）與 GitHub Actions 做完整驗證；真實 Workspace／Sheets 仍需部署後獨立測試。
+
+## v0.7.0 — 簡化姓名填寫／管理員維護（PR #7）
+
+- 使用者明確取消主管與審核工作流。一般人員僅需姓名下拉選擇、填寫與調閱；管理員可新增／停用使用者並刪除工作日誌。
+- 基於 v0.6.0 PR #6 已 Merge 的 `main` commit `6e9fd8998f1aeb8881a1a1cc7d069826152a3e2b`，獨立分支 `feat/workpulse-v0.7.0-simplify`，**等使用者 Merge 後再進下一批**。
+- `apps-script/Simple.gs`：共享姓名 public API（讀寫、月份讀取、報表）、Google Session owner-only API（員工名單、新增／停用、刪除日誌）。公開 API 的選姓名不是身分驗證；資料一律透過 Apps Script 後端驗證格式與版本。
+- 刪除採 Audit `journal.deleted` 事件的邏輯刪除，可稽核且普通查詢與報表不再回傳已刪除紀錄；前端按鈕另有確認視窗與輸入「刪除」驗證，後端仍獨立進行管理者驗證。
+- `src/admin.js`：簡化為管理員名稱與狀態維護；`src/app.js` 移除主管導航、審核操作及歷程、使用新的 `wpShared*` API。現在 GitHub Pages 仍本機展示模式。
+- 管理者 Google 帳號為 `hello.murui.lab@xicloudpay.com.tw`；目前連接 Google Drive 的帳號不同，**不得把資料建在私人 Google Drive 或聲稱已建立公司試算表**。
+- 此批仍沿用 v4 單一 Google Sheets 工作簿，尚未實作月份自動分檔（預計 v0.8.0）、正式管理員身分與雲端端對端驗證（v0.9.0）、整體上線效能與備份（v1.0.0）。
+- 詳細規劃、部署注意與公司身分安全條件見 [SIMPLIFIED_WORKFLOW.md](SIMPLIFIED_WORKFLOW.md)。

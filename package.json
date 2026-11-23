@@ -1,13 +1,13 @@
 {
   "name": "workpulse",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "Lightweight work journal with a calm neumorphic interface",
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
-    "check": "node --check src/app.js && node --check src/review-ui.js && node --check src/quick-entry.js && node --check src/admin.js && node --check src/reports.js && node --check src/report-ui.js && node --check src/xlsx.js && node --check src/cloud.js && node --check src/data.js && node --check src/icons.js && node --check src/utils.js && node --check scripts/build-gas.mjs && node --check tests/apps-script.test.mjs && node --check tests/report.test.mjs && node --check tests/review-ui.test.mjs",
+    "check": "node --check src/app.js && node --check src/quick-entry.js && node --check src/admin.js && node --check src/reports.js && node --check src/report-ui.js && node --check src/xlsx.js && node --check src/cloud.js && node --check src/data.js && node --check src/icons.js && node --check src/utils.js && node --check scripts/build-gas.mjs && node --check tests/apps-script.test.mjs && node --check tests/report.test.mjs && node --check tests/apps-script.test.mjs",
     "test": "node --test tests/*.test.mjs",
     "verify": "npm run check && npm run test && npm run build && npm run gas:build",
     "gas:build": "node scripts/build-gas.mjs"

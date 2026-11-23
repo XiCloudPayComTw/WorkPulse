@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const backend=readFileSync(new URL('../apps-script/Code.gs',import.meta.url),'utf8');
 const reviewBackend=readFileSync(new URL('../apps-script/Review.gs',import.meta.url),'utf8');
+const simpleBackend=readFileSync(new URL('../apps-script/Simple.gs',import.meta.url),'utf8');
 
 function harness(){
  let email='admin@example.com', seq=1, locked=false;
@@ -35,7 +36,7 @@ function harness(){
   Utilities:{getUuid:()=>`uuid-${seq++}`},
   console
  };
- vm.createContext(scope);vm.runInContext(backend+'\n'+reviewBackend,scope,{filename:'WorkPulse.gs'});
+ vm.createContext(scope);vm.runInContext(backend+'\n'+reviewBackend+'\n'+simpleBackend,scope,{filename:'WorkPulse.gs'});
  const as=user=>{email=user;};
  const addEmployee=(id,mail,role='staff',dept='team-a',active=true)=>sheets.get('Employees').appendRow([id,mail,mail.split('@')[0],role,dept,active,1,'2026-11-22T00:00:00Z','admin@example.com']);
  const addProject=name=>sheets.get('Projects').appendRow([`p-${seq++}`,name,true,1,'2026-11-22T00:00:00Z','admin@example.com']);
@@ -358,4 +359,71 @@ test('idempotent review retries still re-check the actor current department',()=
  assert.equal(h.scope.wpReviewDecision(payload).ok,true);
  h.sheets.get('Employees').rows.find(row=>row[0]==='emp-c')[4]='team-b';
  assert.throws(()=>h.scope.wpReviewDecision(payload),/沒有權限/);
+});
+
+const sharedRequest=(h,id='emp-a',version=0,key='shared-write-0000001')=>({...h.submission(id,version,key)});
+test('shared public bootstrap and save work without Google sign-in',()=>{
+ const h=harness();h.as('');
+ const data=h.scope.wpSharedBootstrap('2026-11');
+ assert.equal(data.user.role,'guest');
+ assert.equal(data.store.employees.length,4);
+ assert.ok(!data.store.employees.some(x=>x.id==='admin@example.com'));
+ const saved=h.scope.wpSharedSaveJournal(sharedRequest(h));
+ assert.equal(saved.journal.employeeId,'emp-a');
+ assert.equal(saved.journal.revision,1);
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals.length,1);
+});
+test('selected name is not authentication: shared visitors can choose any active employee',()=>{
+ const h=harness();h.as('unregistered@other.com');
+ const result=h.scope.wpSharedSaveJournal(sharedRequest(h,'emp-b',0,'shared-b-0000000001'));
+ assert.equal(result.journal.employeeId,'emp-b');
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals.length,1);
+});
+test('shared journals reject unknown staff, invalid work fields, duplicates and conflicts',()=>{
+ const h=harness();h.as('');
+ assert.throws(()=>h.scope.wpSharedSaveJournal(sharedRequest(h,'missing',0,'shared-invalid-00001')),/有效的使用者/);
+ const first=h.scope.wpSharedSaveJournal(sharedRequest(h));
+ assert.equal(h.scope.wpSharedSaveJournal(sharedRequest(h)).deduplicated,true);
+ assert.equal(h.sheets.get('Journals').rows.length,2);
+ assert.throws(()=>h.scope.wpSharedSaveJournal(sharedRequest(h,'emp-a',0,'shared-stale-000001')),/CONFLICT/);
+ assert.throws(()=>h.scope.wpSharedSaveJournal({...sharedRequest(h,'emp-a',1,'shared-badhours-001'),tasks:[{...h.submission().tasks[0],hours:26}]}),/工時/);
+});
+test('only verified Google Drive owner can manage user directory',()=>{
+ const h=harness();h.as('');
+ assert.throws(()=>h.scope.wpOwnerBootstrap(),/管理員驗證/);
+ assert.throws(()=>h.scope.wpOwnerSaveEmployee({name:'新同事',active:true,expectedRevision:0,requestId:'owner-add-000000001'}),/管理員驗證/);
+ h.as('admin@example.com');
+ const saved=h.scope.wpOwnerSaveEmployee({name:'新同事',active:true,expectedRevision:0,requestId:'owner-add-000000001'});
+ assert.equal(saved.ok,true);
+ assert.ok(saved.employees.find(x=>x.name==='新同事'));
+ assert.equal(h.scope.wpSharedBootstrap('2026-11').store.employees.length,5);
+ assert.throws(()=>h.scope.wpOwnerSaveEmployee({name:'新同事',active:true,expectedRevision:0,requestId:'owner-dup-000000001'}),/姓名重複/);
+});
+test('admin deletion hides a journal, preserves audit trail and is idempotent',()=>{
+ const h=harness();h.as('');
+ const original=h.scope.wpSharedSaveJournal(sharedRequest(h)).journal;
+ assert.throws(()=>h.scope.wpOwnerDeleteJournal({journalId:original.id,expectedRevision:1,requestId:'owner-delete-0000001'}),/管理員驗證/);
+ h.as('admin@example.com');
+ assert.throws(()=>h.scope.wpOwnerDeleteJournal({journalId:original.id,expectedRevision:0,requestId:'owner-delete-invalid1'}),/版本無效|CONFLICT/);
+ const request={journalId:original.id,expectedRevision:1,requestId:'owner-delete-0000001'};
+ const result=h.scope.wpOwnerDeleteJournal(request);
+ assert.equal(result.ok,true);
+ assert.equal(h.scope.wpOwnerDeleteJournal(request).deduplicated,true);
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals.length,0);
+ assert.equal(h.sheets.get('Journals').rows.length,2);
+ assert.equal(h.sheets.get('Audit').rows.filter(x=>x[3]==='journal.deleted').length,1);
+ h.as('');
+ const fresh=h.scope.wpSharedSaveJournal(sharedRequest(h,'emp-a',0,'shared-after-delete-1'));
+ assert.notEqual(fresh.journal.id,original.id);
+});
+test('shared report follows employee filter and omits deleted journals',()=>{
+ const h=harness();h.as('');
+ const a=h.scope.wpSharedSaveJournal(sharedRequest(h)).journal;
+ h.scope.wpSharedSaveJournal(sharedRequest(h,'emp-b',0,'shared-report-b-00001'));
+ const params={startDate:'2026-11-01',endDate:'2026-11-30',employeeId:'all',project:'all',category:'all',status:'all'};
+ assert.equal(h.scope.wpSharedQueryReport(params).journals.length,2);
+ assert.equal(h.scope.wpSharedQueryReport({...params,employeeId:'emp-b'}).journals.length,1);
+ h.as('admin@example.com');
+ h.scope.wpOwnerDeleteJournal({journalId:a.id,expectedRevision:1,requestId:'report-delete-000001'});
+ assert.equal(h.scope.wpSharedQueryReport(params).journals.length,1);
 });
