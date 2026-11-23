@@ -1,4 +1,4 @@
-import {readFile,mkdir,writeFile} from 'node:fs/promises';
+import {readFile,mkdir,writeFile,rm} from 'node:fs/promises';
 // WorkPulse v0.8: produce physically separate public and administrator Apps Script projects.
 // The public deployment MUST NOT include Owner.gs or the old Code.gs / Review.gs.
 const ordered=['src/utils.js','src/data.js','src/icons.js','src/cloud.js','src/admin.js',
@@ -21,6 +21,8 @@ const simple=await readFile('apps-script/Simple.gs','utf8');
 const owner=await readFile('apps-script/Owner.gs','utf8');
 if(/function\s+wpOwner(?:Bootstrap|SaveEmployee|DeleteJournal)\s*\(/.test(core+'\n'+monthly+'\n'+simple))
  throw Error('Owner API accidentally included in public backend');
+// Always remove old build outputs, preventing stale privileged files in a public bundle.
+await rm('dist-gas',{recursive:true,force:true});
 for(const [portal,isOwner] of [['public',false],['admin',true]]){
  const directory='dist-gas/'+portal;
  await mkdir(directory,{recursive:true});
