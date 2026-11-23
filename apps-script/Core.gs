@@ -12,6 +12,7 @@ var WP_HEADERS={
   Tasks:['taskId','journalId','revision','position','project','category','title','description','result','status','hours'],
   Requests:['requestId','actorEmail','journalId','revision','createdAt'],
   Audit:['auditId','occurredAt','actorEmail','action','journalId','revision','requestId'],
+  Reviews:['reviewId','journalId','journalRevision','status','actorEmail','comment','requestId','createdAt'],
   Meta:['key','value'],
   MonthIndex:['month','spreadsheetId','createdAt']
 };
