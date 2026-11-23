@@ -19,6 +19,7 @@ const NAV = [
 ];
 const today = localISODate();
 const isCloud = cloudEnabled();
+const isOwnerPortal = isCloud && typeof window!=='undefined' && window.WORKPULSE_ADMIN_PORTAL===true;
 const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
   filters:{query:'',employee:'all',status:'all'},
@@ -76,10 +77,10 @@ function renderShell(){
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.7.0</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.8.0</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button><span class="avatar" title="${esc(isCloud?(state.cloud.user?.email||'Google 帳號驗證中'):'展示模式，尚無登入機制')}">${esc(isCloud?(state.cloud.user?.name||'雲').slice(0,1):'示')}</span></div></header>
-   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.7.0</footer></main>
+   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.8.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${visibleNav().length}" aria-label="手機導覽">${visibleNav().map(n=>navButton(n,true)).join('')}</nav>
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
@@ -279,6 +280,11 @@ async function initCloud(){
   const payload=await cloudCall('wpSharedBootstrap',state.month);
   if(!payload?.store || !payload?.user)throw Error('雲端回應格式不完整');
   state.store={...payload.store,mode:'cloud'};
+  if(isOwnerPortal){
+    const owner=await cloudCall('wpOwnerBootstrap');
+    if(!owner || !Array.isArray(owner.employees))throw Error('管理員身分未通過驗證');
+    payload.user={...payload.user,role:'admin',name:'管理員'};
+  }
   state.cloud.user=payload.user;state.cloud.phase='ready';
   state.draft=makeDraft(today,payload.store.employees[0]?.id);
   state.dirty=false;restoreQuickDraft();if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
@@ -294,7 +300,7 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
   const result=await cloudCall('wpSharedLoadMonth',month);
   if(token!==state.cloud.monthToken)return;
   state.store={...state.store,journals:result.journals};state.month=month;
-  if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.cloud.user?.id);state.dirty=false;}
+  if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.draft?.employeeId||state.store.employees[0]?.id);state.dirty=false;}
  }catch(e){notify('雲端讀取失敗：'+(e.message||'未知錯誤'),true);}
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
 }
@@ -352,7 +358,7 @@ root.addEventListener('click', event=>{
    if(!confirm(`確定刪除「${name}」在 ${j.date} 的整日工作日誌（${j.tasks.length} 項）？刪除後一般使用者將無法查閱。`))return;
    if(prompt('為避免誤刪，請輸入「刪除」確認：')!=='刪除')return;
    state.cloud.saving=true;render();
-   cloudCall('wpOwnerDeleteJournal',{journalId:j.id,expectedRevision:j.revision,requestId:uid()})
+   cloudCall('wpOwnerDeleteJournal',{journalId:j.id,date:j.date,expectedRevision:j.revision,requestId:uid()})
     .then(result=>{
       if(!result?.ok)throw Error('刪除結果未確認');
       state.store={...state.store,journals:state.store.journals.filter(x=>x.id!==j.id)};
