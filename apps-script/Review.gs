@@ -64,9 +64,9 @@ function wpReviewSubmit(payload) {
   try {
     var ctx=wpContext_();
     if(!wpReviewConfig_(ctx.book).enabled)throw Error('公司尚未啟用主管審核');
-    var duplicate=wpReviewDuplicate_(ctx,input,'submitted');if(duplicate)return duplicate;
     var target=wpReviewTarget_(ctx,input.journalId),j=target.journal;
     if(ctx.actor.employeeId!==j.employeeId||!target.target.active)throw Error('只有日誌本人能提交審核');
+    var duplicate=wpReviewDuplicate_(ctx,input,'submitted');if(duplicate)return duplicate;
     if(Number(j.revision)!==input.expectedRevision)throw Error('CONFLICT:日誌版本已更新，請重新載入');
     var last=wpReviewStatus_(ctx.book,j.journalId);
     if(['submitted','approved'].indexOf(last)>=0)throw Error('日誌已送審或通過，不能重複提交');
@@ -85,10 +85,10 @@ function wpReviewDecision(payload) {
   try {
     var ctx=wpContext_();
     if(!wpReviewConfig_(ctx.book).enabled)throw Error('公司尚未啟用主管審核');
-    var duplicate=wpReviewDuplicate_(ctx,input,decision);if(duplicate)return duplicate;
     var target=wpReviewTarget_(ctx,input.journalId),j=target.journal;
     if(['manager','admin'].indexOf(ctx.actor.role)<0 || j.employeeId===ctx.actor.employeeId ||
        !target.target.active)throw Error('無權審核自己或其他未授權員工的日誌');
+    var duplicate=wpReviewDuplicate_(ctx,input,decision);if(duplicate)return duplicate;
     if(Number(j.revision)!==input.expectedRevision)throw Error('CONFLICT:日誌版本已變更，請重新整理');
     var last=wpReviewMap_(ctx.book)[j.journalId];
     if(!last||last.status!=='submitted'||Number(last.journalRevision)!==Number(j.revision))
