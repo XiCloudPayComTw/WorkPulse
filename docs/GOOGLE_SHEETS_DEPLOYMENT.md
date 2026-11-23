@@ -1,3 +1,7 @@
+# v0.8.0 部署規範已更新
+
+目前正式架構改為控制工作簿＋每月獨立 Google Sheets，且公開／管理員使用不同 Apps Script 專案。**請以 [DEPLOYMENT_V080.md](DEPLOYMENT_V080.md) 為準**，本文以下是舊版本參考，不能照舊流程公開 Code.gs 或 Review.gs。公司 Google Drive 尚未授權／建立正式檔案。
+
 # v0.7.0 更新：姓名選擇與管理員模式
 
 目前的正式設計已移除主管審核。**請以 [SIMPLIFIED_WORKFLOW.md](SIMPLIFIED_WORKFLOW.md) 為準**。新發布包為 `Code.gs` + `Simple.gs` + `Index.html` + `appsscript.json`，不再發布 `Review.gs`，仍暫用 schema v4 單一工作簿；舊版 v0.6.0 的審核部署步驟已作廢。下一批才會分月建檔。

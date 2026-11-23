@@ -3,17 +3,7 @@
  * All ordinary visitors can read/edit records by selecting a name.
  * Never infer administrator rights from the selected name or browser state.
  */
-function wsBook_(){
-  var cfg=wpConfig_(),book=SpreadsheetApp.openById(cfg.sheetId);
-  if(!wpRows_(wpSheet_(book,'Meta')).some(function(r){return r.key==='schemaVersion'&&String(r.value)==='4';}))
-    throw Error('Google Sheets 結構需要 v4，請先備份並完成初始化／遷移');
-  return book;
-}
-function wsOwner_(){
-  var email=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
-  return !!email&&email===wpConfig_().adminEmail;
-}
-function wsRequireOwner_(){if(!wsOwner_())throw Error('管理員驗證失敗：只能以設定的 Google 管理帳號執行。');}
+function wsBook_(){return wpController_();}
 function wsPeople_(book,includeInactive){
   return wpRows_(wpSheet_(book,'Employees')).filter(function(r){
     return String(r.role)!=='admin'&&(includeInactive||wpActive_(r.active));
@@ -35,8 +25,10 @@ function wsRecord_(j,tasks){
         category:String(t.category),title:wpPlainText_(t.title),description:wpPlainText_(t.description),
         result:wpPlainText_(t.result),status:String(t.status),hours:Number(t.hours)||0};})};
 }
-function wsMonth_(book,month){
-  var m=wpMonth_(month),deleted=wsDeleted_(book);
+function wsMonth_(control,month){
+  var m=wpMonth_(month),book=wpMonthFile_(control,m,false);
+  if(!book)return [];
+  var deleted=wsDeleted_(book);
   var rows=wpRows_(wpSheet_(book,'Journals')).filter(function(j){
     return String(j.date).slice(0,7)===m&&!deleted[String(j.journalId)];
   });
@@ -50,7 +42,7 @@ function wpSharedBootstrap(month){
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
       .map(function(p){return wpPlainText_(p.name);}),journals:wsMonth_(book,m)},
-    user:{id:'guest',name:'共用填寫',role:wsOwner_()?'admin':'guest',email:'',
+    user:{id:'guest',name:'共用填寫',role:'guest',email:'',
       canWriteIds:people.map(function(p){return p.id;})}};
 }
 function wpSharedLoadMonth(month){var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}
@@ -85,7 +77,8 @@ function wsValidated_(input,book){
 function wpSharedSaveJournal(payload){
   var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
-    var book=wsBook_(),p=wsValidated_(payload,book),deleted=wsDeleted_(book);
+    var control=wsBook_(),p=wsValidated_(payload,control);
+    var book=wpMonthFile_(control,p.date.slice(0,7),true),deleted=wsDeleted_(book);
     var sheet=wpSheet_(book,'Journals'),rows=wpRows_(sheet),allRequests=wpRows_(wpSheet_(book,'Requests'));
     var previous=allRequests.find(function(r){return String(r.requestId)===p.requestId;});
     if(previous){
@@ -126,14 +119,19 @@ function wpSharedQueryReport(criteria){
   if(employeeId!=='all'&&!ids[employeeId])throw Error('找不到選取的使用者');
   if(project.length>100||WP_CATEGORIES.indexOf(category)<0&&category!=='all'
     ||WP_STATUS.indexOf(status)<0&&status!=='all')throw Error('報表篩選格式錯誤');
-  var deleted=wsDeleted_(book),tasks=wpRows_(wpSheet_(book,'Tasks'));
-  var journals=wpRows_(wpSheet_(book,'Journals')).filter(function(j){
-    return String(j.date)>=start&&String(j.date)<=end&&!deleted[String(j.journalId)]&&
-      !!ids[String(j.employeeId)]&&(employeeId==='all'||String(j.employeeId)===employeeId);
+  var journals=[];
+  wpMonthRange_(start,end).forEach(function(month){
+    var monthBook=wpMonthFile_(book,month,false);
+    if(!monthBook)return;
+    var removed=wsDeleted_(monthBook),monthTasks=wpRows_(wpSheet_(monthBook,'Tasks'));
+    wpRows_(wpSheet_(monthBook,'Journals')).forEach(function(j){
+      if(String(j.date)<start||String(j.date)>end||removed[String(j.journalId)]||
+          !ids[String(j.employeeId)]||(employeeId!=='all'&&String(j.employeeId)!==employeeId))return;
+      journals.push(wsRecord_(j,monthTasks));
+    });
   });
   if(journals.length>1500)throw Error('報表資料量超過單次上限');
-  var count=0;journals=journals.map(function(j){
-    var entry=wsRecord_(j,tasks);
+  var count=0;journals=journals.map(function(entry){
     entry.tasks=entry.tasks.filter(function(t){return (project==='all'||t.project===project)&&
       (category==='all'||t.category===category)&&(status==='all'||t.status===status);});
     count+=entry.tasks.length;return entry;
@@ -143,61 +141,4 @@ function wpSharedQueryReport(criteria){
     id:p.id,name:p.name,departmentId:''};}),departments:[],
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
       .map(function(p){return wpPlainText_(p.name);}),journals:journals,generatedAt:new Date().toISOString()};
-}
-function wpOwnerBootstrap(){
-  wsRequireOwner_();return {employees:wsPeople_(wsBook_(),true),owner:wpConfig_().adminEmail};
-}
-function wpOwnerSaveEmployee(payload){
-  wsRequireOwner_();
-  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('使用者資料無效');
-  var name=wpText_(payload.name,80),id=String(payload.id||''),requestId=String(payload.requestId||'');
-  var expected=Number(payload.expectedRevision);
-  if(!name||!/^[a-zA-Z0-9_-]{12,120}$/.test(requestId)
-    ||!Number.isSafeInteger(expected)||expected<0||typeof payload.active!=='boolean'
-    ||id&&!/^[a-zA-Z0-9_-]{1,120}$/.test(id))throw Error('使用者資料或版本無效');
-  var lock=LockService.getScriptLock();lock.waitLock(20000);
-  try{
-    wsRequireOwner_();var book=wsBook_(),sheet=wpSheet_(book,'Employees'),rows=wpRows_(sheet);
-    var old=wpRows_(wpSheet_(book,'Audit')).find(function(r){return r.action==='employee.saved'&&r.requestId===requestId;});
-    if(old)return {ok:true,deduplicated:true,employees:wsPeople_(book,true)};
-    var existing=rows.find(function(r){return String(r.employeeId)===id;});
-    if(id&&!existing)throw Error('使用者不存在');
-    if(existing&&existing.role==='admin')throw Error('不可修改管理員');
-    if(rows.some(function(r){return wpActive_(r.active)&&String(r.role)!=='admin'&&String(r.employeeId)!==id&&
-      wpPlainText_(r.name).trim().toLocaleLowerCase()===wpPlainText_(name).toLocaleLowerCase();}))
-      throw Error('使用者姓名重複');
-    var revision=existing?Number(existing.revision)||0:0;
-    if(revision!==expected)throw Error('CONFLICT:使用者資料已更新');
-    var activeCount=wsPeople_(book,false).length;
-    if(existing&&wpActive_(existing.active)&&!payload.active&&activeCount<=1)
-      throw Error('至少保留一位可填寫的使用者');
-    var nextId=existing?id:Utilities.getUuid(),now=new Date().toISOString();
-    var data=[nextId,existing?existing.email:'',name,'staff','',payload.active,revision+1,now,wpConfig_().adminEmail];
-    if(existing)sheet.getRange(existing.__row,1,1,data.length).setValues([data]);else sheet.appendRow(data);
-    wpSheet_(book,'Audit').appendRow([Utilities.getUuid(),now,wpConfig_().adminEmail,
-      'employee.saved','employee:'+nextId,revision+1,requestId]);
-    SpreadsheetApp.flush();
-    return {ok:true,deduplicated:false,employees:wsPeople_(book,true)};
-  }finally{lock.releaseLock();}
-}
-function wpOwnerDeleteJournal(payload){
-  wsRequireOwner_();
-  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('刪除資料無效');
-  var id=String(payload.journalId||''),requestId=String(payload.requestId||''),revision=Number(payload.expectedRevision);
-  if(!/^[a-zA-Z0-9_-]{1,120}$/.test(id)||!/^[a-zA-Z0-9_-]{12,120}$/.test(requestId)
-    ||!Number.isSafeInteger(revision)||revision<1)throw Error('刪除請求或版本無效');
-  var lock=LockService.getScriptLock();lock.waitLock(20000);
-  try{
-    wsRequireOwner_();var book=wsBook_(),audit=wpRows_(wpSheet_(book,'Audit'));
-    var prior=audit.find(function(r){return r.action==='journal.deleted'&&r.requestId===requestId;});
-    if(prior){if(String(prior.journalId)!==id)throw Error('請求識別碼重複使用');
-      return {ok:true,deduplicated:true,journalId:id};}
-    if(wsDeleted_(book)[id])throw Error('此紀錄已刪除');
-    var journal=wpRows_(wpSheet_(book,'Journals')).find(function(r){return String(r.journalId)===id;});
-    if(!journal)throw Error('找不到工作日誌');
-    if(Number(journal.revision)!==revision)throw Error('CONFLICT:內容已被修改，請重新整理');
-    wpSheet_(book,'Audit').appendRow([Utilities.getUuid(),new Date().toISOString(),
-      wpConfig_().adminEmail,'journal.deleted',id,revision,requestId]);SpreadsheetApp.flush();
-    return {ok:true,deduplicated:false,journalId:id};
-  }finally{lock.releaseLock();}
 }
