@@ -128,6 +128,39 @@ function wpEnableMonthly_(control){
   else meta.appendRow(['monthlyStorage','enabled']);
   SpreadsheetApp.flush();
 }
+/**
+ * Run from the administrator Apps Script editor, under the intended Google account.
+ * Creates the control spreadsheet and WorkPulse folder on the first run.
+ * Safe to run again: an already configured control spreadsheet is reused.
+ */
+function wpPrivateCreateWorkspace_(){
+  var properties=PropertiesService.getScriptProperties();
+  var email=String(properties.getProperty('WORKPULSE_ADMIN_EMAIL')||'').trim().toLowerCase();
+  var domain=String(properties.getProperty('WORKPULSE_ALLOWED_DOMAIN')||'').trim().toLowerCase().replace(/^@/,'');
+  var active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
+  var effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
+  if(!email||!domain||!email.endsWith('@'+domain)||active!==email||effective!==email)
+    throw Error('請先設定管理員與網域，並使用該公司 Google 帳號執行初始化');
+  var folderId=String(properties.getProperty('WORKPULSE_FOLDER_ID')||'');
+  if(!folderId){
+    var folder=DriveApp.createFolder('WorkPulse');
+    if(String(folder.getOwner().getEmail()||'').toLowerCase()!==email)
+      throw Error('建立的雲端資料夾不屬於管理者');
+    folderId=folder.getId();
+    properties.setProperty('WORKPULSE_FOLDER_ID',folderId);
+  }
+  var controlId=String(properties.getProperty('WORKPULSE_SHEET_ID')||'');
+  if(!controlId){
+    var book=SpreadsheetApp.create('WorkPulse_Control');
+    var file=DriveApp.getFileById(book.getId());
+    if(String(file.getOwner().getEmail()||'').toLowerCase()!==email)
+      throw Error('建立的控制試算表不屬於管理者');
+    file.moveTo(DriveApp.getFolderById(folderId));
+    controlId=book.getId();
+    properties.setProperty('WORKPULSE_SHEET_ID',controlId);
+  }
+  return wpPrivateSetupMonthly_();
+}
 function wpPrivateSetupMonthly_(){
   var cfg=wpOwnerAssert_(),lock=LockService.getScriptLock();lock.waitLock(30000);
   try{
