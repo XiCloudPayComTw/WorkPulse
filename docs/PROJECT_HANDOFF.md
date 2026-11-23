@@ -140,3 +140,18 @@
 - 管理者 Google 帳號為 `hello.murui.lab@xicloudpay.com.tw`；目前連接 Google Drive 的帳號不同，**不得把資料建在私人 Google Drive 或聲稱已建立公司試算表**。
 - 此批仍沿用 v4 單一 Google Sheets 工作簿，尚未實作月份自動分檔（預計 v0.8.0）、正式管理員身分與雲端端對端驗證（v0.9.0）、整體上線效能與備份（v1.0.0）。
 - 詳細規劃、部署注意與公司身分安全條件見 [SIMPLIFIED_WORKFLOW.md](SIMPLIFIED_WORKFLOW.md)。
+
+
+## v0.8.0 — Google Drive 分月建檔／雙入口正式部署準備（PR #8）
+
+- 核對 PR #7 已 Merge；本批基於 main commit b8426bc744a5db9e4cceb72a0b6cb3d7b9d52eac，使用獨立分支 feat/workpulse-v0.8.0-monthly-deployment，等待使用者 Merge 後才進行下一批。
+- 核心資料：每月第一次儲存會以指定公司的 Google Drive 擁有者身分建立 WorkPulse_YYYY-MM 原生 Google Sheets。WorkPulse_Control 保留 Employees、Projects、MonthIndex 等資訊；各月份含 Journals、Tasks、Requests、Audit、Meta。
+- apps-script/Core.gs：移出舊版 Code.gs 的必要共用函式，只提供查詢與寫入基本功能，沒有舊主管審核與管理員 API。apps-script/Monthly.gs：月檔索引、同月建檔去重、跨月份範圍、所有權檢查與安全遷移。apps-script/Simple.gs：訪客姓名填寫、月檔儲存與查詢、跨月報表。apps-script/Owner.gs：只在私人管理員專案部署的新增／停用使用者與日誌刪除 API。
+- scripts/build-gas.mjs 產生 dist-gas/public 與 dist-gas/admin 兩份各自獨立的 Apps Script 發布包，先刪除舊輸出防止意外公開上一版管理員程式。公開版只包含 Core、Monthly、Simple、Index、manifest；私人版另外包含 Owner。舊 Code.gs/Review.gs 不再部署。
+- src/app.js 新增 private portal 驗證機制；必須先成功從私人端取得 wpOwnerBootstrap 才顯示管理選單。管理員刪除請求指定日誌 ID、日期與版本。
+- Apps Script 私人編輯器可執行 workPulseInitialize：在設定的公司管理者雲端建立資料夾與控制 Google Sheets，使用 WORKPULSE_ADMIN_EMAIL、WORKPULSE_ALLOWED_DOMAIN、WORKPULSE_SHEET_ID、WORKPULSE_FOLDER_ID。已有舊 v4 資料時要求備份，再用 workPulseMigrateLegacy 遷移，不會自動清除。
+- tests/monthly.test.mjs 使用模擬 Google Drive/Sheets 驗證空月份不建檔、兩個月不同檔案、跨月查詢、重複請求、版控、刪除權限、擁有者雙重驗證、備份遷移及初始化。歷史 Code/Review 的測試分離為舊版相容測試。
+- **正式公司 Google Drive 尚未連線**：目前 ChatGPT 的 Google Drive 連線經檔案擁有者驗證是其他 Gmail；本批沒有在 hello.murui.lab@xicloudpay.com.tw 建立任何資料，也未取得 Apps Script 真實 /exec 部署網址。模擬測試與 CI 不代表正式上線。
+- 人員選姓名不是身分驗證；公開網址使用者可能選別人姓名查閱／修改。使用者要求保留這個簡便模式，但應避免放入機密資料或無控制地散佈網址。
+- 詳細操作以 docs/DEPLOYMENT_V080.md 為準：由公司帳號建立私人和公開兩個獨立 Apps Script 專案、同步 Script Properties、只發布不同權限包、實際驗證匿名讀寫和管理員刪除、備份及資料恢復。
+- 下一批優先進行**公司帳號授權後的端對端驗收**、備份、跨專案競態與大量工作日誌性能測試。開發流程依舊：每批測試 → PR → 使用者 Merge。
