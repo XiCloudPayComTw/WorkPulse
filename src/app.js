@@ -354,6 +354,48 @@ root.addEventListener('click', event=>{
    render();return;
  }
  if(state.cloud.phase==='error' || state.cloud.phase==='loading')return;
+ if(action==='review-refresh'){if(!isCloud||reviewState.busy)return;loadReviewQueue(reviewState.month).then(render);render();return;}
+ if(action==='review-toggle'){
+  if(!isCloud||state.cloud.user?.role!=='admin'||state.cloud.saving)return;
+  const enabled=!state.cloud.review?.enabled;
+  if(!confirm(enabled?'確定啟用主管審核？員工儲存後需另行提交。':'確定關閉主管審核？系統將拒絕在仍有待審核項目時關閉。'))return;
+  state.cloud.saving=true;render();
+  cloudCall('wpReviewSetEnabled',{enabled,expectedRevision:state.cloud.review?.revision||1,requestId:uid()})
+   .then(result=>{if(!result?.ok)throw Error('設定未確認');state.cloud.review=result.config;notify(enabled?'已啟用主管審核':'已關閉主管審核');})
+   .catch(e=>notify('審核設定失敗：'+e.message,true)).finally(()=>{state.cloud.saving=false;render();});
+  return;
+ }
+ if(action==='review-submit'){
+  if(!isCloud||state.cloud.saving)return;
+  const j=state.store.journals.find(x=>x.id===button.dataset.id);
+  if(!canSubmitReview(j)){notify('此日誌不能提交審核，請重新整理',true);return;}
+  if(state.view==='entry'&&state.dirty){notify('請先正式儲存修改內容，再提交審核',true);return;}
+  if(!confirm('確定將此日誌提交主管審核？送出後，直到主管退回前都不能修改。'))return;
+  state.cloud.saving=true;render();
+  cloudCall('wpReviewSubmit',{journalId:j.id,expectedRevision:j.revision,requestId:uid()})
+   .then(result=>{if(!result?.ok||!result.journal)throw Error('雲端提交結果未確認');state.store={...state.store,journals:state.store.journals.map(x=>x.id===j.id?result.journal:x)};state.report.phase='idle';state.report.payload=null;notify('日誌已提交主管審核');})
+   .catch(e=>notify('提交失敗：'+e.message,true)).finally(()=>{state.cloud.saving=false;render();});
+  return;
+ }
+ if(action==='review-decision'){
+  if(!isCloud||reviewState.busy)return;
+  const j=reviewState.records.find(x=>x.id===button.dataset.id),decision=button.dataset.decision;
+  if(!j||!['approved','returned'].includes(decision))return;
+  if(!confirm(decision==='approved'?'確定核准這份工作日誌？':'確定退回這份工作日誌？退回原因會留在審核紀錄中。'))return;
+  decideReview(j,decision).then(async()=>{
+   const month=state.month;const fresh=await cloudCall('wpLoadMonth',month);
+   state.store={...state.store,journals:fresh.journals};state.cloud.review=fresh.review||state.cloud.review;
+   state.report.phase='idle';state.report.payload=null;
+   notify(decision==='approved'?'已核准工作日誌':'已退回工作日誌');
+  }).catch(e=>notify('審核失敗：'+e.message,true)).finally(render);render();return;
+ }
+ if(action==='review-history'){
+  if(!isCloud)return;const id=button.dataset.id;
+  if(state.reviewTimeline.id===id){state.reviewTimeline={id:'',events:[],loading:false};render();return;}
+  state.reviewTimeline={id,events:[],loading:true};render();
+  cloudCall('wpReviewHistory',id).then(payload=>{if(state.reviewTimeline.id===id)state.reviewTimeline={id,events:payload.events||[],loading:false};})
+   .catch(e=>{notify('審核歷程載入失敗：'+e.message,true);state.reviewTimeline={id:'',events:[],loading:false};}).finally(render);return;
+ }
  if(action==='report-run'){if(isCloud)loadCloudReport();else {const err=reportDateError();if(err)notify(err,true);else {render();notify('報表已更新');}}return;}
  if(action==='report-period'){selectReportPeriod(button.dataset.period);render();return;}
  if(action==='report-export-csv'){exportReport('csv');return;}
@@ -431,6 +473,7 @@ root.addEventListener('click', event=>{
 root.addEventListener('input',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
+ if(el.matches('[data-review-reason]')){setReviewReason(el.dataset.reviewReason,el.value);return;}
  if(el.matches('[data-task]')){const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;t[el.dataset.field]=el.dataset.field==='hours'?Number(el.value):el.value;markDraftDirty();updateDraftSummary();return;}
  if(el.matches('[data-draft]')){state.draft[el.dataset.draft]=el.value;markDraftDirty();return;}
  if(el.matches('[data-filter="query"]')){state.filters.query=el.value;const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults();const count=document.querySelector('#history-count');if(count)count.textContent=`${filteredGroups().length} 個工作日`;return;}
@@ -438,6 +481,7 @@ root.addEventListener('input',event=>{
 root.addEventListener('change',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
+ if(el.matches('[data-review-month]')){loadReviewQueue(el.value).then(render);render();return;}
  if(el.matches('[data-report-filter]')){state.report.filters[el.dataset.reportFilter]=el.value;render();return;}
  if(el.matches('[data-identity]')){
    const field=el.dataset.identity;const value=el.value;
