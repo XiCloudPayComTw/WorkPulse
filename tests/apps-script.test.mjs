@@ -271,7 +271,10 @@ test('owner submits saved record and same-department manager approves it',()=>{
  assert.equal(h.scope.wpLoadMonth('2026-11').journals[0].review.status,'draft');
  const result=h.scope.wpReviewSubmit(reviewPayload(j,'review-submit-0000001'));
  assert.equal(result.review.status,'submitted');
- assert.equal(h.scope.wpReviewSubmit(reviewPayload(j,'review-submit-0000001')).deduplicated,true);
+ const retried=h.scope.wpReviewSubmit(reviewPayload(j,'review-submit-0000001'));
+ assert.equal(retried.deduplicated,true);
+ assert.equal(retried.journal.id,j.id);
+ assert.equal(retried.journal.review.status,'submitted');
  assert.throws(()=>h.scope.wpSaveJournal(h.submission('emp-a',1,'review-edit-block-0001')),/已提交審核/);
  h.as('carol@example.com');
  assert.equal(h.scope.wpReviewQueue('2026-11').count,1);
