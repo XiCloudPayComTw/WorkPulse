@@ -279,6 +279,7 @@ test('owner submits saved record and same-department manager approves it',()=>{
  assert.equal(approval.review.status,'approved');
  assert.equal(h.scope.wpReviewQueue('2026-11').count,0);
  assert.equal(h.scope.wpLoadMonth('2026-11').journals[0].review.status,'approved');
+ h.as('alice@example.com');
  assert.throws(()=>h.scope.wpSaveJournal(h.submission('emp-a',1,'review-edit-block-0002')),/已提交審核或已通過/);
 });
 test('staff cannot review other users; manager cannot review another department or self',()=>{
