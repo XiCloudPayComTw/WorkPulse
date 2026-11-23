@@ -25,7 +25,7 @@ const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
   filters:{query:'',employee:'all',status:'all'},
   expanded:new Set([today,shiftDate(today,-1)]),draft:null,dirty:false,draftRestored:false,draftStatus:'未有暫存草稿',templates:[],
-  toast:null,reviewTimeline:{id:'',events:[],loading:false},cloud:{phase:isCloud?'loading':'local',user:null,review:{enabled:false,revision:1},error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
+  toast:null,reviewRequests:{},reviewTimeline:{id:'',events:[],loading:false},cloud:{phase:isCloud?'loading':'local',user:null,review:{enabled:false,revision:1},error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
   report:{filters:{startDate:today.slice(0,7)+'-01',endDate:today,employeeId:'all',departmentId:'all',project:'all',category:'all',status:'all'},phase:'idle',error:'',payload:null,applied:null,token:0}
 };
 state.draft = makeDraft(today, state.store.employees[0]?.id);
@@ -371,9 +371,11 @@ root.addEventListener('click', event=>{
   if(!canSubmitReview(j)){notify('此日誌不能提交審核，請重新整理',true);return;}
   if(state.view==='entry'&&state.dirty){notify('請先正式儲存修改內容，再提交審核',true);return;}
   if(!confirm('確定將此日誌提交主管審核？送出後，直到主管退回前都不能修改。'))return;
+  const requestKey=`${j.id}:${j.revision}`;
+  const requestId=state.reviewRequests[requestKey]||(state.reviewRequests[requestKey]=uid());
   state.cloud.saving=true;render();
-  cloudCall('wpReviewSubmit',{journalId:j.id,expectedRevision:j.revision,requestId:uid()})
-   .then(result=>{if(!result?.ok||!result.journal)throw Error('雲端提交結果未確認');state.store={...state.store,journals:state.store.journals.map(x=>x.id===j.id?result.journal:x)};state.report.phase='idle';state.report.payload=null;notify('日誌已提交主管審核');})
+  cloudCall('wpReviewSubmit',{journalId:j.id,expectedRevision:j.revision,requestId})
+   .then(result=>{if(!result?.ok||!result.journal)throw Error('雲端提交結果未確認');delete state.reviewRequests[requestKey];state.store={...state.store,journals:state.store.journals.map(x=>x.id===j.id?result.journal:x)};state.report.phase='idle';state.report.payload=null;notify('日誌已提交主管審核');})
    .catch(e=>notify('提交失敗：'+e.message,true)).finally(()=>{state.cloud.saving=false;render();});
   return;
  }
