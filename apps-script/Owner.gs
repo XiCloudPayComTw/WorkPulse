@@ -63,3 +63,14 @@ function wpOwnerDeleteJournal(payload){
     return {ok:true,deduplicated:false,journalId:id};
   }finally{lock.releaseLock();}
 }
+
+/**
+ * Editor-visible entry points. These are shipped ONLY in the private admin project.
+ * For initial setup, configure WORKPULSE_ADMIN_EMAIL and WORKPULSE_ALLOWED_DOMAIN first.
+ */
+function workPulseInitialize(){
+  return wpPrivateCreateWorkspace_();
+}
+function workPulseMigrateLegacy(){
+  return wpPrivateMigrateLegacyMonthly_();
+}
