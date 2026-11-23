@@ -69,6 +69,7 @@ function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord
   return {date,employeeId,note:record?.note||'',tomorrow:record?.tomorrow||'',tasks:record?.tasks.length?record.tasks.map(makeItem):[makeItem()],editing:!!record,revision:record?.revision||0};
 }
 function canEditJournal(employeeId){return !isCloud || Boolean(state.cloud.user?.canWriteIds?.includes(employeeId));}
+function employeeName(id){return state.store.employees.find(e=>e.id===id)?.name || '未指定人員';}
 function navButton(n, mobile=false){return `<button type="button" class="nav-link ${state.view===n.id?'active':''}" data-action="navigate" data-view="${n.id}" aria-current="${state.view===n.id?'page':'false'}">${icon(n.symbol,mobile?18:19)}<span>${n.label}</span></button>`;}
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
@@ -226,7 +227,7 @@ async function loadCloudReport(){
  const filters={...state.report.filters};const token=++state.report.token;
  state.report.phase='loading';state.report.error='';render();
  try{
-  const result=await cloudCall('wpQueryReport',filters);
+  const result=await cloudCall('wpSharedQueryReport',filters);
   if(token!==state.report.token)return;
   if(!Array.isArray(result?.journals)||!Array.isArray(result?.employees)||!Array.isArray(result?.departments))throw Error('報表資料格式不完整');
   state.report.payload=result;state.report.applied=filters;state.report.phase='ready';
@@ -250,9 +251,7 @@ function exportReport(type){
  notify(`已產生 ${type==='xlsx'?'Excel':'CSV'} 報表（${report.count} 項）`);
 }
 function renderSettings(){
- if(isCloud)return `${syncBanner()}<section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">雲端管理</h2><p class="card-sub">透過 Google Workspace 授權的工作日誌</p></div>${icon('database',19)}</div>
- <div class="notice">${icon('info',18)}<div><p>登入身分：${esc(state.cloud.user?.email||'')}</p><p>權限：${esc(state.cloud.user?.role||'')}</p><p>系統只顯示已授權的員工與當月紀錄。${state.cloud.user?.role==='admin'?'你可以在團隊管理中維護員工、部門、角色和專案。':'團隊名冊與權限只能由系統管理員變更。'}</p></div></div>
- <div class="row section-space" style="flex-wrap:wrap">${state.cloud.user?.role==='admin'?`<button class="soft-button primary" data-action="navigate" data-view="team">${icon('users',15)} 團隊管理</button>`:''}<button class="soft-button" data-action="refresh-cloud">${icon('arrowRight',15)} 重新同步</button><button class="soft-button" data-action="export-csv">${icon('download',15)} 匯出目前月份 CSV</button></div><p class="small muted">雲端版不支援透過 JSON 匯入、清空瀏覽器或直接修改員工名單；避免繞過伺服端權限。</p></section>${state.cloud.user?.role==='admin'?`<section class="soft-card card-pad-lg section-space review-settings"><div class="card-head"><div><h2 class="card-title">主管審核流程</h2><p class="card-sub">預設關閉。啟用後員工需先儲存，再點擊「提交主管審核」。已送審及核准的日誌鎖定編輯。</p></div><span class="review-tag ${state.cloud.review?.enabled?'review-approved':'review-draft'}">${state.cloud.review?.enabled?'已啟用':'未啟用'}</span></div><button class="soft-button ${state.cloud.review?.enabled?'':'primary'}" data-action="review-toggle">${state.cloud.review?.enabled?'關閉審核功能':'啟用審核功能'}</button><p class="small muted section-space">關閉前必須處理完所有待審核項目；已通過日誌仍會保留鎖定與歷程。</p></section>`:''}`;
+ if(isCloud)return `${syncBanner()}<section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">管理者 Google Drive</h2><p class="card-sub">只有驗證通過的管理員能維護使用者與刪除日誌。</p></div></div><div class="notice">${icon('info',18)}<div>一般使用者直接選擇姓名填寫與查閱；請注意姓名選單並非登入身分驗證。</div></div><button class="soft-button primary section-space" data-action="navigate" data-view="team">${icon('users',16)} 管理員控制台</button></section>`;
 
  return `<div class="notice">${icon('shield',20)}<div><strong style="font-weight:550">資料存放與權限提醒</strong><br/>這是可操作的本機原型，所有紀錄只存在目前瀏覽器的 localStorage。人員選單不等於登入驗證，且資料尚未同步至 Google Sheets。請先使用測試資料。</div></div>
  <div class="settings-grid section-space"><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">填寫人員</h2><p class="card-sub">管理日誌表單的人員選單</p></div>${icon('users',19)}</div><div class="inline-add"><input class="input" id="new-employee" maxlength="80" placeholder="新增人員名稱" aria-label="新增人員名稱"/><button class="soft-button icon-only" data-action="add-employee" aria-label="新增人員">${icon('plus',17)}</button></div><div class="chip-list">${state.store.employees.map(e=>`<span class="chip">${esc(e.name)}<button aria-label="移除 ${esc(e.name)}" data-action="remove-employee" data-id="${esc(e.id)}">${icon('x',13)}</button></span>`).join('')}</div></section>
@@ -262,14 +261,14 @@ function renderSettings(){
 }
 function empty(symbol,title,body,button,action){return `<div class="empty"><div class="empty-orb">${icon(symbol,28)}</div><h3>${title}</h3><p>${body}</p><button class="soft-button sm" data-action="${action}">${icon('plus',15)} ${button}</button></div>`;}
 function render(){renderShell();}
-function changeView(view){if(!visibleNav().some(n=>n.id===view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='reviews'&&isCloud&&state.cloud.phase==='ready'){loadReviewQueue(state.month).then(render);}if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
+function changeView(view){if(!visibleNav().some(n=>n.id===view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;const promise=loadAdmin();render();await promise;render();}
 function notify(text,error=false){state.toast={text,error};showToast(text,error);}
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;flushQuickDraft();return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
-function openRecord(record){if(journalLocked(record)){notify('日誌已鎖定，請聯絡主管退回後再編輯',true);return;}if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
-function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=isCloud?state.cloud.user?.id:state.store.employees[0]?.id;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
+function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
+function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=isCloud?(state.draft?.employeeId||state.store.employees[0]?.id):state.store.employees[0]?.id;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
 
@@ -277,14 +276,13 @@ async function initCloud(){
  if(!isCloud)return;
  state.cloud.phase='loading';state.cloud.error='';state.report.payload=null;state.report.applied=null;state.report.phase='idle';render();
  try{
-  const payload=await cloudCall('wpBootstrap',state.month);
+  const payload=await cloudCall('wpSharedBootstrap',state.month);
   if(!payload?.store || !payload?.user)throw Error('雲端回應格式不完整');
   state.store={...payload.store,mode:'cloud'};
-  state.cloud.user=payload.user;state.cloud.review=payload.review||{enabled:false,revision:1};state.cloud.phase='ready';
-  state.draft=makeDraft(today,payload.user.id);
-  state.dirty=false;restoreQuickDraft();if((state.view==='team' && payload.user.role!=='admin') || (state.view==='reviews'&&!['manager','admin'].includes(payload.user.role)))state.view='overview';render();
+  state.cloud.user=payload.user;state.cloud.phase='ready';
+  state.draft=makeDraft(today,payload.store.employees[0]?.id);
+  state.dirty=false;restoreQuickDraft();if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
   if(state.view==='team'&&payload.user.role==='admin')refreshTeam();
-  if(state.view==='reviews')loadReviewQueue(state.month).then(render);
   if(state.view==='insights'&&state.report.phase==='idle')loadCloudReport();
  }catch(e){state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';render();}
 }
@@ -293,9 +291,9 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  if(state.cloud.loadingMonth)return;
  state.cloud.loadingMonth=true;const token=++state.cloud.monthToken;render();
  try{
-  const result=await cloudCall('wpLoadMonth',month);
+  const result=await cloudCall('wpSharedLoadMonth',month);
   if(token!==state.cloud.monthToken)return;
-  state.store={...state.store,journals:result.journals};state.month=month;state.cloud.review=result.review||state.cloud.review;
+  state.store={...state.store,journals:result.journals};state.month=month;
   if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.cloud.user?.id);state.dirty=false;}
  }catch(e){notify('雲端讀取失敗：'+(e.message||'未知錯誤'),true);}
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
@@ -303,7 +301,6 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
 async function saveCloudJournal(){
  if(state.cloud.saving || state.cloud.phase!=='ready')return;
  const d=state.draft;
- if(journalLocked(journalFor(state.store,d.date,d.employeeId))){notify('日誌已鎖定，請聯絡主管退回',true);return;}
  if(!d.date || !d.employeeId || !d.tasks.some(t=>t.title.trim())){notify('請選日期、人員並至少填寫一項工作名稱',true);return;}
  const hours=d.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);
  if(d.tasks.some(t=>Number(t.hours)<0||Number(t.hours)>24) || hours>24){notify('每日總工時不可超過 24 小時',true);return;}
@@ -312,7 +309,7 @@ async function saveCloudJournal(){
   note:d.note,tomorrow:d.tomorrow,tasks:d.tasks.filter(t=>t.title.trim()).map(t=>({...t}))};
  state.cloud.saving=true;render();
  try{
-  const result=await cloudCall('wpSaveJournal',request);
+  const result=await cloudCall('wpSharedSaveJournal',request);
   if(!result?.ok || !result.journal)throw Error('雲端回傳資料不完整，請先重新整理再嘗試');
   state.saveRequestId=null;
   state.store={...state.store,journals:[...state.store.journals.filter(j=>!(j.date===result.journal.date && j.employeeId===result.journal.employeeId)),result.journal]};
@@ -337,60 +334,16 @@ root.addEventListener('click', event=>{
    if(adminState.saving)return;
    if(adminState.draft && adminState.draft.active===false && !confirm('停用後該資料將不再可用，但歷史紀錄會保留。確定儲存？'))return;
    saveAdmin().then(async r=>{
-     const updated=await cloudCall('wpBootstrap',state.month);
+     const updated=await cloudCall('wpSharedBootstrap',state.month);
      state.store={...updated.store,mode:'cloud'};
      state.cloud.user=updated.user;state.report.payload=null;state.report.applied=null;state.report.phase='idle';
      if(updated.user?.role!=='admin'){state.view='overview';location.hash='/overview';}
-     else if(!canEditJournal(state.draft?.employeeId))state.draft=makeDraft(today,updated.user.id);
+     else if(!canEditJournal(state.draft?.employeeId))state.draft=makeDraft(today,updated.store.employees[0]?.id);
      render();notify(r.deduplicated?'已確認資料儲存結果':'團隊資料已更新');
    }).catch(e=>{render();notify('變更未儲存：'+(e.message||'未知錯誤'),true);});
    render();return;
  }
  if(state.cloud.phase==='error' || state.cloud.phase==='loading')return;
- if(action==='review-refresh'){if(!isCloud||reviewState.busy)return;loadReviewQueue(reviewState.month).then(render);render();return;}
- if(action==='review-toggle'){
-  if(!isCloud||state.cloud.user?.role!=='admin'||state.cloud.saving)return;
-  const enabled=!state.cloud.review?.enabled;
-  if(!confirm(enabled?'確定啟用主管審核？員工儲存後需另行提交。':'確定關閉主管審核？系統將拒絕在仍有待審核項目時關閉。'))return;
-  state.cloud.saving=true;render();
-  cloudCall('wpReviewSetEnabled',{enabled,expectedRevision:state.cloud.review?.revision||1,requestId:uid()})
-   .then(result=>{if(!result?.ok)throw Error('設定未確認');state.cloud.review=result.config;notify(enabled?'已啟用主管審核':'已關閉主管審核');})
-   .catch(e=>notify('審核設定失敗：'+e.message,true)).finally(()=>{state.cloud.saving=false;render();});
-  return;
- }
- if(action==='review-submit'){
-  if(!isCloud||state.cloud.saving)return;
-  const j=state.store.journals.find(x=>x.id===button.dataset.id);
-  if(!canSubmitReview(j)){notify('此日誌不能提交審核，請重新整理',true);return;}
-  if(state.view==='entry'&&state.dirty){notify('請先正式儲存修改內容，再提交審核',true);return;}
-  if(!confirm('確定將此日誌提交主管審核？送出後，直到主管退回前都不能修改。'))return;
-  const requestKey=`${j.id}:${j.revision}`;
-  const requestId=state.reviewRequests[requestKey]||(state.reviewRequests[requestKey]=uid());
-  state.cloud.saving=true;render();
-  cloudCall('wpReviewSubmit',{journalId:j.id,expectedRevision:j.revision,requestId})
-   .then(result=>{if(!result?.ok||!result.journal)throw Error('雲端提交結果未確認');delete state.reviewRequests[requestKey];state.store={...state.store,journals:state.store.journals.map(x=>x.id===j.id?result.journal:x)};state.report.phase='idle';state.report.payload=null;notify('日誌已提交主管審核');})
-   .catch(e=>notify('提交失敗：'+e.message,true)).finally(()=>{state.cloud.saving=false;render();});
-  return;
- }
- if(action==='review-decision'){
-  if(!isCloud||reviewState.busy)return;
-  const j=reviewState.records.find(x=>x.id===button.dataset.id),decision=button.dataset.decision;
-  if(!j||!['approved','returned'].includes(decision))return;
-  if(!confirm(decision==='approved'?'確定核准這份工作日誌？':'確定退回這份工作日誌？退回原因會留在審核紀錄中。'))return;
-  decideReview(j,decision).then(async()=>{
-   const month=state.month;const fresh=await cloudCall('wpLoadMonth',month);
-   state.store={...state.store,journals:fresh.journals};state.cloud.review=fresh.review||state.cloud.review;
-   state.report.phase='idle';state.report.payload=null;
-   notify(decision==='approved'?'已核准工作日誌':'已退回工作日誌');
-  }).catch(e=>notify('審核失敗：'+e.message,true)).finally(render);render();return;
- }
- if(action==='review-history'){
-  if(!isCloud)return;const id=button.dataset.id;
-  if(state.reviewTimeline.id===id){state.reviewTimeline={id:'',events:[],loading:false};render();return;}
-  state.reviewTimeline={id,events:[],loading:true};render();
-  cloudCall('wpReviewHistory',id).then(payload=>{if(state.reviewTimeline.id===id)state.reviewTimeline={id,events:payload.events||[],loading:false};})
-   .catch(e=>{notify('審核歷程載入失敗：'+e.message,true);state.reviewTimeline={id:'',events:[],loading:false};}).finally(render);return;
- }
  if(action==='report-run'){if(isCloud)loadCloudReport();else {const err=reportDateError();if(err)notify(err,true);else {render();notify('報表已更新');}}return;}
  if(action==='report-period'){selectReportPeriod(button.dataset.period);render();return;}
  if(action==='report-export-csv'){exportReport('csv');return;}
@@ -468,7 +421,6 @@ root.addEventListener('click', event=>{
 root.addEventListener('input',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
- if(el.matches('[data-review-reason]')){setReviewReason(el.dataset.reviewReason,el.value);return;}
  if(el.matches('[data-task]')){const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;t[el.dataset.field]=el.dataset.field==='hours'?Number(el.value):el.value;markDraftDirty();updateDraftSummary();return;}
  if(el.matches('[data-draft]')){state.draft[el.dataset.draft]=el.value;markDraftDirty();return;}
  if(el.matches('[data-filter="query"]')){state.filters.query=el.value;const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults();const count=document.querySelector('#history-count');if(count)count.textContent=`${filteredGroups().length} 個工作日`;return;}
@@ -476,7 +428,6 @@ root.addEventListener('input',event=>{
 root.addEventListener('change',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
- if(el.matches('[data-review-month]')){loadReviewQueue(el.value).then(render);render();return;}
  if(el.matches('[data-report-filter]')){state.report.filters[el.dataset.reportFilter]=el.value;render();return;}
  if(el.matches('[data-identity]')){
    const field=el.dataset.identity;const value=el.value;
@@ -509,7 +460,7 @@ root.addEventListener('change',async event=>{
    if(saveStore(payload)){state.draft=makeDraft();state.dirty=false;state.filters={query:'',employee:'all',status:'all'};render();notify('備份資料匯入成功');}
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
-window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='reviews'&&isCloud&&state.cloud.phase==='ready')loadReviewQueue(state.month).then(render);if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
+window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
 window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();
