@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const backend=readFileSync(new URL('../apps-script/Code.gs',import.meta.url),'utf8');
+const reviewBackend=readFileSync(new URL('../apps-script/Review.gs',import.meta.url),'utf8');
 
 function harness(){
  let email='admin@example.com', seq=1, locked=false;
@@ -34,7 +35,7 @@ function harness(){
   Utilities:{getUuid:()=>`uuid-${seq++}`},
   console
  };
- vm.createContext(scope);vm.runInContext(backend,scope,{filename:'Code.gs'});
+ vm.createContext(scope);vm.runInContext(backend+'\n'+reviewBackend,scope,{filename:'WorkPulse.gs'});
  const as=user=>{email=user;};
  const addEmployee=(id,mail,role='staff',dept='team-a',active=true)=>sheets.get('Employees').appendRow([id,mail,mail.split('@')[0],role,dept,active,1,'2026-11-22T00:00:00Z','admin@example.com']);
  const addProject=name=>sheets.get('Projects').appendRow([`p-${seq++}`,name,true,1,'2026-11-22T00:00:00Z','admin@example.com']);
@@ -55,7 +56,7 @@ function harness(){
 test('initialization creates normalized sheets and can run twice without duplicating admin',()=>{
  const h=harness();const rows=h.sheets.get('Employees').rows.length;
  h.scope.setupWorkPulse_();assert.equal(h.sheets.get('Employees').rows.length,rows);
- assert.equal(h.sheets.get('Meta').rows[1][1],'3');
+ assert.equal(h.sheets.get('Meta').rows[1][1],'4');
  assert.deepEqual(h.sheets.get('Journals').rows[0].slice(0,4),['journalId','date','employeeId','revision']);
 });
 test('fail-closed authentication and cross-domain access',()=>{
@@ -138,7 +139,7 @@ test('only admin can read inactive employee roster or edit settings',()=>{
  h.as('carol@example.com');assert.throws(()=>h.scope.wpAdminBootstrap(),/權限/);
  h.as('admin@example.com');const data=h.scope.wpAdminBootstrap();
  assert.equal(data.employees.length,5);assert.equal(data.departments.length,2);
- assert.equal(data.schema,'3');
+ assert.equal(data.schema,'4');
 });
 test('admin create/update employee, prevent conflict, preserve ID and audit',()=>{
  const h=harness();const p=adminRequest('employees');
@@ -195,13 +196,16 @@ test('explicit v2-to-v3 migration retains employee IDs and populates departments
  for(const entry of [['Employees',6],['Projects',3]]){
   const sheet=h.sheets.get(entry[0]);for(const row of sheet.rows)row.splice(entry[1]);
  }
- h.sheets.delete('Departments');h.sheets.get('Meta').rows[1][1]='2';
+ h.sheets.delete('Departments');h.sheets.delete('Reviews');h.sheets.get('Meta').rows.splice(2);h.sheets.get('Meta').rows[1][1]='2';
  assert.throws(()=>h.scope.wpBootstrap('2026-11'),/版本不相容/);
  assert.match(h.scope.upgradeWorkPulseV3_(),/遷移完成/);
  assert.equal(h.sheets.get('Meta').rows[1][1],'3');
  assert.deepEqual(h.sheets.get('Departments').rows.slice(1).map(x=>x[0]).sort(),['team-a','team-b']);
- assert.equal(h.scope.wpBootstrap('2026-11').store.employees.length,5);
+ assert.throws(()=>h.scope.wpBootstrap('2026-11'),/版本不相容/);
  assert.match(h.scope.upgradeWorkPulseV3_(),/已是 v3/);
+ assert.match(h.scope.upgradeWorkPulseV4_(),/升級完成/);
+ assert.equal(h.scope.wpBootstrap('2026-11').store.employees.length,5);
+ assert.match(h.scope.upgradeWorkPulseV4_(),/已是 v4/);
  h.as('alice@example.com');assert.throws(()=>h.scope.upgradeWorkPulseV3_(),/管理員/);
 });
 
