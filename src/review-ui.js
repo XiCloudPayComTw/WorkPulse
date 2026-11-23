@@ -46,8 +46,8 @@ export function renderReviewWorkspace(user){
   const body=reviewState.records.length?reviewState.records.map(j=>{
     const hours=(j.tasks||[]).reduce((n,t)=>n+(Number(t.hours)||0),0);
     return `<article class="soft-card card-pad-lg review-record">
-      <div class="row-between review-record-title"><div><div class="small muted">${esc(formatDate(j.date))} · ${esc(j.employeeId)}</div><h3 class="card-title">${j.tasks.length} 項工作 · ${esc(formatHours(hours))}</h3></div>${reviewBadge(j.review)}</div>
-      <div class="review-tasks">${j.tasks.map(t=>`<div class="review-task"><span>${esc(t.title)}</span><span class="small muted">${esc(t.project||t.category)} · ${esc(formatHours(t.hours))}</span></div>`).join('')}</div>
+      <div class="row-between review-record-title"><div><div class="small muted">${esc(formatDate(j.date))} · ${esc(j.employeeName||j.employeeId)}</div><h3 class="card-title">${j.tasks.length} 項工作 · ${esc(formatHours(hours))}</h3></div>${reviewBadge(j.review)}</div>
+      <div class="review-tasks">${j.tasks.map(t=>`<div class="review-task"><div><span>${esc(t.title)}</span>${t.description?`<p class="small muted">${esc(t.description)}</p>`:''}${t.result?`<p class="small muted">成果：${esc(t.result)}</p>`:''}</div><span class="small muted">${esc(t.project||t.category)} · ${esc(formatHours(t.hours))}</span></div>`).join('')}</div>
       ${j.note?`<p class="small review-note">備註：${esc(j.note)}</p>`:''}
       <label class="form-group"><span class="field-label">退回原因（選擇退回時必填）</span><textarea class="input" data-review-reason="${esc(j.id)}" maxlength="500" placeholder="請說明需要修正的內容…">${esc(reviewState.reasons[j.id]||'')}</textarea></label>
       <div class="review-actions"><button class="soft-button primary sm" data-action="review-decision" data-decision="approved" data-id="${esc(j.id)}" ${reviewState.busy?'disabled':''}>通過審核</button>
