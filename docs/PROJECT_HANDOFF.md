@@ -100,3 +100,21 @@
 
 - 下班草稿自動儲存、快速複製昨日工作、常用項目、鍵盤操作與低階手機效能。
 - 大量工作日誌的索引／分頁／快取評估，主管審核操作及資料備份排程；視公司授權情況再決定正式部署與審核流程。
+
+
+## v0.5.0 — UX 穩定性與快速填寫（獨立 PR）
+
+- 基於 v0.4.0 PR #4 已合併的 `main` commit `53511d3018b3ec9e9ee1db8f7eddb215cd71917b` 開發；合併前沒有開啟中的 PR。
+- `styles.css`：文字全面提升一級、主字級 16px、輸入欄位 16px；透過 `minmax(0,1fr)` / `min-width:0` / overflow 限制長文字只影響自身，固定 sidebar 與主內容格局；導航顯著選取狀態（灰藍柔和背景與左側細線）；手機導覽斷點提早為 900px。保留 transition/transform 與 reduced-motion。
+- `src/quick-entry.js`：未提交草稿讀寫、到期與帳號隔離；本機 localStorage、雲端 sessionStorage；常用工作範本上限 10 個；讀取已載入日誌中同人最近前一筆；複製重設結果、完成狀態和時數。
+- `src/app.js`：填寫頁新增快速工具、常用工作、捨棄／還原草稿、Ctrl/Cmd+S／Ctrl/Cmd+Enter；確認正式儲存成功後才清除草稿。雲端儲存失敗保留草稿，未改變既有伺服端授權政策。
+- `src/report-ui.js`：日期快速範圍增加 aria-pressed 與醒目選取樣式；團隊子頁籤維持 aria-selected。
+- `scripts/build-gas.mjs` 加入 quick-entry 模組；`package.json` 版本 v0.5.0。Google Sheets schema v3 不變，無須遷移。
+- `tests/quick-entry.test.mjs` 新增 7 項；`npm run verify` 共 40 項單元測試通過。Chromium 離線／模擬雲端在 320–1920px（12 種寬度）檢查布局；強制超長員工／專案／工作標題；測試草稿暫存／還原、複製、快捷鍵與儲存清除。詳見 [UX_STABILITY.md](UX_STABILITY.md)。
+
+### 本批限制／下一步
+
+1. **沒有在公司真實 Google Workspace 執行部署**；現有 Google Sheets schema v3 不變，虛擬 Workspace API 測試不等於正式授權驗收。
+2. 雲端版草稿與範本只在當前分頁，且 sessionStorage 會留在重整後的同一分頁；不是跨裝置同步與企業長期儲存。共用裝置要另做帳號安全稽核與作業政策。
+3. 近期工作只會搜尋已載入月份，跨月缺漏時不會擅自讀取未授權紀錄；複製與套用範本都不直接提交。
+4. 大量記錄的分頁、正式登入實測、主管審核與備份仍屬後續批次。

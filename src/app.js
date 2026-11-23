@@ -6,6 +6,7 @@ import { adminState, loadAdmin, setAdminTab, editAdmin, updateAdminDraft, resetA
 import { buildReport, reportCsv, reportSheets } from './reports.js';
 import { buildXlsx } from './xlsx.js';
 import { renderReportWorkspace } from './report-ui.js';
+import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemplate, removeTemplate, newTaskFromTemplate, recentPriorJournal } from './quick-entry.js';
 
 const root = document.querySelector('#app');
 const NAV = [
@@ -21,11 +22,45 @@ const isCloud = cloudEnabled();
 const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
   filters:{query:'',employee:'all',status:'all'},
-  expanded:new Set([today,shiftDate(today,-1)]),draft:null,dirty:false,
+  expanded:new Set([today,shiftDate(today,-1)]),draft:null,dirty:false,draftRestored:false,draftStatus:'未有暫存草稿',templates:[],
   toast:null,cloud:{phase:isCloud?'loading':'local',user:null,error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
   report:{filters:{startDate:today.slice(0,7)+'-01',endDate:today,employeeId:'all',departmentId:'all',project:'all',category:'all',status:'all'},phase:'idle',error:'',payload:null,applied:null,token:0}
 };
 state.draft = makeDraft(today, state.store.employees[0]?.id);
+const draftStorage = () => { try { return isCloud ? window.sessionStorage : window.localStorage; }catch { return null; } };
+const draftAccount = () => isCloud ? `workspace:${state.cloud.user?.email || 'unverified'}` : 'local-device';
+let draftTimer = null;
+function restoreQuickDraft(){
+  const stored=readQuickDraft(draftStorage(),draftAccount(),isCloud?86400000:7*86400000);
+  if(stored&&(!isCloud||canEditJournal(stored.employeeId))){
+    state.draft={...makeDraft(stored.date,stored.employeeId),...stored,tasks:stored.tasks.map(makeItem)};
+    state.dirty=true;state.draftRestored=true;state.draftStatus='已還原未提交草稿';
+  } else {state.draftRestored=false;state.draftStatus='草稿自動暫存已啟用';}
+  state.templates=readTemplates(draftStorage(),draftAccount());
+}
+function flushQuickDraft(){
+  clearTimeout(draftTimer);draftTimer=null;
+  if(!state.dirty)return;
+  const success=saveQuickDraft(draftStorage(),draftAccount(),state.draft);
+  state.draftStatus=success?'草稿已暫存於此瀏覽器':'無法暫存草稿，請儘快正式儲存';
+  const label=document.querySelector('#draft-save-status');if(label)label.textContent=state.draftStatus;
+}
+function scheduleQuickDraft(){
+  state.draftStatus='草稿暫存中…';
+  const label=document.querySelector('#draft-save-status');if(label)label.textContent=state.draftStatus;
+  clearTimeout(draftTimer);draftTimer=setTimeout(flushQuickDraft,480);
+}
+function markDraftDirty(){state.dirty=true;state.saveRequestId=null;state.draftRestored=false;scheduleQuickDraft();}
+function appendReusableTasks(rows){
+  if(!rows?.length)return;
+  const entries=rows.map(newTaskFromTemplate);
+  const tasks=state.draft.tasks;
+  const empty=tasks.length===1&&!tasks[0].title?.trim()&&!tasks[0].description?.trim()&&!tasks[0].result?.trim();
+  if(tasks.length-(empty?1:0)+entries.length>100){notify('同一天最多可填寫 100 項工作',true);return;}
+  if(empty)tasks.splice(0,1);
+  tasks.push(...entries);markDraftDirty();render();notify(`已加入 ${entries.length} 項工作，進度和工時已重設`);
+}
+if(!isCloud)restoreQuickDraft();
 function fromHash(){const key = location.hash.replace(/^#\/?/,'');return NAV.some(n=>n.id===key)?key:'overview';}
 function visibleNav(){return NAV.filter(n=>n.id!=='team'||(isCloud&&state.cloud.user?.role==='admin'));}
 function makeItem(source={}) {return {id:source.id||uid(),project:source.project||'',category:source.category||'前端開發',title:source.title||'',description:source.description||'',result:source.result||'',status:source.status||'doing',hours:source.hours??0};}
@@ -41,10 +76,10 @@ function renderShell(){
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'由公司 Google 帳號驗證身分，工作紀錄儲存在受控試算表。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.4.0</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'由公司 Google 帳號驗證身分，工作紀錄儲存在受控試算表。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.5.0</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button><span class="avatar" title="${esc(isCloud?(state.cloud.user?.email||'Google 帳號驗證中'):'展示模式，尚無登入機制')}">${esc(isCloud?(state.cloud.user?.name||'雲').slice(0,1):'示')}</span></div></header>
-   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.4.0</footer></main>
+   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.5.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${visibleNav().length}" aria-label="手機導覽">${visibleNav().map(n=>navButton(n,true)).join('')}</nav>
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
@@ -86,10 +121,20 @@ function categoryBars(stats){
 function renderEntry(){
  const d=state.draft;
  const existing = state.store.mode !== 'demo' && journalFor(state.store,d.date,d.employeeId);
+ const previous=recentPriorJournal(state.store.journals,d.date,d.employeeId);
+ const templates=state.templates;
  return `${syncBanner()}<div class="entry-grid"><div><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">基本資訊</h2><p class="card-sub">選擇日期與填寫人員，同一天可建立多個工作項目</p></div><span class="tag">${existing?'編輯紀錄':'新增紀錄'}</span></div><div class="form-fields">
   <label class="form-group"><span class="field-label">工作日期 *</span><input class="input" type="date" id="entry-date" data-identity="date" value="${esc(d.date)}" required /></label>
   <label class="form-group"><span class="field-label">填寫人員 *</span><select class="input" id="entry-employee" data-identity="employeeId">${state.store.employees.filter(e=>canEditJournal(e.id)).map(e=>`<option value="${esc(e.id)}" ${d.employeeId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></label>
  </div></section>
+ <section class="quick-tools soft-card card-pad section-space" aria-label="快速填寫工具">
+  <div class="quick-tool-head"><div><h2 class="card-title">快速填寫</h2><p class="card-sub">從上一次工作或常用範本帶入，不會直接提交資料</p></div><span class="tag">${isCloud?'此分頁暫存':'本機暫存'}</span></div>
+  <div class="quick-tool-actions"><button class="soft-button sm" data-action="copy-previous" ${!previous?'disabled':''}>${icon('calendar',16)} ${previous?`複製上次工作 · ${formatDate(previous.date,false)}`:'沒有可複製的上次工作'}</button>
+   <span class="small muted" id="draft-save-status" role="status" aria-live="polite">${esc(state.draftStatus)}</span>
+   <button class="soft-button ghost sm" data-action="discard-draft" ${state.dirty?'':'disabled'}>${icon('trash',15)} 捨棄草稿</button></div>
+  ${templates.length?`<div class="quick-template-list" aria-label="常用工作項目">${templates.map(t=>`<div class="quick-template"><button class="quick-template-use" data-action="use-template" data-id="${esc(t.id)}" title="${esc(t.title)}">${icon('plus',14)}<span>${esc(t.title)}</span></button><button class="quick-template-remove" data-action="remove-template" data-id="${esc(t.id)}" title="移除 ${esc(t.title)}" aria-label="移除 ${esc(t.title)}">${icon('x',13)}</button></div>`).join('')}</div>`:'<p class="xs muted quick-template-empty">可在下方工作項目按「設為常用」，以後一鍵加入。</p>'}
+  <p class="xs muted quick-shortcuts">快捷鍵：Ctrl / Cmd + S 正式儲存，Ctrl / Cmd + Enter 新增項目。${isCloud?'草稿僅暫存於目前瀏覽器分頁，不代表已同步至 Google Sheets。':'草稿會暫存於這個瀏覽器，正式紀錄仍需點擊儲存。'}</p>
+ </section>
  <div class="section-head section-space"><div><h2 class="section-title">工作項目 <span class="muted" style="font-size:13px">(${d.tasks.length})</span></h2><p class="card-sub">每件工作獨立記錄，儲存時自動合併到同一天</p></div><button class="soft-button sm" data-action="add-task">${icon('plus',15)} 新增項目</button></div>
  <div class="entry-task-list">${d.tasks.map((t,i)=>renderTask(t,i)).join('')}</div>
  <button class="soft-button" style="width:100%;margin-top:18px" data-action="add-task">${icon('plus',17)} 新增另一項工作</button>
@@ -99,7 +144,7 @@ function renderEntry(){
 function renderTask(t,i){
  const key=`task-${i}`;
  const options=(items,value)=>[...(value&&!items.includes(value)?[value]:[]),...items].map(v=>`<option value="${esc(v)}" ${value===v?'selected':''}>${esc(v||'未指定專案')}</option>`).join('');
- return `<article class="task-card"><div class="task-heading"><div class="task-number"><span class="task-number-spot">${String(i+1).padStart(2,'0')}</span> 工作內容</div><button class="soft-button ghost mini danger" aria-label="刪除第 ${i+1} 項工作" data-action="remove-task" data-index="${i}">${icon('trash',16)}</button></div>
+ return `<article class="task-card"><div class="task-heading"><div class="task-number"><span class="task-number-spot">${String(i+1).padStart(2,'0')}</span> 工作內容</div><div class="task-heading-actions"><button class="soft-button ghost mini" data-action="save-template" data-index="${i}" title="儲存此工作為常用項目">${icon('sparkles',15)} 設為常用</button><button class="soft-button ghost mini danger" aria-label="刪除第 ${i+1} 項工作" data-action="remove-task" data-index="${i}">${icon('trash',16)}</button></div></div>
  <div class="form-fields"><label class="form-group full"><span class="field-label">工作名稱 *</span><input class="input" id="${key}-title" maxlength="160" data-task="${i}" data-field="title" placeholder="例如：確認自助洗衣設備配置" value="${esc(t.title)}" /></label>
  <label class="form-group"><span class="field-label">所屬專案</span><select class="input" data-task="${i}" data-field="project"><option value="" ${!t.project?'selected':''}>未指定專案</option>${options(state.store.projects,t.project)}</select></label>
  <label class="form-group"><span class="field-label">工作類型</span><select class="input" data-task="${i}" data-field="category">${options(CATEGORIES,t.category)}</select></label>
@@ -223,7 +268,7 @@ async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')retur
 function notify(text,error=false){state.toast={text,error};showToast(text,error);}
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
-function requireDiscard(){return !state.dirty || confirm('目前有尚未儲存的變更，要放棄嗎？');}
+function requireDiscard(){if(!state.dirty)return true;flushQuickDraft();return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
 function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
 function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=isCloud?state.cloud.user?.id:state.store.employees[0]?.id;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
@@ -238,7 +283,7 @@ async function initCloud(){
   state.store={...payload.store,mode:'cloud'};
   state.cloud.user=payload.user;state.cloud.phase='ready';
   state.draft=makeDraft(today,payload.user.id);
-  state.dirty=false;if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
+  state.dirty=false;restoreQuickDraft();if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
   if(state.view==='team'&&payload.user.role==='admin')refreshTeam();
   if(state.view==='insights'&&state.report.phase==='idle')loadCloudReport();
  }catch(e){state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';render();}
@@ -272,7 +317,7 @@ async function saveCloudJournal(){
   state.store={...state.store,journals:[...state.store.journals.filter(j=>!(j.date===result.journal.date && j.employeeId===result.journal.employeeId)),result.journal]};
   state.draft=makeDraft(result.journal.date,result.journal.employeeId,result.journal);
   state.report.payload=null;state.report.applied=null;state.report.phase='idle';
-  state.dirty=false;
+  state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());state.draftStatus='已正式儲存';
   notify(result.deduplicated?'已確認此筆工作日誌存在雲端':'工作日誌已成功儲存到 Google Sheets');
  }catch(e){
   notify('雲端儲存未確認：'+(e.message||'請重新嘗試')+'。保留目前草稿，請勿重新填寫。',true);
@@ -309,14 +354,37 @@ root.addEventListener('click', event=>{
  if(isCloud && state.cloud.saving)return;
  if(action==='navigate'){if(state.view==='entry' && !requireDiscard())return;if(state.view==='team'&&adminState.dirty&&!confirm('團隊資料尚未儲存，確定離開嗎？'))return;state.dirty=false;changeView(button.dataset.view);return;}
  if(action==='new-journal'){openNew();return;}
- if(action==='add-task'){state.draft.tasks.push(makeItem());state.dirty=true;state.saveRequestId=null;render();document.querySelector('.task-card:last-child input[data-field="title"]')?.focus();return;}
- if(action==='remove-task'){const index=Number(button.dataset.index);state.saveRequestId=null;state.draft.tasks.splice(index,1);if(!state.draft.tasks.length)state.draft.tasks.push(makeItem());state.dirty=true;render();return;}
+ if(action==='copy-previous'){
+  const previous=recentPriorJournal(state.store.journals,state.draft.date,state.draft.employeeId);
+  if(previous)appendReusableTasks(previous.tasks);else notify('目前載入的月份沒有可複製的上次工作',true);
+  return;
+ }
+ if(action==='save-template'){
+  const task=state.draft.tasks[Number(button.dataset.index)];if(!task)return;
+  const result=addTemplate(draftStorage(),draftAccount(),task);
+  if(!result.ok){notify(result.reason,true);return;}
+  state.templates=readTemplates(draftStorage(),draftAccount());render();notify('已加入常用項目');return;
+ }
+ if(action==='remove-template'){
+  removeTemplate(draftStorage(),draftAccount(),button.dataset.id);
+  state.templates=readTemplates(draftStorage(),draftAccount());render();return;
+ }
+ if(action==='use-template'){
+  const t=state.templates.find(t=>t.id===button.dataset.id);if(t)appendReusableTasks([t]);return;
+ }
+ if(action==='discard-draft'){
+  if(!confirm('要捨棄目前尚未正式儲存的草稿嗎？'))return;
+  clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());
+  state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;state.saveRequestId=null;state.draftStatus='草稿已捨棄';render();return;
+ }
+ if(action==='add-task'){if(state.draft.tasks.length>=100){notify('同一天最多可填寫 100 項工作',true);return;}state.draft.tasks.push(makeItem());markDraftDirty();render();document.querySelector('.task-card:last-child input[data-field="title"]')?.focus();return;}
+ if(action==='remove-task'){const index=Number(button.dataset.index);state.draft.tasks.splice(index,1);if(!state.draft.tasks.length)state.draft.tasks.push(makeItem());markDraftDirty();render();return;}
  if(action==='save-journal'){
    if(isCloud){saveCloudJournal();return;}
    try{
     const base=state.store.mode==='demo'?{...state.store,journals:[],mode:'local'}:state.store;
     const next=saveJournal(base,state.draft);
-    if(saveStore(next)){state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;render();notify('工作日誌已儲存至目前瀏覽器');}
+    if(saveStore(next)){state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());state.draftStatus='已正式儲存';render();notify('工作日誌已儲存至目前瀏覽器');}
     updateDraftSummary();
    }catch(e){notify(e.message||'無法儲存日誌',true);}return;
  }
@@ -349,14 +417,14 @@ root.addEventListener('click', event=>{
  if(action==='import-json'){if(isCloud)return;document.querySelector('#import-file')?.click();return;}
  if(action==='reset-data'){if(isCloud)return;
    if(!confirm('確定清除目前瀏覽器中的所有 WorkPulse 工作日誌？此操作無法復原，建議先匯出備份。'))return;
-   if(saveStore(emptyState())){state.draft=makeDraft();state.dirty=false;render();notify('本機資料已清空');}return;
+   if(saveStore(emptyState())){clearQuickDraft(draftStorage(),draftAccount());state.draft=makeDraft();state.dirty=false;render();notify('本機資料已清空');}return;
  }
 });
 root.addEventListener('input',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
- if(el.matches('[data-task]')){const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;t[el.dataset.field]=el.dataset.field==='hours'?Number(el.value):el.value;state.dirty=true;state.saveRequestId=null;updateDraftSummary();return;}
- if(el.matches('[data-draft]')){state.draft[el.dataset.draft]=el.value;state.dirty=true;state.saveRequestId=null;return;}
+ if(el.matches('[data-task]')){const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;t[el.dataset.field]=el.dataset.field==='hours'?Number(el.value):el.value;markDraftDirty();updateDraftSummary();return;}
+ if(el.matches('[data-draft]')){state.draft[el.dataset.draft]=el.value;markDraftDirty();return;}
  if(el.matches('[data-filter="query"]')){state.filters.query=el.value;const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults();const count=document.querySelector('#history-count');if(count)count.textContent=`${filteredGroups().length} 個工作日`;return;}
 });
 root.addEventListener('change',event=>{
@@ -366,13 +434,19 @@ root.addEventListener('change',event=>{
  if(el.matches('[data-identity]')){
    const field=el.dataset.identity;const value=el.value;
    if(state.dirty&&!confirm('切換日期或人員會放棄尚未儲存的內容，確定繼續嗎？')){el.value=state.draft[field];return;}
-   const date=field==='date'?value:state.draft.date;const employee=field==='employeeId'?value:state.draft.employeeId;
+   flushQuickDraft();const date=field==='date'?value:state.draft.date;const employee=field==='employeeId'?value:state.draft.employeeId;
    state.saveRequestId=null;
    if(isCloud && date.slice(0,7)!==state.month){loadCloudMonth(date.slice(0,7),date,employee);return;}
    state.draft=makeDraft(date,employee);state.dirty=false;render();return;
  }
  if(el.matches('[data-filter]')){state.filters[el.dataset.filter]=el.value;render();return;}
  if(el.matches('[data-month]')){const month=el.value||currentMonth();if(isCloud){loadCloudMonth(month);return;}state.month=month;render();return;}
+});
+window.addEventListener('keydown',event=>{
+ if((event.ctrlKey||event.metaKey)&&state.view==='entry'&&!event.altKey){
+  if(event.key.toLowerCase()==='s'){event.preventDefault();document.querySelector('[data-action="save-journal"]')?.click();return;}
+  if(event.key==='Enter'){event.preventDefault();document.querySelector('[data-action="add-task"]')?.click();return;}
+ }
 });
 root.addEventListener('keydown',event=>{
  if(event.key==='Enter'&&event.target.matches('#new-employee')){event.preventDefault();document.querySelector('[data-action="add-employee"]')?.click();}
@@ -389,6 +463,6 @@ root.addEventListener('change',async event=>{
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
 window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
-window.addEventListener('beforeunload',event=>{if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();

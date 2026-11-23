@@ -1,7 +1,7 @@
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 // Offline, dependency-free ES module flattening for the known WorkPulse source graph.
 // Fail rather than silently bundling unsupported import/export syntax.
-const ordered=['src/utils.js','src/data.js','src/icons.js','src/cloud.js','src/admin.js','src/reports.js','src/xlsx.js','src/report-ui.js','src/app.js'];
+const ordered=['src/utils.js','src/data.js','src/icons.js','src/cloud.js','src/admin.js','src/reports.js','src/xlsx.js','src/report-ui.js','src/quick-entry.js','src/app.js'];
 let js='';
 for (const name of ordered){
  let source=await readFile(name,'utf8');
