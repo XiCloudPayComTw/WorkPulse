@@ -4,9 +4,9 @@
 
 **WorkPulse** 是一個以手機／桌面皆適用的單頁式日誌原型。視覺靈感來自柔和的灰藍色階與 Neumorphism 浮凸表面，重點是讓員工在下班前輕鬆整理多項工作，也讓管理者按日期快速閱讀。
 
-## 功能（v0.6.0）
+## 功能（v0.7.0）
 
-- **主管審核（雲端可選）**：員工先儲存再提交；同部門主管／管理員按授權範圍通過或退回並保留理由與歷程；預設關閉，可由管理員設定。
+- **共用姓名填寫（雲端模式）**：一般使用者不必登入 Google，選擇姓名即可填寫、修改及查閱工作日誌。這是共用填寫而非個人身分驗證。
 - **工作總覽**：當月項目、總工時、完成數與紀錄天數；近期紀錄依日期分組。
 - **填寫日誌**：人員與日期選擇、動態新增多項工作、專案／類別／狀態／工時、當日備註、明日計畫；新增自動暫存未提交草稿、複製上次工作與常用工作捷徑。
 - **歷史查詢**：按月份、人員、狀態、文字篩選；日期群組可展開／收合；可回編同一天的紀錄。
@@ -14,11 +14,18 @@
 - **系統設定**：編輯人員與專案選單、JSON 備份／還原、CSV（Excel 可開啟）匯出、重設資料。
 - **介面**：擴大文字尺寸、固定導覽欄與卡片約束、加強選取狀態；灰藍柔和陰影、Hover／Pressed 微位移、`prefers-reduced-motion`、手機底部導覽。
 
-### v0.6.0：可選式主管審核
+### v0.7.0：簡化工作日誌與管理員功能
+
+- 移除主管角色、送審及退回流程。一般員工選姓名填寫；管理員可新增、修改、停用使用者，並在確認視窗中刪除日誌。
+- 管理員權限必須由 Google Script 後端驗證指定擁有者帳號；若部署環境無法辨識，就拒絕管理請求。
+- v0.7.0 **仍使用原來單一 v4 Google Sheets**。下一批 v0.8.0 才會建立每月一份原生 Google 試算表。公司 Google Drive 尚未連接或建立，不能把本機 GitHub Pages 當成已同步。
+- 目前沒有驗證公司真實 Google Workspace；清楚的部署與安全限制見 [`docs/SIMPLIFIED_WORKFLOW.md`](docs/SIMPLIFIED_WORKFLOW.md)。
+
+### v0.6.0（已停用的歷史功能）：可選式主管審核
 
 - Apps Script 增加 `Reviews` 事件表、`reviewEnabled` 設定、主管審核工作台及提交／通過／退回操作；已送審或核准的日誌不可修改，退回後可修正並重新送審。
 - **Google Sheets schema v4**：新公司執行新版 `setupWorkPulse_()`，既有 v3 必須先完整備份、再明確執行 `upgradeWorkPulseV4_()`；v2 必須先升到 v3。
-- `npm run gas:build` 輸出 `Code.gs`、`Review.gs`、`Index.html`、`appsscript.json`。GitHub Pages 仍是本機展示版，沒有真正的主管審核或 Google Sheets 同步。
+- `npm run gas:build` 輸出 `Code.gs`、`Simple.gs`、`Index.html`、`appsscript.json`。GitHub Pages 仍是本機展示版，沒有真正的主管審核或 Google Sheets 同步。
 - 角色、遷移與完整驗收見 [`docs/REVIEWS.md`](docs/REVIEWS.md)。公司 Workspace 身分及真實雲端部署尚待管理員驗證。
 
 ### v0.5.0：文字可讀性、版面穩定與快速填寫
@@ -71,6 +78,6 @@ npm run gas:build # 輸出 dist-gas/（Apps Script 公司雲端版）
 
 前端維持原生 HTML、CSS 與 JavaScript ES modules，無外部 runtime 依賴。GitHub Pages 使用模組檔案；Apps Script 則由離線建置腳本將相同前端整合成 HTMLService 的 `Index.html`，確保視覺與工作流程一致。
 
-既有員工／部門／專案權限與統計匯出仍適用，**仍須由公司管理員實際部署與驗收後才能多人使用**。v0.6.0 需要 Sheets schema v4，並且必須另行加入 Review.gs；既有 v3 資料先備份再升級。後續可評估通知、集中跨月待辦、大量資料效能與正式部署備份策略。
+既有員工／部門／專案權限與統計匯出仍適用，**仍須由公司管理員實際部署與驗收後才能多人使用**。v0.6.0 仍相容舊 Sheets schema v4，但公司部署時改為加入 Simple.gs，不再部署 Review.gs；既有 v3 資料先備份再升級。後續可評估通知、集中跨月待辦、大量資料效能與正式部署備份策略。
 
 開發交接請閱讀 [`docs/PROJECT_HANDOFF.md`](docs/PROJECT_HANDOFF.md)。
