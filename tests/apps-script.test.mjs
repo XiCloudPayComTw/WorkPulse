@@ -345,3 +345,14 @@ test('explicit v3 to v4 migration preserves data and rejects non-admin',()=>{
  assert.equal(h.scope.wpLoadMonth('2026-11').journals.length,1);
  assert.match(h.scope.upgradeWorkPulseV4_(),/已是 v4/);
 });
+
+test('idempotent review retries still re-check the actor current department',()=>{
+ const h=harness();turnReviewsOn(h);h.as('alice@example.com');
+ const j=h.scope.wpSaveJournal(h.submission()).journal;
+ h.scope.wpReviewSubmit(reviewPayload(j,'review-scope-send-001'));
+ h.as('carol@example.com');
+ const payload={...reviewPayload(j,'review-scope-approve01'),decision:'approved'};
+ assert.equal(h.scope.wpReviewDecision(payload).ok,true);
+ h.sheets.get('Employees').rows.find(row=>row[0]==='emp-c')[4]='team-b';
+ assert.throws(()=>h.scope.wpReviewDecision(payload),/沒有權限/);
+});
