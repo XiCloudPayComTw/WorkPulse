@@ -1,3 +1,9 @@
+# v0.7.0 更新：姓名選擇與管理員模式
+
+目前的正式設計已移除主管審核。**請以 [SIMPLIFIED_WORKFLOW.md](SIMPLIFIED_WORKFLOW.md) 為準**。新發布包為 `Code.gs` + `Simple.gs` + `Index.html` + `appsscript.json`，不再發布 `Review.gs`，仍暫用 schema v4 單一工作簿；舊版 v0.6.0 的審核部署步驟已作廢。下一批才會分月建檔。
+
+本對話的 Google Drive 連接帳號與指定公司管理者 `hello.murui.lab@xicloudpay.com.tw` 不同，因此尚未建立真實公司資料表。
+
 # v0.6.0 重要部署提醒
 
 **本版本已升至 schema v4，請先閱讀 [主管審核與資料遷移指南](REVIEWS.md)。既有 v3 試算表須備份並明確執行 `upgradeWorkPulseV4_()`，不得照舊 v3 初始化步驟直接上線；v2 先升 v3。編輯器需要同時更新 `Code.gs`、`Review.gs`、`Index.html`。** 以下原有資料表／v3 步驟僅供了解先前版本，應以 `REVIEWS.md` 新流程為準。
