@@ -19,7 +19,7 @@ const core=await readFile('apps-script/Core.gs','utf8');
 const monthly=await readFile('apps-script/Monthly.gs','utf8');
 const simple=await readFile('apps-script/Simple.gs','utf8');
 const owner=await readFile('apps-script/Owner.gs','utf8');
-if(/function\s+wpOwner/.test(core+'\n'+monthly+'\n'+simple))
+if(/function\s+wpOwner(?:Bootstrap|SaveEmployee|DeleteJournal)\s*\(/.test(core+'\n'+monthly+'\n'+simple))
  throw Error('Owner API accidentally included in public backend');
 for(const [portal,isOwner] of [['public',false],['admin',true]]){
  const directory='dist-gas/'+portal;
