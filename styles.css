@@ -220,3 +220,5 @@ input[type=date],input[type=month],select.input{min-width:0;max-width:100%}
  .review-task>.small{text-align:left;flex:auto}
  .review-record .review-actions button{width:100%}
 }
+
+.review-task>div{min-width:0;flex:1;overflow-wrap:anywhere}.review-task>div p{margin:7px 0 0;line-height:1.6}
