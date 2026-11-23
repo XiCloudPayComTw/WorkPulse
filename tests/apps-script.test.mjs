@@ -249,3 +249,98 @@ test('report covers cross-month range with inclusive endpoints',()=>{
  assert.equal(h.scope.wpQueryReport({startDate:'2026-10-31',endDate:'2026-11-01'}).journals.length,2);
  assert.equal(h.scope.wpQueryReport({startDate:'2026-11-02',endDate:'2026-11-30'}).journals.length,0);
 });
+
+const reviewPayload=(journal,requestId)=>({journalId:journal.id,expectedRevision:journal.revision,requestId});
+function turnReviewsOn(h){
+ h.as('admin@example.com');
+ return h.scope.wpReviewSetEnabled({enabled:true,expectedRevision:1,requestId:'review-enable-000001'});
+}
+test('review feature starts disabled; only admin can enable it',()=>{
+ const h=harness();h.as('alice@example.com');
+ assert.equal(h.scope.wpBootstrap('2026-11').review.enabled,false);
+ assert.throws(()=>h.scope.wpReviewSetEnabled({enabled:true,expectedRevision:1,requestId:'review-staff-setting-01'}),/管理員/);
+ const enabled=turnReviewsOn(h);
+ assert.equal(enabled.config.enabled,true);
+ assert.equal(enabled.config.revision,2);
+ assert.equal(h.scope.wpReviewSetEnabled({enabled:true,expectedRevision:1,requestId:'review-enable-000001'}).deduplicated,true);
+ assert.throws(()=>h.scope.wpReviewSetEnabled({enabled:false,expectedRevision:1,requestId:'review-stale-setting-1'}),/CONFLICT/);
+});
+test('owner submits saved record and same-department manager approves it',()=>{
+ const h=harness();turnReviewsOn(h);h.as('alice@example.com');
+ const j=h.scope.wpSaveJournal(h.submission()).journal;
+ assert.equal(h.scope.wpLoadMonth('2026-11').journals[0].review.status,'draft');
+ const result=h.scope.wpReviewSubmit(reviewPayload(j,'review-submit-0000001'));
+ assert.equal(result.review.status,'submitted');
+ assert.equal(h.scope.wpReviewSubmit(reviewPayload(j,'review-submit-0000001')).deduplicated,true);
+ assert.throws(()=>h.scope.wpSaveJournal(h.submission('emp-a',1,'review-edit-block-0001')),/已提交審核/);
+ h.as('carol@example.com');
+ assert.equal(h.scope.wpReviewQueue('2026-11').count,1);
+ const approval=h.scope.wpReviewDecision({...reviewPayload(j,'review-approve-000001'),decision:'approved'});
+ assert.equal(approval.review.status,'approved');
+ assert.equal(h.scope.wpReviewQueue('2026-11').count,0);
+ assert.equal(h.scope.wpLoadMonth('2026-11').journals[0].review.status,'approved');
+ assert.throws(()=>h.scope.wpSaveJournal(h.submission('emp-a',1,'review-edit-block-0002')),/已提交審核或已通過/);
+});
+test('staff cannot review other users; manager cannot review another department or self',()=>{
+ const h=harness();turnReviewsOn(h);h.as('alice@example.com');
+ const alice=h.scope.wpSaveJournal(h.submission()).journal;h.scope.wpReviewSubmit(reviewPayload(alice,'review-alice-send-0001'));
+ h.as('bob@example.com');
+ const bob=h.scope.wpSaveJournal(h.submission('emp-b',0,'review-bob-save-0001')).journal;
+ h.scope.wpReviewSubmit(reviewPayload(bob,'review-bob-submit-001'));
+ assert.throws(()=>h.scope.wpReviewQueue('2026-11'),/主管或管理員/);
+ assert.throws(()=>h.scope.wpReviewDecision({...reviewPayload(alice,'review-staff-judge-01'),decision:'approved'}),/權限/);
+ h.as('carol@example.com');
+ assert.equal(h.scope.wpReviewQueue('2026-11').count,1);
+ assert.throws(()=>h.scope.wpReviewDecision({...reviewPayload(bob,'review-cross-team-01'),decision:'approved'}),/沒有權限/);
+ const own=h.scope.wpSaveJournal(h.submission('emp-c',0,'review-manager-save-1')).journal;
+ h.scope.wpReviewSubmit(reviewPayload(own,'review-manager-send-1'));
+ assert.throws(()=>h.scope.wpReviewDecision({...reviewPayload(own,'review-self-judge-01'),decision:'approved'}),/審核自己/);
+});
+test('returned journal requires a reason, can be edited and resubmitted, rejects stale review',()=>{
+ const h=harness();turnReviewsOn(h);h.as('alice@example.com');
+ const initial=h.scope.wpSaveJournal(h.submission()).journal;h.scope.wpReviewSubmit(reviewPayload(initial,'review-return-submit01'));
+ h.as('carol@example.com');
+ assert.throws(()=>h.scope.wpReviewDecision({...reviewPayload(initial,'review-no-reason-001'),decision:'returned',reason:'x'}),/至少 3/);
+ const returned=h.scope.wpReviewDecision({...reviewPayload(initial,'review-return-action1'),decision:'returned',reason:'請補充交付成果'});
+ assert.equal(returned.review.comment,'請補充交付成果');
+ h.as('alice@example.com');
+ const edited=h.scope.wpSaveJournal({...h.submission('emp-a',1,'review-revised-save01'),note:'成果已補上'}).journal;
+ assert.equal(edited.revision,2);assert.equal(edited.review.status,'returned');
+ h.scope.wpReviewSubmit(reviewPayload(edited,'review-resubmitted01'));
+ h.as('carol@example.com');
+ assert.throws(()=>h.scope.wpReviewDecision({...reviewPayload(initial,'review-stale-judge01'),decision:'approved'}),/CONFLICT/);
+ assert.equal(h.scope.wpReviewHistory(initial.id).events.length,3);
+});
+test('review queue and history enforce current authorized scope',()=>{
+ const h=harness();turnReviewsOn(h);h.as('bob@example.com');
+ const j=h.scope.wpSaveJournal(h.submission('emp-b',0,'review-queue-bob-save')).journal;
+ h.scope.wpReviewSubmit(reviewPayload(j,'review-queue-bob-send'));
+ h.as('carol@example.com');
+ assert.equal(h.scope.wpReviewQueue('2026-11').count,0);
+ assert.throws(()=>h.scope.wpReviewHistory(j.id),/沒有權限/);
+ h.as('admin@example.com');
+ assert.equal(h.scope.wpReviewQueue('2026-11').count,1);
+ assert.equal(h.scope.wpReviewQueue('2026-12').count,0);
+});
+test('pending items block disabling review and approval keeps the old journal locked',()=>{
+ const h=harness();turnReviewsOn(h);h.as('alice@example.com');
+ const j=h.scope.wpSaveJournal(h.submission()).journal;h.scope.wpReviewSubmit(reviewPayload(j,'review-disable-send-01'));
+ h.as('admin@example.com');
+ assert.throws(()=>h.scope.wpReviewSetEnabled({enabled:false,expectedRevision:2,requestId:'review-disable-busy01'}),/仍有待審核/);
+ h.scope.wpReviewDecision({...reviewPayload(j,'review-disable-approve'),decision:'approved'});
+ const result=h.scope.wpReviewSetEnabled({enabled:false,expectedRevision:2,requestId:'review-disable-clean01'});
+ assert.equal(result.config.enabled,false);
+ h.as('alice@example.com');
+ assert.throws(()=>h.scope.wpSaveJournal(h.submission('emp-a',1,'review-edit-afteroff1')),/已提交審核或已通過/);
+ assert.throws(()=>h.scope.wpReviewSubmit(reviewPayload(j,'review-disabled-send1')),/尚未啟用/);
+});
+test('explicit v3 to v4 migration preserves data and rejects non-admin',()=>{
+ const h=harness();h.as('alice@example.com');h.scope.wpSaveJournal(h.submission());
+ h.sheets.delete('Reviews');h.sheets.get('Meta').rows.splice(2);h.sheets.get('Meta').rows[1][1]='3';
+ assert.throws(()=>h.scope.wpBootstrap('2026-11'),/版本不相容/);
+ assert.throws(()=>h.scope.upgradeWorkPulseV4_(),/管理員/);
+ h.as('admin@example.com');
+ assert.match(h.scope.upgradeWorkPulseV4_(),/升級完成/);
+ assert.equal(h.scope.wpLoadMonth('2026-11').journals.length,1);
+ assert.match(h.scope.upgradeWorkPulseV4_(),/已是 v4/);
+});
