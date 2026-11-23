@@ -128,7 +128,9 @@ test('old control workbook with journals requires explicit backup and migration'
  h.control.getSheetByName('Tasks').appendRow(['legacy-task','legacy-id',1,0,'','前端開發','舊資料','內容','成果','done',2]);
  assert.throws(()=>h.scope.wpPrivateSetupMonthly_(),/請先備份/);
  assert.throws(()=>h.scope.wpPrivateMigrateLegacyMonthly_(),/先備份/);
- const backup=h.makeBook('backup');backup.insertSheet('Journals').appendRow(['journalId','date']);
+ const backup=h.makeBook('backup');const snapshot=backup.insertSheet('Journals');
+ snapshot.appendRow(['journalId','date','employeeId','revision','updatedAt','updatedBy','requestId','note','tomorrow']);
+ snapshot.appendRow([...h.control.getSheetByName('Journals').rows[1]]);
  h.props.WORKPULSE_BACKUP_SHEET_ID=backup.getId();
  const migrated=h.scope.wpPrivateMigrateLegacyMonthly_();
  assert.equal(migrated.legacyJournals,1);
@@ -141,4 +143,26 @@ test('malformed month metadata rejects queries instead of returning incorrect da
  const book=h.books.get(h.scope.wpMonthIndex_(h.control)['2026-11']);
  const meta=book.getSheetByName('Meta').rows.find(r=>r[0]==='month');meta[1]='2026-10';
  assert.throws(()=>h.scope.wpSharedLoadMonth('2026-11'),/索引不符/);
+});
+
+test('private first-time bootstrap creates controller and folder only under configured company identity',()=>{
+ const h=harness();
+ delete h.props.WORKPULSE_SHEET_ID;
+ const result=h.scope.wpPrivateCreateWorkspace_();
+ assert.equal(result.ok,true);
+ assert.ok(h.props.WORKPULSE_SHEET_ID.startsWith('file-'));
+ assert.ok(h.props.WORKPULSE_FOLDER_ID.startsWith('folder-'));
+ assert.equal(h.scope.wpPrivateCreateWorkspace_().controlId,h.props.WORKPULSE_SHEET_ID);
+ h.as('guest@example.com');
+ assert.throws(()=>h.scope.wpPrivateCreateWorkspace_(),/公司 Google 帳號/);
+});
+test('migrator refuses a backup that does not match the control workbook',()=>{
+ const h=harness();h.setup();const p=h.employee();
+ h.control.getSheetByName('Meta').rows=h.control.getSheetByName('Meta').rows.filter(r=>r[0]!=='monthlyStorage');
+ h.control.getSheetByName('Journals').appendRow(['keep-this','2026-11-12',p.id,1,'now','selected','req','note','next']);
+ const backup=h.makeBook('invalid-backup');
+ backup.insertSheet('Journals').appendRow(['journalId','date','employeeId','revision','updatedAt','updatedBy','requestId','note','tomorrow']);
+ h.props.WORKPULSE_BACKUP_SHEET_ID=backup.getId();
+ assert.throws(()=>h.scope.wpPrivateMigrateLegacyMonthly_(),/備份與目前控制表/);
+ assert.equal(h.scope.wpMonthIndex_(h.control)['2026-11'],undefined);
 });
