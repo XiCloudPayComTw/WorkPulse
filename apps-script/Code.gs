@@ -1,12 +1,12 @@
 /**
- * WorkPulse v0.3.0 — Google Apps Script back-end.
+ * WorkPulse v0.6.0 — Google Apps Script back-end.
  * Deploy as an HTMLService web app. This file is intentionally unbundled and
  * contains no hard-coded spreadsheet ID, domain, email, password or token.
  *
  * Script properties required before setupWorkPulse_() is run manually:
  * WORKPULSE_SHEET_ID, WORKPULSE_ALLOWED_DOMAIN, WORKPULSE_ADMIN_EMAIL.
  */
-var WP_SCHEMA = '3';
+var WP_SCHEMA = '4';
 var WP_HEADERS = {
   Employees:['employeeId','email','name','role','departmentId','active','revision','updatedAt','updatedBy'],
   Departments:['departmentId','name','active','revision','updatedAt','updatedBy'],
@@ -15,6 +15,7 @@ var WP_HEADERS = {
   Tasks:['taskId','journalId','revision','position','project','category','title','description','result','status','hours'],
   Requests:['requestId','actorEmail','journalId','revision','createdAt'],
   Audit:['auditId','occurredAt','actorEmail','action','journalId','revision','requestId'],
+  Reviews:['reviewId','journalId','journalRevision','status','actorEmail','comment','requestId','createdAt'],
   Meta:['key','value']
 };
 var WP_CATEGORIES = ['前端開發','展店設計','現場勘查','行政／會議','其他'];
@@ -51,8 +52,11 @@ function setupWorkPulse_() {
     });
     var meta = wpSheet_(book,'Meta');
     var existingSchema = wpRows_(meta).find(function(r){return r.key==='schemaVersion';});
-    if (existingSchema && String(existingSchema.value)!==WP_SCHEMA) throw Error('版本不相容；v2 請先執行 upgradeWorkPulseV3_。');
+    if (existingSchema && String(existingSchema.value)!==WP_SCHEMA) throw Error('版本不相容；請先備份並完成 v2→v3→v4 資料遷移。');
     if (!existingSchema) meta.appendRow(['schemaVersion',WP_SCHEMA]);
+     var metaRows=wpRows_(meta);
+     if (!metaRows.some(function(r){return r.key==='reviewEnabled';})) meta.appendRow(['reviewEnabled','false']);
+     if (!metaRows.some(function(r){return r.key==='reviewSettingsRevision';})) meta.appendRow(['reviewSettingsRevision','1']);
     var employees = wpSheet_(book,'Employees');
     if (!wpRows_(employees).some(function(r){return String(r.email).toLowerCase()===cfg.adminEmail;})) {
       employees.appendRow(['admin-'+Utilities.getUuid(),cfg.adminEmail,'系統管理員','admin','',true,1,new Date().toISOString(),cfg.adminEmail]);
@@ -70,7 +74,7 @@ function wpBootstrap(month) {
   return {
     store:{version:1,mode:'cloud',employees:ctx.visible.map(function(e){return {id:e.employeeId,name:e.name};}),
       projects:ctx.projects.map(function(p){return p.name;}),journals:wpMonthRecords_(ctx,m)},
-    month:m, user:{id:ctx.actor.employeeId,email:ctx.actor.email,name:ctx.actor.name,
+    month:m, review:wpReviewConfig_(ctx.book), user:{id:ctx.actor.employeeId,email:ctx.actor.email,name:ctx.actor.name,
       role:ctx.actor.role,departmentId:ctx.actor.departmentId,
       canWriteIds:ctx.visible.filter(function(e){return wpCanWrite_(ctx.actor,e);}).map(function(e){return e.employeeId;})}
   };
@@ -78,7 +82,7 @@ function wpBootstrap(month) {
 function wpLoadMonth(month) {
   var ctx = wpContext_();
   var m = wpMonth_(month);
-  return {month:m,journals:wpMonthRecords_(ctx,m)};
+  return {month:m,review:wpReviewConfig_(ctx.book),journals:wpMonthRecords_(ctx,m)};
 }
 function wpSaveJournal(payload) {
   var ctx = wpContext_();
@@ -99,6 +103,8 @@ function wpSaveJournal(payload) {
     }
     var rows=wpRows_(journalSheet);
     var existing=rows.find(function(r){return r.date===input.date && r.employeeId===input.employeeId;});
+     if(existing && ['submitted','approved'].indexOf(wpReviewStatus_(book,existing.journalId))>=0)
+       throw Error('此日誌已提交審核或已通過，不能修改；請聯絡主管退回後再編輯。');
     if (existing && existing.requestId===input.requestId) {
       return {ok:true,deduplicated:true,journal:wpFindRecord_(ctx,existing),requestId:input.requestId};
     }
@@ -122,7 +128,7 @@ function wpSaveJournal(payload) {
     SpreadsheetApp.flush();
     return {ok:true,deduplicated:false,requestId:input.requestId,journal:{
       id:journalId,date:input.date,employeeId:input.employeeId,revision:next,updatedAt:now,
-      note:input.note,tomorrow:input.tomorrow,tasks:input.tasks
+      note:input.note,tomorrow:input.tomorrow,tasks:input.tasks,review:wpReviewPublic_(wpReviewMap_(book)[journalId])
     }};
   } finally {lock.releaseLock();}
 }
@@ -240,14 +246,15 @@ function wpMonthRecords_(ctx,month) {
   var journals=wpRows_(wpSheet_(ctx.book,'Journals')).filter(function(j){return String(j.date).slice(0,7)===month&&allowed[j.employeeId];});
   if (journals.length>3000) throw Error('資料量過大，請縮小查詢範圍或升級資料庫');
   var taskList=wpRows_(wpSheet_(ctx.book,'Tasks'));
-  return journals.map(function(j){return wpRecord_(j,taskList);});
+  var reviewMap=wpReviewMap_(ctx.book);
+  return journals.map(function(j){return wpRecord_(j,taskList,reviewMap);});
 }
 function wpFindRecord_(ctx,journal) {
   if (!ctx.visible.some(function(e){return e.employeeId===journal.employeeId;})) throw Error('無權查看此紀錄');
-  return wpRecord_(journal,wpRows_(wpSheet_(ctx.book,'Tasks')));
+  return wpRecord_(journal,wpRows_(wpSheet_(ctx.book,'Tasks')),wpReviewMap_(ctx.book));
 }
-function wpRecord_(j,tasks) {
-  return {id:String(j.journalId),date:String(j.date),employeeId:String(j.employeeId),
+function wpRecord_(j,tasks,reviewMap) {
+  return {id:String(j.journalId),date:String(j.date),employeeId:String(j.employeeId),review:wpReviewPublic_(reviewMap&&reviewMap[j.journalId]),
     revision:Number(j.revision)||0,note:wpPlainText_(j.note),tomorrow:wpPlainText_(j.tomorrow),
     updatedAt:String(j.updatedAt),tasks:tasks.filter(function(t){return t.journalId===j.journalId&&Number(t.revision)===Number(j.revision);})
      .sort(function(a,b){return Number(a.position)-Number(b.position);})

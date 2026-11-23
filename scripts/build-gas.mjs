@@ -1,7 +1,7 @@
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 // Offline, dependency-free ES module flattening for the known WorkPulse source graph.
 // Fail rather than silently bundling unsupported import/export syntax.
-const ordered=['src/utils.js','src/data.js','src/icons.js','src/cloud.js','src/admin.js','src/reports.js','src/xlsx.js','src/report-ui.js','src/quick-entry.js','src/app.js'];
+const ordered=['src/utils.js','src/data.js','src/icons.js','src/cloud.js','src/admin.js','src/reports.js','src/xlsx.js','src/report-ui.js','src/quick-entry.js','src/review-ui.js','src/app.js'];
 let js='';
 for (const name of ordered){
  let source=await readFile(name,'utf8');
@@ -22,5 +22,6 @@ if (html===index || html.includes('type="module"')) throw Error('Apps Script HTM
 await mkdir('dist-gas',{recursive:true});
 await writeFile('dist-gas/Index.html',html);
 await writeFile('dist-gas/Code.gs',await readFile('apps-script/Code.gs','utf8'));
+await writeFile('dist-gas/Review.gs',await readFile('apps-script/Review.gs','utf8'));
 await writeFile('dist-gas/appsscript.json',await readFile('apps-script/appsscript.json','utf8'));
-console.log('Built dist-gas: Index.html + Code.gs + appsscript.json');
+console.log('Built dist-gas: Index.html + Code.gs + Review.gs + appsscript.json');

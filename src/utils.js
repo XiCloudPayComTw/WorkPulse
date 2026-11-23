@@ -18,7 +18,7 @@ export function esc(value = '') {
   return String(value ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 }
 export function uid() {
-  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 export function formatHours(hours) { return `${Number(hours || 0).toLocaleString('zh-TW',{ maximumFractionDigits:1 })} h`; }
 export function download(name, content, type = 'application/json;charset=utf-8') {
