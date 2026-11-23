@@ -122,10 +122,10 @@
 ## v0.6.0 — 主管審核工作流（PR #6）
 
 - 核對 v0.5.0 PR #5 已合併，起始 main commit `0a5399fefec170541d9a4a2779dc8839c773b790`，開發時無待處理 PR；基於獨立 `feat/workpulse-v0.6.0`。
-- `apps-script/Review.gs`：新增可選式審核，schema v4 `Reviews` append-only 事件、Meta 開關與版本、使用者與部門後端授權、本人提交／主管通過或退回、自我審核禁止、版本鎖與 idempotency；不允許在仍有 submitted 日誌時停用功能。
+- `apps-script/Review.gs`：新增可選式審核，schema v4 `Reviews` append-only 事件、Meta 開關與版本、使用者與部門後端授權、本人提交／主管通過或退回、自我審核禁止、版本鎖與 idempotency；斷線後同一 requestId 重送可回傳日誌，且重送前重新檢查使用者的部門權限；不允許在仍有 submitted 日誌時停用功能。
 - `apps-script/Code.gs`：初始化 v4，讀取與儲存整合審核狀態；送審與通過後鎖定寫入，退回才重新可編輯；保留舊 `Tasks`／`Audit`。
 - `src/review-ui.js` 和 `src/app.js`：新增主管審核導覽／工作台、員工提交按鈕、歷史狀態與原因、事件歷程，以及管理員的啟用開關。原本簡約浮凸色彩維持，行動版防止長文字溢出。
 - `scripts/build-gas.mjs`：加入 review-ui 模組並輸出 Review.gs；`src/cloud.js` 只允許明確列出的審核 API；`package.json` v0.6.0。
 - 由既有 v3 資料升級**必須先備份**、管理員從 Apps Script 編輯器手動執行 `upgradeWorkPulseV4_()`；v2 應先經 v3。新公司可用 v4 初始化。流程見 [REVIEWS.md](REVIEWS.md)。
 - GitHub Pages 不具公司身分與後端寫入，**沒有真實主管審核能力**；Google Workspace 真實授權、多人端對端與資料備份仍未正式驗收。
-- 完成後以 `npm run verify`（47 項）與 GitHub Actions 做完整驗證；真實 Workspace／Sheets 仍需部署後獨立測試。
+- 完成後以 `npm run verify`（54 項）與 GitHub Actions 做完整驗證；真實 Workspace／Sheets 仍需部署後獨立測試。
