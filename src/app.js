@@ -71,6 +71,8 @@ function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord
   return {date,employeeId,note:record?.note||'',tomorrow:record?.tomorrow||'',tasks:record?.tasks.length?record.tasks.map(makeItem):[makeItem()],editing:!!record,revision:record?.revision||0};
 }
 function canEditJournal(employeeId){return !isCloud || Boolean(state.cloud.user?.canWriteIds?.includes(employeeId));}
+function journalLocked(record){return isCloud && ['submitted','approved'].includes(record?.review?.status);}
+function canSubmitReview(record){return isCloud && state.cloud.review?.enabled && record && record.employeeId===state.cloud.user?.id && ['draft','returned'].includes(record.review?.status||'draft');}
 function employeeName(id){return state.store.employees.find(e=>e.id===id)?.name || '未指定人員';}
 function navButton(n, mobile=false){return `<button type="button" class="nav-link ${state.view===n.id?'active':''}" data-action="navigate" data-view="${n.id}" aria-current="${state.view===n.id?'page':'false'}">${icon(n.symbol,mobile?18:19)}<span>${n.label}</span></button>`;}
 function renderShell(){
@@ -125,7 +127,8 @@ function renderEntry(){
  const existing = state.store.mode !== 'demo' && journalFor(state.store,d.date,d.employeeId);
  const previous=recentPriorJournal(state.store.journals,d.date,d.employeeId);
  const templates=state.templates;
- return `${syncBanner()}<div class="entry-grid"><div><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">基本資訊</h2><p class="card-sub">選擇日期與填寫人員，同一天可建立多個工作項目</p></div><span class="tag">${existing?'編輯紀錄':'新增紀錄'}</span></div><div class="form-fields">
+ if(journalLocked(existing))return `${syncBanner()}<section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">此日誌已鎖定</h2><p class="card-sub">已提交審核或審核通過的工作日誌無法直接修改。請聯絡主管退回。</p></div>${reviewBadge(existing.review)}</div><button class="soft-button sm section-space" data-action="navigate" data-view="history">${icon('calendar',16)} 返回歷史紀錄</button></section>`;
+ return `${syncBanner()}<div class="entry-grid"><div><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">基本資訊</h2><p class="card-sub">選擇日期與填寫人員，同一天可建立多個工作項目</p></div><div class="review-entry-badges"><span class="tag">${existing?'編輯紀錄':'新增紀錄'}</span>${isCloud&&state.cloud.review?.enabled&&existing?reviewBadge(existing.review):''}</div></div><div class="form-fields">
   <label class="form-group"><span class="field-label">工作日期 *</span><input class="input" type="date" id="entry-date" data-identity="date" value="${esc(d.date)}" required /></label>
   <label class="form-group"><span class="field-label">填寫人員 *</span><select class="input" id="entry-employee" data-identity="employeeId">${state.store.employees.filter(e=>canEditJournal(e.id)).map(e=>`<option value="${esc(e.id)}" ${d.employeeId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></label>
  </div></section>
@@ -271,7 +274,7 @@ function notify(text,error=false){state.toast={text,error};showToast(text,error)
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;flushQuickDraft();return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
-function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
+function openRecord(record){if(journalLocked(record)){notify('日誌已鎖定，請聯絡主管退回後再編輯',true);return;}if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
 function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=isCloud?state.cloud.user?.id:state.store.employees[0]?.id;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
@@ -306,6 +309,7 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
 async function saveCloudJournal(){
  if(state.cloud.saving || state.cloud.phase!=='ready')return;
  const d=state.draft;
+ if(journalLocked(journalFor(state.store,d.date,d.employeeId))){notify('日誌已鎖定，請聯絡主管退回',true);return;}
  if(!d.date || !d.employeeId || !d.tasks.some(t=>t.title.trim())){notify('請選日期、人員並至少填寫一項工作名稱',true);return;}
  const hours=d.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);
  if(d.tasks.some(t=>Number(t.hours)<0||Number(t.hours)>24) || hours>24){notify('每日總工時不可超過 24 小時',true);return;}
