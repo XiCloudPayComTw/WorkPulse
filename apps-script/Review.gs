@@ -66,7 +66,7 @@ function wpReviewSubmit(payload) {
     if(!wpReviewConfig_(ctx.book).enabled)throw Error('公司尚未啟用主管審核');
     var target=wpReviewTarget_(ctx,input.journalId),j=target.journal;
     if(ctx.actor.employeeId!==j.employeeId||!target.target.active)throw Error('只有日誌本人能提交審核');
-    var duplicate=wpReviewDuplicate_(ctx,input,'submitted');if(duplicate)return duplicate;
+    var duplicate=wpReviewDuplicate_(ctx,input,'submitted');if(duplicate)return Object.assign({},duplicate,{journal:wpFindRecord_(ctx,j)});
     if(Number(j.revision)!==input.expectedRevision)throw Error('CONFLICT:日誌版本已更新，請重新載入');
     var last=wpReviewStatus_(ctx.book,j.journalId);
     if(['submitted','approved'].indexOf(last)>=0)throw Error('日誌已送審或通過，不能重複提交');
