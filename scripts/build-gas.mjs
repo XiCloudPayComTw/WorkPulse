@@ -15,14 +15,14 @@ for(const name of ordered){
 if(/<\/script\s*>/i.test(js))throw Error('Unexpected script terminator');
 const html=await readFile('index.html','utf8'),css=await readFile('styles.css','utf8');
 const manifest=await readFile('apps-script/appsscript.json','utf8');
-const core=await readFile('apps-script/Core.gs','utf8');
-const monthly=await readFile('apps-script/Monthly.gs','utf8');
-const simple=await readFile('apps-script/Simple.gs','utf8');
-const owner=await readFile('apps-script/Owner.gs','utf8');
-const attendance=await readFile('apps-script/Attendance.gs','utf8');
-const attendanceSave=await readFile('apps-script/AttendanceSave.gs','utf8');
-const attendanceRange=await readFile('apps-script/AttendanceRange.gs','utf8');
-const attendanceOwner=await readFile('apps-script/OwnerAttendance.gs','utf8');
+const core=await readFile('apps-script/shared/Core.gs','utf8');
+const monthly=await readFile('apps-script/shared/Monthly.gs','utf8');
+const simple=await readFile('apps-script/journals/Simple.gs','utf8');
+const owner=await readFile('apps-script/admin/Owner.gs','utf8');
+const attendance=await readFile('apps-script/attendance/Attendance.gs','utf8');
+const attendanceSave=await readFile('apps-script/attendance/AttendanceSave.gs','utf8');
+const attendanceRange=await readFile('apps-script/attendance/AttendanceRange.gs','utf8');
+const attendanceOwner=await readFile('apps-script/admin/OwnerAttendance.gs','utf8');
 if(/function\s+wpOwner(?:Bootstrap|SaveEmployee|DeleteJournal|AttendanceConfig|SaveAttendanceConfig)\s*\(/.test(core+'\n'+monthly+'\n'+simple+'\n'+attendance+'\n'+attendanceSave))
  throw Error('Owner API accidentally included in public backend');
 // Always remove old build outputs, preventing stale privileged files in a public bundle.

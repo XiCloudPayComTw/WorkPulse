@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-const read=n=>readFileSync(new URL('../apps-script/'+n,import.meta.url),'utf8');
+const serverFileNames={"Core.gs":"shared/Core.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
+const read=n=>readFileSync(new URL('../apps-script/'+(serverFileNames[n]||n),import.meta.url),'utf8');
 const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
 function harness(){
  let current='admin@example.com',effective='admin@example.com',counter=1,locked=false;
