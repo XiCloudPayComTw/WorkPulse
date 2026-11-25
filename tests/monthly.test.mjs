@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const read=n=>readFileSync(new URL('../apps-script/'+n,import.meta.url),'utf8');
-const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs'].map(read).join('\n');
+const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
 function harness(){
  let current='admin@example.com',effective='admin@example.com',counter=1,locked=false;
  const books=new Map(),files=new Map(),folders=new Map();
@@ -261,4 +261,32 @@ test('explicitly authorized company design operator can edit payroll settings bu
  assert.throws(()=>h.scope.wpPrivateMigrateLegacyMonthly_(),/公司資料持有帳號/);
  h.as('intruder@example.com');h.effective('intruder@example.com');
  assert.throws(()=>h.scope.wpOwnerAttendanceConfig({employeeId:p.id,month:'2026-11'}),/管理帳號/);
+});
+
+test('payroll date range loads separate months without creating empty Sheets',()=>{
+ const h=harness();h.setup();const e=h.employee();h.as('');
+ const before=h.books.size;
+ let empty=h.scope.wpAttendanceRange({employeeId:e.id,startDate:'2026-11-01',endDate:'2026-12-31'});
+ assert.equal(empty.rows.length,0);
+ assert.equal(h.books.size,before);
+ for(const [date,key] of [['2026-11-26','range-payroll-001'],['2026-12-01','range-payroll-002']]){
+  h.scope.wpAttendanceSave({date,employeeId:e.id,dayType:'workday',
+   startTime:'09:00',endTime:'20:00',breakMinutes:60,leaveType:'none',
+   leaveMinutes:0,notes:'跨月測試',expectedRevision:0,requestId:key+'0001'});
+ }
+ const result=h.scope.wpAttendanceRange({employeeId:e.id,startDate:'2026-11-25',endDate:'2026-12-02'});
+ assert.equal(result.rows.length,2);
+ assert.equal(result.rows[0].date,'2026-11-26');
+ assert.equal(result.rows[1].date,'2026-12-01');
+ assert.equal(result.rows[0].overtimePay,undefined);
+ assert.equal(result.rows[0].monthlyWage,undefined);
+ assert.equal(h.books.size,before+2);
+});
+test('payroll range rejects salary transport, invalid employees and oversized spans',()=>{
+ const h=harness();h.setup();const e=h.employee();h.as('');
+ const input={employeeId:e.id,startDate:'2026-11-01',endDate:'2026-11-30'};
+ assert.throws(()=>h.scope.wpAttendanceRange({...input,monthlyWage:60000}),/不得傳送/);
+ assert.throws(()=>h.scope.wpAttendanceRange({...input,overtimePay:10}),/不得傳送/);
+ assert.throws(()=>h.scope.wpAttendanceRange({...input,employeeId:'fake-employee'}),/有效的出勤人員/);
+ assert.throws(()=>h.scope.wpAttendanceRange({...input,endDate:'2028-12-31'}),/366/);
 });
