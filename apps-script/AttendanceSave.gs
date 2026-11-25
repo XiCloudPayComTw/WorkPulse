@@ -1,6 +1,8 @@
 /** Attendance write endpoint. Separate file to keep public APIs auditable. */
 function wpAttendanceSave(input){
  if(!input||typeof input!=='object')throw Error('出勤資料錯誤');
+ if(Object.prototype.hasOwnProperty.call(input,'monthlyWage')||Object.prototype.hasOwnProperty.call(input,'overtimePay'))
+  throw Error('薪資及試算金額只能在目前瀏覽器試算，禁止上傳');
  var id=String(input.employeeId||''),date=wpDate_(input.date),month=date.slice(0,7);
  var day=String(input.dayType||'workday'),leave=String(input.leaveType||'none');
  var request=String(input.requestId||''),revision=Number(input.expectedRevision);
@@ -25,10 +27,9 @@ function wpAttendanceSave(input){
   var existing=rows.find(function(x){return x.date===date&&x.employeeId===id;});
   var oldVersion=existing?Number(existing.revision)||0:0;
   if(oldVersion!==revision)throw Error('CONFLICT:出勤紀錄已被更新');
-  var settings=wpAttConfig_(control,id,month),pay=wpAttPay_(day,worked,settings.monthlyWage);
   var now=new Date().toISOString(),newId=existing?existing.attendanceId:Utilities.getUuid();
   var values=[newId,date,id,day,String(input.startTime||''),String(input.endTime||''),pause,worked,
-   wpAttExtra_(day,worked),leave,leaveMinutes,pay==null?'':pay,notes,oldVersion+1,now,request];
+   wpAttExtra_(day,worked),leave,leaveMinutes,'',notes,oldVersion+1,now,request];
   if(existing)sheet.getRange(existing.__row,1,1,values.length).setValues([values]);else sheet.appendRow(values);
   wpSheet_(file,'Requests').appendRow([request,'attendance:'+id,newId,oldVersion+1,now]);
   wpSheet_(file,'Audit').appendRow([Utilities.getUuid(),now,'attendance:'+id,
