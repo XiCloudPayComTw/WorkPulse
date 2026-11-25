@@ -21,6 +21,11 @@ function localRows(){
   return clean;
  }catch{return [];}
 }
+/** Read anonymous demo attendance across months. Salary is never part of the result. */
+export function readLocalAttendanceRange(employeeId,startDate,endDate){
+ return localRows().filter(r=>r.employeeId===employeeId&&r.date>=startDate&&r.date<=endDate)
+  .map(({overtimePay,monthlyWage,...r})=>r);
+}
 export function updateTemporarySalary(value){
  // Memory-only. Never included in a draft, request, localStorage or Google Sheets.
  attendanceState.temporarySalary=String(value??'').slice(0,16);
