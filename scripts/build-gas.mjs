@@ -22,7 +22,7 @@ const owner=await readFile('apps-script/Owner.gs','utf8');
 const attendance=await readFile('apps-script/Attendance.gs','utf8');
 const attendanceSave=await readFile('apps-script/AttendanceSave.gs','utf8');
 const attendanceOwner=await readFile('apps-script/OwnerAttendance.gs','utf8');
-if(/function\s+wpOwner(?:Bootstrap|SaveEmployee|DeleteJournal)\s*\(/.test(core+'\n'+monthly+'\n'+simple))
+if(/function\s+wpOwner(?:Bootstrap|SaveEmployee|DeleteJournal|AttendanceConfig|SaveAttendanceConfig)\s*\(/.test(core+'\n'+monthly+'\n'+simple+'\n'+attendance+'\n'+attendanceSave))
  throw Error('Owner API accidentally included in public backend');
 // Always remove old build outputs, preventing stale privileged files in a public bundle.
 await rm('dist-gas',{recursive:true,force:true});
