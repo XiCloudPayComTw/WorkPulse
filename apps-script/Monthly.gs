@@ -162,7 +162,7 @@ function wpPrivateCreateWorkspace_(){
   return wpPrivateSetupMonthly_();
 }
 function wpPrivateSetupMonthly_(){
-  var cfg=wpOwnerAssert_(),lock=LockService.getScriptLock();lock.waitLock(30000);
+  var cfg=wpPrimaryOwnerAssert_(),lock=LockService.getScriptLock();lock.waitLock(30000);
   try{
     var control=SpreadsheetApp.openById(cfg.sheetId);
     var owner=DriveApp.getFileById(cfg.sheetId).getOwner().getEmail();
@@ -205,7 +205,7 @@ function wpCopyLegacy_(source,target,name,records){
   });
 }
 function wpPrivateMigrateLegacyMonthly_(){
-  wpOwnerAssert_();
+  wpPrimaryOwnerAssert_();
   var backupId=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_BACKUP_SHEET_ID')||'');
   var cfg=wpConfig_();
   if(!backupId||backupId===cfg.sheetId)throw Error('請先備份並設定不同的 WORKPULSE_BACKUP_SHEET_ID');
