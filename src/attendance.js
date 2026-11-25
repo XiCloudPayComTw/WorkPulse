@@ -1,5 +1,5 @@
 /** WorkPulse v0.9 — attendance calculations. Taiwan, standard 8h/40h regime.
- * Overtime pay is an ESTIMATE using configured monthly ordinary wage / 240.
+ * Overtime pay is an ESTIMATE calculated locally from transient monthly wage / 240.
  * This does not infer company schedules, holiday transfers or flexible-hour arrangements.
  */
 export const DAY_TYPES={workday:'一般工作日',rest:'休息日',holiday:'國定假日／特休出勤',weekly:'例假日（須人工核算）'};
@@ -61,14 +61,15 @@ export function weekdayCount(month){
  for(let i=1;i<=days;i++){const day=new Date(Date.UTC(year,m-1,i)).getUTCDay();if(day>=1&&day<=5)count++;}
  return count;
 }
-export function attendanceSummary(rows,month,expectedDays){
+export function attendanceSummary(rows,month,expectedDays,temporaryMonthlyWage=null){
  const current=rows.filter(r=>r.date?.startsWith(month));
  const worked=current.reduce((s,r)=>s+(Number(r.workedMinutes)||0),0);
  const overtime=current.reduce((s,r)=>s+(Number(r.overtimeMinutes)||0),0);
  const leave=current.reduce((s,r)=>s+(Number(r.leaveMinutes)||0),0);
  const actualWorkedDays=current.filter(r=>Number(r.workedMinutes)>0).length;
- const unknownPay=current.some(r=>Number(r.overtimeMinutes)>0&&r.overtimePay==null);
- const totalPay=unknownPay?null:current.reduce((s,r)=>s+(Number(r.overtimePay)||0),0);
+ // Recalculate from entered wage only. Never use persisted attendance pay.
+ const pays=current.map(row=>payEstimate(row.dayType||'workday',row.workedMinutes,temporaryMonthlyWage));
+ const totalPay=pays.some(value=>value===null)?null:Math.round(pays.reduce((sum,value)=>sum+value,0)*100)/100;
  const expected=Number.isInteger(Number(expectedDays))&&expectedDays!==null&&expectedDays!==undefined?Number(expectedDays):weekdayCount(month);
  return {workedMinutes:worked,overtimeMinutes:overtime,leaveMinutes:leave,leaveDays:leave/480,
    workedDays:actualWorkedDays,expectedDays:expected,expectedIsEstimate:expectedDays==null,totalPay};
