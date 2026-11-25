@@ -1,6 +1,6 @@
 import {esc} from './utils.js';
 import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,TWD_FORMAT,validateAttendanceDraft,payEstimate} from './attendance.js';
-import {attendanceState} from './attendance-state.js';
+import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig} from './attendance-state.js';
 function opts(items,selected){
  return Object.entries(items).map(([key,value])=>'<option value="'+esc(key)+'" '+(selected===key?'selected':'')+'>'+esc(value)+'</option>').join('');
 }
@@ -76,3 +76,69 @@ export function renderAttendance(people,isAdmin=false){
  (info.expectedIsEstimate?'<p class="small muted att-estimate">應上班天數暫用週一至週五推估，未扣除國定假日與調班，管理員可設定確切天數。</p>':'')+
  '<div class="att-layout">'+editor+admin+'</div>'+table+law+'</div>';
 }
+
+/** Attendance interactions are delegated here to avoid coupling the journal editor. */
+function refreshAttendanceDom(){
+ const element=document.querySelector('.att-page');
+ if(element)element.outerHTML=renderAttendance(knownPeople,knownAdmin);
+}
+async function changeAttendanceMonth(month,employee){
+ attendanceNotice='';
+ const promise=loadAttendance(knownPeople,knownAdmin,month,employee);
+ refreshAttendanceDom();
+ await promise;
+ refreshAttendanceDom();
+}
+document.addEventListener('click',event=>{
+ const el=event.target.closest('[data-action]');
+ if(!el||!el.closest('.att-page'))return;
+ const action=el.dataset.action;
+ if(action==='attendance-refresh'){
+  changeAttendanceMonth(attendanceState.month,attendanceState.employeeId)
+   .catch(e=>{attendanceNotice=e.message;refreshAttendanceDom();});
+ }else if(action==='attendance-edit'){
+  attendanceNotice='';attendanceSelectDate(el.dataset.date);refreshAttendanceDom();
+  document.querySelector('.att-layout')?.scrollIntoView({behavior:'smooth',block:'start'});
+ }else if(action==='attendance-save'){
+  attendanceNotice='正在儲存出勤紀錄…';
+  submitAttendance().then(()=>attendanceNotice='出勤紀錄已成功儲存至 Google Sheets／本機展示資料。')
+   .catch(e=>attendanceNotice='無法儲存：'+e.message).finally(refreshAttendanceDom);
+  refreshAttendanceDom();
+ }else if(action==='attendance-config-save'){
+  attendanceNotice='正在儲存計薪設定…';
+  saveAttendanceConfig().then(()=>attendanceNotice='計薪與應上班天數設定已儲存')
+   .catch(e=>attendanceNotice='設定失敗：'+e.message).finally(refreshAttendanceDom);
+  refreshAttendanceDom();
+ }
+});
+document.addEventListener('input',event=>{
+ const el=event.target;
+ if(!el.closest('.att-page'))return;
+ if(el.matches('[data-att-field]'))updateAttendance(el.dataset.attField,el.value);
+ if(el.matches('[data-att-config]'))updateAttendanceConfig(el.dataset.attConfig,el.value);
+});
+document.addEventListener('change',event=>{
+ const el=event.target;
+ if(!el.closest('.att-page'))return;
+ if(el.matches('[data-att-person]')||el.matches('[data-att-month]')){
+  if(attendanceState.dirty&&!confirm('出勤資料尚未儲存，確定要切換？')){refreshAttendanceDom();return;}
+  const month=el.matches('[data-att-month]')?el.value:attendanceState.month;
+  const employee=el.matches('[data-att-person]')?el.value:attendanceState.employeeId;
+  changeAttendanceMonth(month,employee).catch(e=>{attendanceNotice=e.message;refreshAttendanceDom();});return;
+ }
+ if(el.matches('[data-att-date]')){
+  if(attendanceState.dirty&&!confirm('出勤資料尚未儲存，確定要切換日期？')){refreshAttendanceDom();return;}
+  const date=el.value;
+  if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date)){attendanceNotice='日期格式無效';refreshAttendanceDom();return;}
+  if(date.slice(0,7)!==attendanceState.month){
+   attendanceState.date=date;
+   changeAttendanceMonth(date.slice(0,7),attendanceState.employeeId)
+    .catch(e=>{attendanceNotice=e.message;refreshAttendanceDom();});
+   return;
+  }
+  attendanceNotice='';attendanceSelectDate(date);refreshAttendanceDom();return;
+ }
+ if(el.matches('[data-att-field]')){
+  updateAttendance(el.dataset.attField,el.value);refreshAttendanceDom();
+ }
+});
