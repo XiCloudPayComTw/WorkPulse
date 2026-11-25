@@ -1,0 +1,56 @@
+/* styles/legacy-review.css — source layer 6 */
+/* v0.6.0: optional review workflow — restrained, stable neumorphic surfaces */
+.review-entry-badges,.review-top-actions,.review-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.review-entry-badges>*{min-width:0}
+.review-tag{display:inline-flex;align-items:center;justify-content:center;min-width:84px;max-width:100%;
+ padding:7px 12px;border-radius:999px;font-size:13px;line-height:1.4;font-weight:550;
+ background:#e4ebf1;color:#526778;box-shadow:inset 2px 2px 5px rgba(94,111,130,.12),inset -2px -2px 5px rgba(255,255,255,.9);
+ border:1px solid rgba(255,255,255,.65);overflow-wrap:anywhere}
+.review-approved{background:#deebe8;color:#356b5c}
+.review-submitted{background:#dbe7f4;color:#3d678a}
+.review-returned{background:#f4e4dd;color:#925d43}
+.review-draft{background:#e9edf2;color:#68798a}
+.review-head{display:flex;justify-content:space-between;align-items:center;gap:24px;min-width:0}
+.review-head>div{min-width:0}
+.review-top-actions{justify-content:flex-end}
+.review-month-label{min-width:180px;margin:0}
+.review-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr));gap:20px;min-width:0}
+.review-record{min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:16px}
+.review-record-title{align-items:flex-start;gap:12px}
+.review-record-title>div{min-width:0;overflow-wrap:anywhere}
+.review-record-title .card-title{margin-top:7px}
+.review-tasks{display:grid;gap:10px;min-width:0}
+.review-task{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:12px;
+ background:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.45);min-width:0}
+.review-task>*{min-width:0;overflow-wrap:anywhere}
+.review-task>.small{text-align:right;flex:0 1 45%}
+.review-record textarea{min-height:90px;resize:vertical}
+.review-record .review-actions{margin-top:auto}
+.review-record .review-actions button{flex:1;min-width:145px}
+.review-note,.review-return-message{overflow-wrap:anywhere;line-height:1.7}
+.review-return-message{margin:14px 0;padding:13px 15px;background:#f4e4dd;border-radius:13px;color:#87543f}
+.review-history-status{margin:12px 0}
+.review-summary{display:flex;align-items:center;gap:12px;font-size:15px;color:#546b7a}
+.review-count{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.review-timeline{padding:14px;margin:12px 0;border-radius:14px;background:rgba(230,237,244,.6);min-width:0}
+.review-timeline-row{padding:10px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow-wrap:anywhere}
+.review-timeline-row+.review-timeline-row{border-top:1px solid rgba(117,137,155,.15)}
+.review-timeline-row p{width:100%;margin:0;line-height:1.65;overflow-wrap:anywhere}
+.review-settings{overflow:hidden}
+.review-settings .card-head>*{min-width:0}
+.review-submit-btn{width:100%}
+@media(max-width:650px){
+ .review-head{align-items:stretch;flex-direction:column;gap:16px}
+ .review-top-actions{justify-content:space-between;width:100%}
+ .review-month-label{min-width:0;flex:1}
+ .review-task{flex-direction:column;gap:5px}
+ .review-task>.small{text-align:left;flex:auto}
+ .review-record .review-actions button{width:100%}
+}
+
+.review-task>div{min-width:0;flex:1;overflow-wrap:anywhere}.review-task>div p{margin:7px 0 0;line-height:1.6}
+
+.review-overview{display:flex;justify-content:space-between;align-items:center;gap:16px;min-width:0}.review-overview>div{min-width:0;overflow-wrap:anywhere}.review-overview button{flex-shrink:0}@media(max-width:620px){.review-overview{flex-direction:column;align-items:stretch}.review-overview button{width:100%}}
+
+
+

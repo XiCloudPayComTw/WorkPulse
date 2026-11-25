@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {previousCompletedMonth,payrollPeriod,payrollDays,buildPayrollReport} from '../src/payroll.js';
-import {payrollWorkbookSheets,createPayrollXlsx} from '../src/payroll-xlsx.js';
+import {previousCompletedMonth,payrollPeriod,payrollDays,buildPayrollReport} from '../src/features/payroll/payroll.js';
+import {payrollWorkbookSheets,createPayrollXlsx} from '../src/features/payroll/payroll-xlsx.js';
 
 function sampleRows(){
  return [

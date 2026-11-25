@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildReport, reportCsv, reportSheets } from '../src/reports.js';
-import { buildXlsx } from '../src/xlsx.js';
+import { buildReport, reportCsv, reportSheets } from '../src/features/reports/reports.js';
+import { buildXlsx } from '../src/shared/xlsx.js';
 
 const employees=[{id:'a',name:'甲同事',departmentId:'d1'},{id:'b',name:'乙同事',departmentId:'d2'}];
 const departments=[{id:'d1',name:'設計部'},{id:'d2',name:'工程部'}];

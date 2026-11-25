@@ -1,4 +1,4 @@
-import { localISODate, shiftDate, currentMonth, uid, csvSafe } from './utils.js';
+import { localISODate, shiftDate, currentMonth, uid, csvSafe } from '../../shared/utils.js';
 export const STORAGE_KEY = 'workpulse:v1';
 export const VERSION = 1;
 export const STATUSES = { done:'已完成', doing:'進行中', blocked:'待處理' };

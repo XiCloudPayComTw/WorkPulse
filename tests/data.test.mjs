@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { demoState, emptyState, validateState, saveJournal, journalFor, monthStats, csvExport, STORAGE_KEY, writeState, readState } from '../src/data.js';
-import { localISODate, shiftDate, esc, csvSafe } from '../src/utils.js';
+import { demoState, emptyState, validateState, saveJournal, journalFor, monthStats, csvExport, STORAGE_KEY, writeState, readState } from '../src/features/journals/data.js';
+import { localISODate, shiftDate, esc, csvSafe } from '../src/shared/utils.js';
 const example={date:'2026-11-22',employeeId:'me',note:'檢查結果',tomorrow:'持續測試',tasks:[{title:'首頁版型',category:'前端開發',project:'WorkPulse',description:'完成互動',result:'版型檔',status:'done',hours:2.5},{title:'施工現場確認',category:'現場勘查',project:'',description:'現場圖面',result:'',status:'doing',hours:1.5}]};
 
 test('local calendar dates do not depend on UTC timezone formatting',()=>{

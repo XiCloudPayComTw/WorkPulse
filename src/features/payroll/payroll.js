@@ -1,5 +1,5 @@
-import {payEstimate,weekdayLabel,DAY_TYPES,LEAVE_TYPES} from './attendance.js';
-import {localISODate} from './utils.js';
+import {payEstimate,weekdayLabel,DAY_TYPES,LEAVE_TYPES} from '../attendance/attendance.js';
+import {localISODate} from '../../shared/utils.js';
 const DAY_MS=86400000;
 const DATE_RE=/^(\d{4})-(\d{2})-(\d{2})$/;
 const round2=n=>Math.round((n+Number.EPSILON)*100)/100;

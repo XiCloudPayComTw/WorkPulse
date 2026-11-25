@@ -1,0 +1,71 @@
+/* styles/attendance.css — source layer 7 */
+/* v0.9.0 Attendance: stable neumorphic layout and 16px readable form fields. */
+.att-page{display:grid;gap:20px;min-width:0;width:100%;overflow-wrap:anywhere}
+.att-panel{min-width:0;overflow:hidden}
+.att-selectors,.att-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;min-width:0}
+.att-selectors{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end}
+.att-selectors>*{min-width:0}
+.att-selectors button{min-height:46px}
+.att-fields{margin-top:18px}
+.att-fields .form-group,.att-selectors .form-group{min-width:0}
+.att-fields .input,.att-selectors .input{min-width:0;width:100%;font-size:16px}
+.att-full{grid-column:1/-1}
+.att-static{display:flex;align-items:center;padding:12px 15px;min-height:46px;color:#516a7b;font-size:16px;background:#e4ebf1;border-radius:12px;box-shadow:var(--inset)}
+.att-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.att-metric{padding:18px 20px;min-height:96px;min-width:0;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.att-metric>span{font-size:15px;line-height:1.45;color:#637b8b;overflow-wrap:anywhere}
+.att-metric>strong{font-size:22px;line-height:1.3;font-weight:550;color:#344e60;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.att-estimate{margin:-6px 0 0;line-height:1.8}
+.att-layout{display:grid;gap:20px;min-width:0}
+.att-actions{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-top:19px;flex-wrap:wrap}
+.att-actions>*{min-width:0}
+.att-actions>span{flex:1;line-height:1.7}
+.att-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px;min-width:0}
+.att-preview>div{padding:14px 15px;border-radius:13px;background:#e7edf3;box-shadow:var(--inset);display:flex;flex-direction:column;gap:7px;min-width:0}
+.att-preview span{font-size:14px;color:#657c8a}
+.att-preview strong{font-size:17px;line-height:1.4;color:#39576b;font-weight:550;overflow-wrap:anywhere}
+.att-error{color:#9f4b4b;font-size:14px;line-height:1.7}
+.att-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;padding-bottom:4px}
+.att-table{border-collapse:collapse;min-width:1120px;width:100%;table-layout:fixed;text-align:left;font-size:15px}
+.att-table th,.att-table td{padding:12px 9px;border-bottom:1px solid rgba(107,125,145,.16);vertical-align:middle;white-space:nowrap}
+.att-table th{font-weight:550;color:#576f7f;background:rgba(223,231,238,.5);font-size:14px}
+.att-table tr:hover td{background:rgba(255,255,255,.23)}
+.att-table th:nth-child(3),.att-table td:nth-child(3){width:150px}
+.att-table th:nth-child(10),.att-table td:nth-child(10){width:180px}
+.att-table .att-note{display:block;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-law{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}
+.att-law p{background:#e5ecf2;box-shadow:var(--inset);border-radius:12px;padding:15px;font-size:15px;line-height:1.75;color:#587181;margin:0;min-width:0;overflow-wrap:anywhere}
+.att-law strong{display:block;font-size:16px;font-weight:560;color:#3e5c70;margin-bottom:4px}
+.att-panel a{color:#456d89;text-decoration:underline;text-underline-offset:3px}
+.att-notice{line-height:1.7;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:1020px){.att-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.att-preview{grid-template-columns:1fr}}
+@media(max-width:900px){
+ .mobile-nav{overflow-x:auto;overflow-y:hidden;justify-content:flex-start;scrollbar-width:thin}
+ .mobile-nav>.nav-link{flex:0 0 88px;min-width:88px;max-width:88px}
+}
+@media(max-width:600px){
+ .att-selectors{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .att-selectors button{grid-column:1/-1;width:100%}
+ .att-fields{grid-template-columns:1fr}
+ .att-metrics{gap:11px}
+ .att-metric{padding:15px;min-height:90px}
+ .att-metric>strong{font-size:18px}
+ .att-law{grid-template-columns:1fr}
+ .att-actions{align-items:stretch;flex-direction:column}
+ .att-actions button{width:100%}
+}
+@media(max-width:350px){.att-selectors{grid-template-columns:1fr}.att-metrics{grid-template-columns:1fr}}
+
+
+/* v0.9.1 on-screen-only payroll calculator. Keeps the sidebar and cards stable. */
+.att-salary-panel{min-width:0;display:grid;gap:16px;overflow:hidden}
+.att-salary-panel .card-sub{line-height:1.8}
+.att-salary-tools{display:flex;gap:14px;align-items:end;min-width:0;flex-wrap:wrap}
+.att-salary-tools .form-group{flex:1 1 250px;min-width:0;max-width:430px}
+.att-salary-tools .input{width:100%;font-size:17px;min-width:0}
+.att-salary-tools button{flex:none;min-height:46px}
+.att-salary-panel>.small{line-height:1.85;margin:0}
+@media(max-width:600px){.att-salary-tools{align-items:stretch;flex-direction:column}.att-salary-tools .form-group{flex:auto;width:100%;max-width:none}.att-salary-tools button{width:100%}}
+
+
+

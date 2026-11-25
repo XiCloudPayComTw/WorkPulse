@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-const backend=readFileSync(new URL('../apps-script/Code.gs',import.meta.url),'utf8');
-const reviewBackend=readFileSync(new URL('../apps-script/Review.gs',import.meta.url),'utf8');
+const backend=readFileSync(new URL('../apps-script/legacy/Code.gs',import.meta.url),'utf8');
+const reviewBackend=readFileSync(new URL('../apps-script/legacy/Review.gs',import.meta.url),'utf8');
 
 function harness(){
  let email='admin@example.com', seq=1, locked=false;

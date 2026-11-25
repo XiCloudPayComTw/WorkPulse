@@ -1,0 +1,135 @@
+/* styles/stability.css — source layer 5 */
+/* v0.5.0 — stable fluid geometry, readable type and unmistakable navigation */
+html{scrollbar-gutter:stable;overflow-x:clip}
+body{font-size:16px;overflow-x:clip}
+.shell{width:100%;max-width:1800px;grid-template-columns:264px minmax(0,1fr)}
+.sidebar{min-width:0;width:100%;max-width:100%;padding:30px 20px 25px 24px;gap:28px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;overscroll-behavior:contain;scrollbar-gutter:stable}
+.sidebar>*,.sidebar-bottom,.brand,.brand>div,.nav-list,.nav-link,.mode-card{min-width:0;max-width:100%}
+.sidebar-bottom{gap:14px}
+.brand{padding:8px 5px;flex-shrink:0}
+.brand-symbol{flex:none}
+.brand-title{font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-subtitle{font-size:11px;letter-spacing:.15em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-list{gap:9px}
+.nav-link{min-height:54px;flex:none;display:flex;align-items:center;gap:13px;padding:13px 15px;font-size:15px;font-weight:450;position:relative;white-space:nowrap;overflow:hidden;isolation:isolate}
+.nav-link .icon{flex:0 0 auto}
+.nav-link span{min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-link.active{background:linear-gradient(115deg,#d7e4ee 0%,#e5edf4 65%,#eef3f9 100%);color:#263f53;box-shadow:inset 4px 4px 10px rgba(65,92,112,.17),inset -3px -3px 8px rgba(255,255,255,.95),0 2px 8px rgba(87,110,132,.06);font-weight:650}
+.sidebar .nav-link.active:before{content:'';position:absolute;left:4px;top:14px;bottom:14px;width:3px;background:#7c99ac;border-radius:999px}
+.nav-link.active .icon{color:#54758d;stroke-width:2.1}
+.nav-link:hover:not(.active){background:#e7edf5;box-shadow:inset 1px 1px 4px rgba(68,86,100,.08)}
+.mode-card{overflow-wrap:anywhere;padding:16px}
+.mode-card p{font-size:13px;line-height:1.75}
+.mode-title{font-size:14px;line-height:1.55;overflow-wrap:anywhere}
+.mode-title .icon{flex:none}
+.sidebar-foot{font-size:12px}
+.main{min-width:0;width:100%;padding:34px clamp(20px,3.5vw,60px) 90px}
+.main>*,#page-content,#page-content>*,.topbar>*,.top-actions,.soft-card,.report-screen,.report-toolbar,.entry-grid,.entry-grid>*,.entry-summary,.form-fields,.form-group,.two-col,.two-col>*,.stats-grid,.stats-grid>*,.report-summary-grid,.report-summary-grid>*,.settings-grid,.settings-grid>*{min-width:0;max-width:100%}
+.topbar{min-height:140px;gap:16px}
+.topbar>div:first-child{flex:1;min-width:0}
+.topbar .eyebrow,.page-desc,.page-title{overflow-wrap:anywhere}
+.top-actions{flex:none;flex-wrap:nowrap}
+.top-actions .soft-button{min-width:120px}
+.tiny-date{white-space:nowrap}
+/* Content is allowed to wrap inside its OWN component, never widen the entire dashboard. */
+.card-head>*,.card-head>div,.row-between>*,.section-head>*,.report-panel-header>*,.history-head>*,.history-head .row,.history-day-summary,.team-member-main>*,.team-member-actions>*{min-width:0;max-width:100%}
+.card-title,.card-sub,.section-title,.notice,.history-date-name,.report-panel-header p,.report-panel-header h3,.report-action-hint,.report-task-title,.report-table th,.report-table td,.team-member-label,.team-member-label .xs,.tag,.chip,.hint-row,.report-scope-tag{overflow-wrap:anywhere}
+.report-table th,.report-table td{word-break:break-word}
+.input{min-width:0;max-width:100%;font-size:16px;line-height:1.5}
+textarea.input{resize:vertical}
+input[type=date],input[type=month],select.input{min-width:0;max-width:100%}
+.form-group{min-width:0}
+.form-group>.field-label{font-size:15px}
+.field-label,.surface-label{letter-spacing:.04em}
+.soft-button{min-height:42px;max-width:100%;min-width:0;padding:11px 17px;font-size:15px;line-height:1.5;white-space:normal;text-align:center;overflow-wrap:anywhere}
+.soft-button .icon{flex:none}
+.soft-button.sm{font-size:14px;min-height:39px;padding:9px 12px}
+.soft-button.mini{font-size:13px;min-height:35px}
+.soft-button.icon-only{flex:none}
+.tag{font-size:13px;max-width:100%;white-space:normal}
+.card-sub{font-size:14px;line-height:1.65}
+.small{font-size:14px}.xs{font-size:13px}.eyebrow,.overline,.sidebar-caption{font-size:12px}
+.stat-number,.stat-foot,.record-line-title,.bar-row,.history-day-summary{font-variant-numeric:tabular-nums}
+.hero{min-width:0}
+.hero>*{min-width:0}
+.record-line-title{font-size:15px}
+.record-line .tag{flex:none}
+.history-record,.history-detail,.history-head{min-width:0}
+.history-head{width:100%}
+.history-date-name{font-size:19px}
+.history-day-summary{flex-wrap:wrap;justify-content:flex-end}
+.team-member{min-width:0}
+.team-member-main{flex:1;min-width:0}
+.team-member-actions{min-width:0}
+.team-tabs .soft-button.active,.report-quick-range .soft-button.active{background:linear-gradient(115deg,#d4e2ef,#eaf1f8);box-shadow:inset 3px 3px 9px rgba(65,92,112,.17),inset -3px -3px 9px rgba(255,255,255,.9);color:#304f65;font-weight:650;border:1px solid rgba(106,138,162,.2)}
+.team-tabs .soft-button:not(.active),.report-quick-range .soft-button:not(.active){border:1px solid transparent}
+.report-table-scroll{min-width:0;max-width:100%;contain:inline-size}
+.report-bar-meta>span:first-child{min-width:0}
+.report-toolbar-heading>*,.report-export-row>*,.report-action-row>*{min-width:0}
+.report-scope-tag{white-space:normal}
+.report-metric-value{overflow-wrap:anywhere}
+.report-filter-grid .form-group{min-width:0}
+/* Quick-entry: predictable two-row layout without content-based column expansion. */
+.quick-tools{display:grid;gap:15px;min-width:0}
+.quick-tool-head{display:flex;align-items:start;justify-content:space-between;gap:14px;flex-wrap:wrap;min-width:0}
+.quick-tool-head>div{min-width:0;flex:1}
+.quick-tool-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.quick-tool-actions #draft-save-status{flex:1;min-width:180px;overflow-wrap:anywhere}
+.quick-template-list{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.quick-template{display:flex;align-items:center;max-width:min(100%,245px);min-width:0;border-radius:12px;background:#e3ebf2;box-shadow:var(--inset);border:1px solid rgba(255,255,255,.62);transition:box-shadow .22s var(--ease),transform .22s var(--ease)}
+.quick-template:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.quick-template button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:#475f70;padding:10px 8px;font:inherit;font-size:14px;min-height:40px}
+.quick-template-use{flex:1;min-width:0;max-width:100%;text-align:left}
+.quick-template-use span{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.quick-template-remove{flex:none;color:#9d6872!important}
+.quick-template-empty,.quick-shortcuts{margin:0;line-height:1.65}
+.task-heading{flex-wrap:wrap;min-width:0}
+.task-number{min-width:0;overflow-wrap:anywhere}
+.task-heading-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0;max-width:100%;margin-left:auto}
+.entry-summary .soft-button{width:100%}
+/* At narrow desktop widths the sidebar is removed BEFORE it can squash text/cards. */
+@media(max-width:1220px) and (min-width:901px){.shell{grid-template-columns:232px minmax(0,1fr)}.sidebar{padding-left:13px;padding-right:13px}.main{padding-left:25px;padding-right:25px}}
+@media(max-width:1100px) and (min-width:901px){.topbar{flex-wrap:wrap;min-height:0}.top-actions{width:100%;justify-content:flex-end}.main{padding-top:23px}}
+@media(max-width:900px){
+  .shell{display:block;padding-bottom:82px}
+  .sidebar{display:none}
+  .main{padding:22px 19px 55px}
+  .topbar{min-height:0}
+  .mobile-nav{display:grid;grid-template-columns:repeat(var(--nav-count,5),minmax(0,1fr));position:fixed;bottom:0;left:0;right:0;z-index:15;background:rgba(239,242,249,.96);backdrop-filter:blur(18px);border-top:1px solid rgba(255,255,255,.7);padding:7px 6px max(7px,env(safe-area-inset-bottom));box-shadow:0 -10px 20px rgba(68,86,100,.05)}
+  .mobile-nav .nav-link{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;padding:8px 2px;border-radius:12px;font-size:12px;min-height:63px;line-height:1.2;letter-spacing:0}
+  .mobile-nav .nav-link.active{box-shadow:inset 3px 3px 8px rgba(65,92,112,.18),inset -3px -3px 9px rgba(255,255,255,.92);background:linear-gradient(135deg,#d0e0ed,#e9f1f8)}
+  .mobile-nav .nav-link span{max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+}
+@media(max-width:600px){
+  .main{padding-left:16px;padding-right:16px}
+  .topbar{gap:8px}
+  .top-actions{flex:none}
+  .page-title{font-size:29px}
+  .report-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .report-filter-grid .form-group:nth-child(1),.report-filter-grid .form-group:nth-child(2){grid-column:span 1}
+  .card-pad-lg{padding:18px}
+  .task-card{padding:17px}
+  .quick-tool-actions>.soft-button:first-child{flex:1}
+  .quick-tool-actions #draft-save-status{flex:1 1 100%;order:3}
+  .report-quick-range .soft-button{font-size:13px;min-height:40px}
+}
+@media(max-width:460px){
+  .report-filter-grid{grid-template-columns:1fr}
+  .report-filter-grid .form-group{grid-column:auto}
+  .mobile-nav{padding-left:3px;padding-right:3px}
+  .mobile-nav .nav-link{font-size:11px;gap:5px;padding:8px 1px}
+  .mobile-nav .nav-link .icon{width:19px;height:19px}
+  .report-export-actions .soft-button{font-size:13px;padding:10px 5px}
+}
+@media(max-width:370px){.mobile-nav .nav-link{font-size:11px}.team-tabs .soft-button{font-size:13px}}
+@media(prefers-reduced-motion:reduce){.quick-template:hover,.nav-link:hover{transform:none}}
+@media(max-width:420px){
+  .quick-tool-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+  .quick-tool-actions>.soft-button:first-child{grid-column:1/-1;width:100%}
+  .quick-tool-actions>#draft-save-status{grid-column:1;grid-row:2;min-width:0;order:0;align-self:center}
+  .quick-tool-actions>.soft-button:last-child{grid-column:2;grid-row:2}
+  .task-heading-actions .soft-button{font-size:12px}
+}
+
+
+
