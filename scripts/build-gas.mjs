@@ -13,7 +13,10 @@ for(const name of ordered){
  js+='\n// '+name+'\n'+source+'\n';
 }
 if(/<\/script\s*>/i.test(js))throw Error('Unexpected script terminator');
-const html=await readFile('index.html','utf8'),css=await readFile('styles.css','utf8');
+const html=await readFile('index.html','utf8');
+// HTMLService embeds the same CSS layers in browser cascade order; no @import at runtime.
+const styleFiles=["styles/base.css","styles/cloud.css","styles/admin.css","styles/reports.css","styles/stability.css","styles/legacy-review.css","styles/attendance.css","styles/payroll.css"];
+const css=(await Promise.all(styleFiles.map(path=>readFile(path,'utf8')))).join('\n');
 const manifest=await readFile('apps-script/appsscript.json','utf8');
 const core=await readFile('apps-script/shared/Core.gs','utf8');
 const monthly=await readFile('apps-script/shared/Monthly.gs','utf8');

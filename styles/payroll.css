@@ -1,0 +1,43 @@
+/* styles/payroll.css — source layer 8 */
+/* v0.10.0 payroll range dialog / local-only accountant export */
+.payroll-dialog-open{overflow:hidden}
+.payroll-overlay{position:fixed;inset:0;z-index:9999;background:rgba(24,42,56,.48);
+ backdrop-filter:blur(7px);display:grid;place-items:center;padding:20px;overflow-y:auto}
+.payroll-modal{width:min(760px,100%);min-width:0;max-height:min(90vh,920px);overflow-y:auto;
+ padding:26px 28px 24px;border-radius:23px;background:#e9eff4;
+ box-shadow:0 25px 65px rgba(14,35,49,.26),inset 0 2px 2px rgba(255,255,255,.85)}
+.payroll-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:17px}
+.payroll-modal-head>div{min-width:0}
+.payroll-modal-head h2{font-size:23px;font-weight:650;color:#284e62;margin:7px 0}
+.payroll-modal-head p{font-size:15px;line-height:1.7;color:#627c8d;margin:0}
+.payroll-period-chip{background:#dce9f0;color:#3a697d;border-radius:11px;padding:11px 14px;
+ font-size:15px;font-weight:600;margin:20px 0;overflow-wrap:anywhere}
+.payroll-modal-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.payroll-modal-fields .form-group,.payroll-modal-fields .input{min-width:0;width:100%;font-size:16px}
+.payroll-modal-actions{display:flex;gap:11px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin:17px 0}
+.payroll-modal-actions button{min-height:44px;font-size:15px}
+.payroll-alert{background:#ffefdf;color:#9d592d;border-radius:12px;padding:13px 15px;font-size:15px;line-height:1.7;overflow-wrap:anywhere}
+.payroll-alert[hidden]{display:none}
+.payroll-preview{margin-top:18px;border-top:1px solid #d1dfe8;padding-top:20px}
+.payroll-preview h3{color:#2f596f;font-size:19px;font-weight:650;margin:0 0 8px}
+.payroll-preview>p{color:#6b8291;font-size:14px;margin:0}
+.payroll-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:17px 0}
+.payroll-stats>div{background:#dfeaf0;border-radius:14px;box-shadow:inset 2px 2px 5px #cad9e2,inset -2px -2px 5px #fff;
+ padding:14px;min-width:0}
+.payroll-stats span{display:block;color:#627c8d;font-size:13px}
+.payroll-stats strong{display:block;color:#28576c;font-size:19px;margin-top:7px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.payroll-flags{border-left:3px solid #cf9160;background:#f7eee4;border-radius:8px;padding:8px 15px;margin:15px 0}
+.payroll-flags p{font-size:14px;line-height:1.7;color:#875b35;margin:6px 0}
+.att-salary-tools .soft-button.primary{white-space:normal;text-align:center}
+@media(max-width:600px){
+ .payroll-overlay{padding:8px;align-items:center}
+ .payroll-modal{padding:19px 16px;max-height:95vh;border-radius:17px}
+ .payroll-modal-head h2{font-size:20px}
+ .payroll-modal-fields{grid-template-columns:1fr}
+ .payroll-modal-actions{flex-direction:column;align-items:stretch}
+ .payroll-modal-actions button{width:100%}
+ .payroll-stats{gap:9px}
+ .payroll-stats strong{font-size:17px}
+}
+@media(prefers-reduced-motion:reduce){.payroll-overlay{backdrop-filter:none}}
+

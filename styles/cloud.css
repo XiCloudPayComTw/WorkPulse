@@ -1,0 +1,17 @@
+/* styles/cloud.css — source layer 2 */
+/* v0.2.0 cloud status: same soft extruded visual language, minimal repaint work */
+.sync-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 17px;border-radius:16px;box-shadow:var(--shadow-sm);margin-bottom:22px;background:rgba(228,235,241,.72);font-size:14px;color:#536a7a;min-height:45px}
+.sync-banner .soft-button{margin-left:auto}
+.sync-dot{width:9px;height:9px;display:inline-block;flex:none;border-radius:50%;background:#8aab9f;box-shadow:0 0 0 4px rgba(121,169,150,.12)}
+.sync-dot.loading,.sync-dot.saving{background:#bfa57d;animation:cloud-pulse 1.3s ease-in-out infinite}
+.sync-dot.failed{background:#c37c7c;box-shadow:0 0 0 4px rgba(195,124,124,.15)}
+.sync-stage{min-height:260px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;margin-top:20px}
+.sync-stage h2{font-weight:500;margin:2px 0 0;font-size:21px}
+.sync-stage p{color:var(--muted);font-size:14px;line-height:1.9;max-width:380px;margin:0}
+.sync-stage .soft-button{margin-top:12px}
+.soft-button:disabled{cursor:wait;opacity:.65;transform:none!important}
+@keyframes cloud-pulse{50%{opacity:.42;transform:scale(.72)}}
+@media(max-width:410px){.sync-banner .xs{max-width:135px;overflow:hidden;text-overflow:ellipsis}.sync-banner{gap:9px;padding:10px 13px}}
+@media(prefers-reduced-motion:reduce){.sync-dot.loading,.sync-dot.saving{animation:none}}
+
+
