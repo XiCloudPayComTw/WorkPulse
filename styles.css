@@ -282,3 +282,14 @@ input[type=date],input[type=month],select.input{min-width:0;max-width:100%}
  .att-actions button{width:100%}
 }
 @media(max-width:350px){.att-selectors{grid-template-columns:1fr}.att-metrics{grid-template-columns:1fr}}
+
+
+/* v0.9.1 on-screen-only payroll calculator. Keeps the sidebar and cards stable. */
+.att-salary-panel{min-width:0;display:grid;gap:16px;overflow:hidden}
+.att-salary-panel .card-sub{line-height:1.8}
+.att-salary-tools{display:flex;gap:14px;align-items:end;min-width:0;flex-wrap:wrap}
+.att-salary-tools .form-group{flex:1 1 250px;min-width:0;max-width:430px}
+.att-salary-tools .input{width:100%;font-size:17px;min-width:0}
+.att-salary-tools button{flex:none;min-height:46px}
+.att-salary-panel>.small{line-height:1.85;margin:0}
+@media(max-width:600px){.att-salary-tools{align-items:stretch;flex-direction:column}.att-salary-tools .form-group{flex:auto;width:100%;max-width:none}.att-salary-tools button{width:100%}}
