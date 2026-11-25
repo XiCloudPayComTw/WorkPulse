@@ -112,6 +112,10 @@ document.addEventListener('click',event=>{
   submitAttendance().then(()=>attendanceNotice='出勤紀錄已成功儲存至 Google Sheets／本機展示資料。')
    .catch(e=>attendanceNotice='無法儲存：'+e.message).finally(refreshAttendanceDom);
   refreshAttendanceDom();
+ }else if(action==='attendance-salary-clear'){
+  clearTemporarySalary();
+  attendanceNotice='臨時薪資基準已清除';
+  refreshAttendanceDom();
  }else if(action==='attendance-config-save'){
   attendanceNotice='正在儲存計薪設定…';
   saveAttendanceConfig().then(()=>attendanceNotice='計薪與應上班天數設定已儲存')
@@ -122,6 +126,26 @@ document.addEventListener('click',event=>{
 document.addEventListener('input',event=>{
  const el=event.target;
  if(!el.closest('.att-page'))return;
+ if(el.matches('[data-att-salary]')){
+  updateTemporarySalary(el.value);
+  // Update monetary cells in place; never rebuild the input during typing.
+  const panel=el.closest('.att-page'),wage=currentTemporaryWage(),a=attendanceState;
+  const sum=attendanceSummary(a.rows,a.month,a.expectedDays,wage);
+  const total=panel.querySelector('[data-att-monthly-pay]');
+  if(total)total.textContent=cost(sum.totalPay);
+  const preview=panel.querySelector('[data-att-preview-pay]');
+  if(preview){
+   try{
+    const draft=validateAttendanceDraft(a.draft);
+    preview.textContent=cost(payEstimate(draft.dayType,draft.workedMinutes,wage));
+   }catch{preview.textContent='待設定／人工核對';}
+  }
+  for(const cell of panel.querySelectorAll('[data-att-row-pay]')){
+   const row=a.rows.find(r=>r.date===cell.dataset.attRowPay);
+   if(row)cell.textContent=cost(payEstimate(row.dayType||'workday',row.workedMinutes,wage));
+  }
+  return;
+ }
  if(el.matches('[data-att-field]'))updateAttendance(el.dataset.attField,el.value);
  if(el.matches('[data-att-config]'))updateAttendanceConfig(el.dataset.attConfig,el.value);
 });
@@ -149,4 +173,9 @@ document.addEventListener('change',event=>{
  if(el.matches('[data-att-field]')){
   updateAttendance(el.dataset.attField,el.value);refreshAttendanceDom();
  }
+});
+
+// The temporary wage must not survive navigation away from the attendance page.
+window.addEventListener('hashchange',()=>{
+ if(location.hash.replace(/^#\\/?/,'')!=='attendance')clearTemporarySalary();
 });
