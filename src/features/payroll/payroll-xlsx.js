@@ -1,5 +1,5 @@
-import {buildStyledXlsx} from './xlsx.js';
-import {DAY_TYPES,LEAVE_TYPES} from './attendance.js';
+import {buildStyledXlsx} from '../../shared/xlsx.js';
+import {DAY_TYPES,LEAVE_TYPES} from '../attendance/attendance.js';
 const c=(v,s=6)=>({v,s});
 const f=(formula,cached,s=7)=>({f:formula,cached,s});
 const blank=(n=14)=>Array(n).fill(undefined);

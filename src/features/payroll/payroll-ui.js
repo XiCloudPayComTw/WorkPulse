@@ -1,9 +1,9 @@
-import {esc,download,localISODate} from './utils.js';
-import {attendanceState,currentTemporaryWage,readLocalAttendanceRange} from './attendance-state.js';
-import {cloudEnabled,cloudCall} from './cloud.js';
+import {esc,download,localISODate} from '../../shared/utils.js';
+import {attendanceState,currentTemporaryWage,readLocalAttendanceRange} from '../attendance/attendance-state.js';
+import {cloudEnabled,cloudCall} from '../../services/cloud.js';
 import {previousCompletedMonth,payrollPeriod,buildPayrollReport} from './payroll.js';
 import {createPayrollXlsx} from './payroll-xlsx.js';
-import {TWD_FORMAT} from './attendance.js';
+import {TWD_FORMAT} from '../attendance/attendance.js';
 
 let payrollDialog=null,payrollResult=null,payrollWorking=false,payrollOriginalFocus=null;
 const payrollMoney=value=>TWD_FORMAT.format(value);
