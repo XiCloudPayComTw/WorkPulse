@@ -43,7 +43,7 @@ test('monthly summary supports expected-day override and fractional leave days',
   {date:'2026-11-26',workedMinutes:600,overtimeMinutes:120,leaveMinutes:120,overtimePay:400},
   {date:'2026-11-27',workedMinutes:0,overtimeMinutes:0,leaveMinutes:480,overtimePay:0}
  ];
- const sum=attendanceSummary(data,'2026-11',21);
+ const sum=attendanceSummary(data,'2026-11',21,36000);
  assert.equal(sum.workedMinutes,1080);assert.equal(sum.overtimeMinutes,120);
  assert.equal(sum.leaveMinutes,600);assert.equal(sum.leaveDays,1.25);
  assert.equal(sum.totalPay,400);assert.equal(sum.expectedDays,21);
@@ -59,4 +59,20 @@ test('without wage configuration total money remains unestimated, but hour total
 test('weekday labels use Taiwan local calendar dates, without browser timezone shifts',()=>{
  assert.equal(weekdayLabel('2026-11-25'),'三');
  assert.equal(weekdayLabel('2026-11-29'),'日');
+});
+
+test('the same attendance rows are recalculated immediately for a different temporary salary',()=>{
+ const rows=[{date:'2026-11-25',dayType:'workday',workedMinutes:600,overtimeMinutes:120,
+   leaveMinutes:0,overtimePay:999999,monthlyWage:990000}];
+ const low=attendanceSummary(rows,'2026-11',21,30000);
+ const high=attendanceSummary(rows,'2026-11',21,45000);
+ assert.equal(low.totalPay,333.33);
+ assert.equal(high.totalPay,500);
+ assert.equal(attendanceSummary(rows,'2026-11',21,null).totalPay,null);
+ // The stored values must never participate in the calculation.
+ assert.deepEqual(rows[0].overtimePay,999999);
+});
+test('zero overtime means zero pay without salary input, not a fabricated debt',()=>{
+ const rows=[{date:'2026-11-25',dayType:'workday',workedMinutes:480,overtimeMinutes:0,leaveMinutes:0}];
+ assert.equal(attendanceSummary(rows,'2026-11',21,null).totalPay,0);
 });
