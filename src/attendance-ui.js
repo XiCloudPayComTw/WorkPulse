@@ -5,7 +5,9 @@ function opts(items,selected){
  return Object.entries(items).map(([key,value])=>'<option value="'+esc(key)+'" '+(selected===key?'selected':'')+'>'+esc(value)+'</option>').join('');
 }
 const cost=n=>n==null?'待設定／人工核對':TWD_FORMAT.format(Number(n));
+let knownPeople=[],knownAdmin=false,attendanceNotice='';
 export function renderAttendance(people,isAdmin=false){
+ knownPeople=people||[];knownAdmin=isAdmin;
  const a=attendanceState;
  if(!people?.length)return '<section class="soft-card card-pad-lg">尚未設定員工名單，請管理員先新增人員。</section>';
  const person=people.some(x=>x.id===a.employeeId)?a.employeeId:people[0].id;
@@ -70,7 +72,7 @@ export function renderAttendance(people,isAdmin=false){
  '<p><strong>國定假日／特休出勤</strong>月薪制 8 小時內另加 1 日工資；超過 8 小時依延長工時計。</p></div>'+
  '<p class="small muted">本欄為月薪制標準工時的估算，例假原則不得出勤；換班、週逾40小時、補休、天災特殊情形請人工核算。'+
  '<a href="https://calcr2.mol.gov.tw/Index" target="_blank" rel="noopener noreferrer">勞動部加班費試算</a></p></section>';
- return '<div class="att-page">'+toolbar+metrics+
+ return '<div class="att-page">'+toolbar+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
  (info.expectedIsEstimate?'<p class="small muted att-estimate">應上班天數暫用週一至週五推估，未扣除國定假日與調班，管理員可設定確切天數。</p>':'')+
  '<div class="att-layout">'+editor+admin+'</div>'+table+law+'</div>';
 }
