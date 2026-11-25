@@ -25,6 +25,7 @@ export function renderAttendance(people,isAdmin=false){
   '<p class="card-sub">會計輸入選定人員月薪，立即試算當月所有加班費。切換人員、月份或離開出勤頁後即清除。</p></div>'+
   '<div class="att-salary-tools"><label class="form-group"><span class="field-label">月薪工資總額（NT$）</span>'+
   '<input class="input" data-att-salary type="number" min="1" max="10000000" step="1" inputmode="numeric" autocomplete="off" placeholder="待設定 · 輸入月薪開始試算" value="'+esc(a.temporarySalary)+'"></label>'+
+  '<button class="soft-button primary sm" type="button" data-action="payroll-start">開始試算／匯出 Excel</button>'+
   '<button class="soft-button sm" type="button" data-action="attendance-salary-clear">清除試算</button></div>'+
   '<p class="small muted">薪資基準與試算金額不會送至伺服器、寫入 Google Sheets 或儲存在瀏覽器。僅目前畫面可見；共用電腦請使用完畢後清除。</p></section>';
  const pairs=[

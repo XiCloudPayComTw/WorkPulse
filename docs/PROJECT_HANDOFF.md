@@ -176,3 +176,15 @@
 - apps-script/AttendanceSave.gs 明確禁止月薪或 overtimePay 欄位上傳，新出勤記錄只存工時／請假等，Google Sheets 的歷史 overtimePay 欄位新寫入會留空。Attendance.gs 的 public wpAttendanceLoad 與 private wpOwnerAttendanceConfig 均不回傳舊版月薪／加班費。OwnerAttendance.gs 只儲存 expectedDays，拒絕儲存月薪。舊 localStorage 展示紀錄也在讀取時移除已保存的薪資與試算欄位。
 - **正式公司資料未改動**，如果已由 v0.9.0 真的存過工資或加班費，原 Sheets 儲存格、歷史版本或備份仍可能有舊資料。需公司擁有者自行核對、備份後再清理；本次只阻止後續洩漏，不能宣稱完全刪除。
 - CI、Pages 部署及實際 Google Workspace 尚需分別驗證，PR 不自動合併。
+
+## v0.10.0 — 會計月度試算、日期懸浮視窗與 Excel（PR #11）
+
+- 基於 v0.9.1 合併後 main 252c79e45a4473fcc46ab3933e4cdec44c044827，分支 feat/workpulse-v0.10.0-payroll-export。
+- 出勤頁臨時月薪欄位旁新增「開始試算／匯出 Excel」，日期 modal 依瀏覽器本地日期預設上個完整曆月；支持跨年、閏年、大小月及自訂起訖日（最多 366 日），禁止未來日期。
+- apps-script/AttendanceRange.gs 新增不攜帶薪資的單一人員跨月份唯讀查詢。Apps Script 公開與管理員發布包都需包含此檔，前端 src/cloud.js 已加入方法白名單。
+- 前端 src/payroll.js 純函式組合整段日期（含缺資料日），只在記憶體中估算加班費，標記缺資料與例假人工核算，避免零時數假象。
+- src/payroll-ui.js 在前端建立無障礙日期懸浮視窗、查詢預覽與本機 XLSX 下載，不將輸入薪資傳至後端。
+- src/xlsx.js 新增 buildStyledXlsx，對既有簡易 buildXlsx 保留相容；src/payroll-xlsx.js 使用富格式 OOXML 編製彩色總覽／逐日明細／計算依據，包含凍結列、打印設定、數值格式、公式與跨表引用，Excel 改總覽 B6 月薪可重算。
+- tests/payroll.test.mjs 與 tests/monthly.test.mjs 增加閏年、跨月、安全、缺資料與 OOXML 驗證。真實 Google Workspace、Excel 現場開啟與行動版瀏覽器需公司完成部署驗收。
+- 報表下載至會計裝置後有機密薪資，應限制權限。WorkPulse 網頁和共用 Sheets 不保存計算薪資資料。
+- 交付文件：docs/PAYROLL_EXPORT.md；待使用者自行 Merge PR #11。
