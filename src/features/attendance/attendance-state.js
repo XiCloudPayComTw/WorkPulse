@@ -1,5 +1,5 @@
-import {cloudEnabled,cloudCall} from './cloud.js';
-import {currentMonth,localISODate,uid} from './utils.js';
+import {cloudEnabled,cloudCall} from '../../services/cloud.js';
+import {currentMonth,localISODate,uid} from '../../shared/utils.js';
 import {validateAttendanceDraft} from './attendance.js';
 const KEY='workpulse-attendance-v1';
 export const attendanceState={month:currentMonth(),employeeId:'',date:localISODate(),rows:[],
