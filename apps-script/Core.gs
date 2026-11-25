@@ -85,6 +85,6 @@ function wpPrimaryOwnerAssert_(){
  var cfg=wpConfig_();
  if(String(Session.getActiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail||
     String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail)
-  throw Error('首次建檔與資料遷移只能由公司資料持有帳號執行');
+  throw Error('首次建檔與資料遷移雙重身分驗證失敗：只能由公司資料持有帳號執行');
  return cfg;
 }
