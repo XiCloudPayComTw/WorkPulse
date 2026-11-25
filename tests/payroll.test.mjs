@@ -47,6 +47,8 @@ test('payroll report contains all calendar dates, flags missing entries rather t
  assert.equal(report.days,30);
  assert.equal(report.recordedDays,2);
  assert.equal(report.missingDays,28);
+ assert.equal(report.estimatedWorkingDays,21);
+ assert.equal(report.leaveDays,0);
  assert.equal(report.rows[0].status,'未登記');
  assert.equal(report.rows[1].status,'已登記');
  assert.equal(report.workHours,16);
