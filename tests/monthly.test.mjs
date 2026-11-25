@@ -180,42 +180,55 @@ test('attendance is stored in monthly Attendance sheet, with exact clock and bre
  assert.equal(h.scope.wpAttendanceLoad({month:'2026-11',employeeId:employee.id}).rows.length,1);
  assert.equal(h.scope.wpMonthIndex_(h.control)['2026-11']?.startsWith('file-'),true);
 });
-test('only owner may set monthly salary; stored attendance pay matches 4/3 rate',()=>{
- const h=harness();h.setup();const employee=h.employee();
- h.as('');
- assert.throws(()=>h.scope.wpOwnerSaveAttendanceConfig({employeeId:employee.id,month:'2026-11',
-  monthlyWage:36000,expectedDays:20,expectedRevision:0,requestId:'att-cfg-00000001'}),/管理員/);
+test('temporary wages never reach Sheets or attendance APIs; expected days can be configured',()=>{
+ const h=harness();h.setup();const e=h.employee();h.as('');
+ const config={employeeId:e.id,month:'2026-11',expectedDays:20,expectedRevision:0,
+   requestId:'att-cfg-00000001'};
+ assert.throws(()=>h.scope.wpOwnerSaveAttendanceConfig(config),/管理員/);
  h.as('admin@example.com');
- const config={employeeId:employee.id,month:'2026-11',monthlyWage:36000,expectedDays:20,
-   expectedRevision:0,requestId:'att-cfg-00000001'};
- const result=h.scope.wpOwnerSaveAttendanceConfig(config);
- assert.equal(result.ok,true);
- assert.equal(h.scope.wpOwnerAttendanceConfig({month:'2026-11',employeeId:employee.id}).monthlyWage,36000);
+ assert.throws(()=>h.scope.wpOwnerSaveAttendanceConfig({...config,monthlyWage:36000}),/禁止儲存/);
+ const set=h.scope.wpOwnerSaveAttendanceConfig(config);
+ assert.equal(set.ok,true);assert.equal(set.config.expectedDays,20);
+ assert.equal(set.config.monthlyWage,undefined);
+ const settings=h.control.getSheetByName('AttendanceSettings');
+ assert.equal(settings.rows[1][2],'');
  h.as('');
- const saved=h.scope.wpAttendanceSave({date:'2026-11-25',employeeId:employee.id,
-  dayType:'workday',startTime:'09:00',endTime:'19:00',breakMinutes:60,
-  leaveType:'none',leaveMinutes:0,notes:'加班',expectedRevision:0,requestId:'att-pay-00000001'});
+ const form={date:'2026-11-25',employeeId:e.id,dayType:'workday',startTime:'09:00',
+  endTime:'19:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,
+  notes:'加班',expectedRevision:0,requestId:'att-pay-00000001'};
+ assert.throws(()=>h.scope.wpAttendanceSave({...form,monthlyWage:36000}),/禁止上傳/);
+ assert.throws(()=>h.scope.wpAttendanceSave({...form,overtimePay:200}),/禁止上傳/);
+ const saved=h.scope.wpAttendanceSave(form);
  assert.equal(saved.row.workedMinutes,540);
  assert.equal(saved.row.overtimeMinutes,60);
- assert.equal(saved.row.overtimePay,200);
- const loaded=h.scope.wpAttendanceLoad({month:'2026-11',employeeId:employee.id});
+ assert.equal(saved.row.overtimePay,undefined);
+ const loaded=h.scope.wpAttendanceLoad({month:'2026-11',employeeId:e.id});
  assert.equal(loaded.expectedDays,20);
- assert.equal(loaded.wageConfigured,true);
+ assert.equal(loaded.wageConfigured,undefined);
  assert.equal(loaded.monthlyWage,undefined);
+ assert.equal(loaded.rows[0].overtimePay,undefined);
+ const monthBook=h.books.get(h.scope.wpMonthIndex_(h.control)['2026-11']);
+ assert.equal(monthBook.getSheetByName('Attendance').rows[1][11],'');
+ // Historical sensitive cells, if any, are excluded from BOTH public and private APIs.
+ settings.rows[1][2]=80000;
+ monthBook.getSheetByName('Attendance').rows[1][11]=987654;
+ assert.equal(h.scope.wpAttendanceLoad({month:'2026-11',employeeId:e.id}).rows[0].overtimePay,undefined);
+ h.as('admin@example.com');
+ assert.equal(h.scope.wpOwnerAttendanceConfig({month:'2026-11',employeeId:e.id}).monthlyWage,undefined);
 });
 test('attendance supports rest days, holiday premium and leave-only records',()=>{
  const h=harness();h.setup();const e=h.employee();
- h.scope.wpOwnerSaveAttendanceConfig({employeeId:e.id,month:'2026-11',monthlyWage:30000,
+ h.scope.wpOwnerSaveAttendanceConfig({employeeId:e.id,month:'2026-11',
   expectedDays:20,expectedRevision:0,requestId:'att-cfg-00000002'});
  h.as('');
  const rest=h.scope.wpAttendanceSave({date:'2026-11-21',employeeId:e.id,dayType:'rest',
   startTime:'09:00',endTime:'15:00',breakMinutes:0,leaveType:'none',
   leaveMinutes:0,notes:'週末支援',expectedRevision:0,requestId:'att-rest-00000001'});
- assert.equal(rest.row.overtimePay,1166.67);
+ assert.equal(rest.row.overtimePay,undefined);
  const holiday=h.scope.wpAttendanceSave({date:'2026-11-24',employeeId:e.id,dayType:'holiday',
   startTime:'09:00',endTime:'11:00',breakMinutes:0,leaveType:'none',
   leaveMinutes:0,notes:'國定假日',expectedRevision:0,requestId:'att-holiday-0001'});
- assert.equal(holiday.row.overtimePay,1000);
+ assert.equal(holiday.row.overtimePay,undefined);
  const leave=h.scope.wpAttendanceSave({date:'2026-11-25',employeeId:e.id,dayType:'workday',
   startTime:'',endTime:'',breakMinutes:0,leaveType:'annual',leaveMinutes:480,
   notes:'整日特休',expectedRevision:0,requestId:'att-leave-0000001'});
@@ -239,7 +252,7 @@ test('explicitly authorized company design operator can edit payroll settings bu
  h.props.WORKPULSE_OPERATOR_EMAIL='design.dev@example.com';
  h.as('design.dev@example.com');h.effective('design.dev@example.com');
  const settings=h.scope.wpOwnerSaveAttendanceConfig({
-  employeeId:p.id,month:'2026-11',monthlyWage:40000,expectedDays:22,
+  employeeId:p.id,month:'2026-11',expectedDays:22,
   expectedRevision:0,requestId:'operator-rate-00001'
  });
  assert.equal(settings.ok,true);
