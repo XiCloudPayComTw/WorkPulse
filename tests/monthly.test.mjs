@@ -233,3 +233,19 @@ test('attendance version conflicts refuse stale overwrites and other employee da
  assert.throws(()=>h.scope.wpAttendanceSave({...input,employeeId:'invalid-employee',
   requestId:'att-invalid-00001'}),/有效的出勤人員/);
 });
+
+test('explicitly authorized company design operator can edit payroll settings but cannot initialize storage',()=>{
+ const h=harness();h.setup();const p=h.employee();
+ h.props.WORKPULSE_OPERATOR_EMAIL='design.dev@example.com';
+ h.as('design.dev@example.com');h.effective('design.dev@example.com');
+ const settings=h.scope.wpOwnerSaveAttendanceConfig({
+  employeeId:p.id,month:'2026-11',monthlyWage:40000,expectedDays:22,
+  expectedRevision:0,requestId:'operator-rate-00001'
+ });
+ assert.equal(settings.ok,true);
+ assert.equal(h.scope.wpOwnerAttendanceConfig({employeeId:p.id,month:'2026-11'}).expectedDays,22);
+ assert.throws(()=>h.scope.wpPrivateSetupMonthly_(),/公司資料持有帳號/);
+ assert.throws(()=>h.scope.wpPrivateMigrateLegacyMonthly_(),/公司資料持有帳號/);
+ h.as('intruder@example.com');h.effective('intruder@example.com');
+ assert.throws(()=>h.scope.wpOwnerAttendanceConfig({employeeId:p.id,month:'2026-11'}),/管理帳號/);
+});
