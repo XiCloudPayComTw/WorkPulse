@@ -69,6 +69,7 @@ export function buildPayrollReport({employeeId,employeeName,startDate,endDate,mo
     leaveMinutes:leave,notes:String(source.notes||''),revision:Number(source.revision)||0,
     status:pay===null?'需人工核對':'已登記',pay};
  });
+ const estimatedWorkingDays=days.filter(d=>d.weekday!=='六'&&d.weekday!=='日').length;
  const recorded=days.filter(d=>d.status!=='未登記'),missing=days.length-recorded.length;
  const manual=recorded.filter(d=>d.status==='需人工核對').length;
  const totalWorkMinutes=recorded.reduce((n,d)=>n+d.workedMinutes,0);
@@ -80,6 +81,7 @@ export function buildPayrollReport({employeeId,employeeName,startDate,endDate,mo
   employeeId,employeeName:String(employeeName||employeeId),...period,
   generatedAt:generatedISO,monthlyWage:wage,hourlyWage:wage/240,
   rows:days,recordedDays:recorded.length,missingDays:missing,manualReviewDays:manual,
+  estimatedWorkingDays,expectedIsEstimate:true,
   workHours:round2(totalWorkMinutes/60),overtimeHours:round2(totalOvertimeMinutes/60),
   leaveHours:round2(totalLeaveMinutes/60),leaveDays:round2(totalLeaveMinutes/480),
   knownPaySubtotal:subtotal,totalPay:manual?null:subtotal,
