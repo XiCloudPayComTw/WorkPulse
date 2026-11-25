@@ -67,6 +67,8 @@ function payrollPreview(report){
  '<div><span>已登記</span><strong>'+report.recordedDays+' 天</strong></div>'+
  '<div><span>總工時</span><strong>'+report.workHours.toLocaleString('zh-TW')+' h</strong></div>'+
  '<div><span>總加班</span><strong>'+report.overtimeHours.toLocaleString('zh-TW')+' h</strong></div>'+
+ '<div><span>請假天數</span><strong>'+report.leaveDays.toLocaleString('zh-TW')+' 天</strong></div>'+
+ '<div><span>預估應上班天數</span><strong>'+report.estimatedWorkingDays+' 天</strong></div>'+
  '<div><span>可計算加班費</span><strong>'+payrollMoney(report.knownPaySubtotal)+'</strong></div>'+
  '</div>'+
  (notes.length?'<div class="payroll-flags">'+notes.map(n=>'<p>• '+esc(n)+'</p>').join('')+'</div>':'')+
