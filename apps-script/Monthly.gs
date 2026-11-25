@@ -55,7 +55,7 @@ function wpInitializeSheet_(book,name){
 }
 function wpInitializeMonth_(book,month){
   var m=wpMonth_(month);
-  ['Journals','Tasks','Requests','Audit','Meta'].forEach(function(n){wpInitializeSheet_(book,n);});
+  ['Journals','Tasks','Requests','Audit','Meta','Attendance'].forEach(function(n){wpInitializeSheet_(book,n);});
   var meta=wpSheet_(book,'Meta'),items=wpRows_(meta);
   var version=items.find(function(r){return r.key==='schemaVersion';});
   var tagged=items.find(function(r){return r.key==='month';});
@@ -112,7 +112,7 @@ function wpMonthRange_(start,end){
   return months;
 }
 function wpEnsureControllerSheets_(control){
-  ['Employees','Departments','Projects','Journals','Tasks','Requests','Audit','Reviews','Meta','MonthIndex']
+  ['Employees','Departments','Projects','Journals','Tasks','Requests','Audit','Reviews','Meta','MonthIndex','AttendanceSettings']
     .forEach(function(name){
       // Old version Review data is retained for historical audit only.
       if(!WP_HEADERS[name]){
@@ -162,7 +162,7 @@ function wpPrivateCreateWorkspace_(){
   return wpPrivateSetupMonthly_();
 }
 function wpPrivateSetupMonthly_(){
-  var cfg=wpOwnerAssert_(),lock=LockService.getScriptLock();lock.waitLock(30000);
+  var cfg=wpPrimaryOwnerAssert_(),lock=LockService.getScriptLock();lock.waitLock(30000);
   try{
     var control=SpreadsheetApp.openById(cfg.sheetId);
     var owner=DriveApp.getFileById(cfg.sheetId).getOwner().getEmail();
@@ -205,7 +205,7 @@ function wpCopyLegacy_(source,target,name,records){
   });
 }
 function wpPrivateMigrateLegacyMonthly_(){
-  wpOwnerAssert_();
+  wpPrimaryOwnerAssert_();
   var backupId=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_BACKUP_SHEET_ID')||'');
   var cfg=wpConfig_();
   if(!backupId||backupId===cfg.sheetId)throw Error('請先備份並設定不同的 WORKPULSE_BACKUP_SHEET_ID');

@@ -155,3 +155,14 @@
 - 人員選姓名不是身分驗證；公開網址使用者可能選別人姓名查閱／修改。使用者要求保留這個簡便模式，但應避免放入機密資料或無控制地散佈網址。
 - 詳細操作以 docs/DEPLOYMENT_V080.md 為準：由公司帳號建立私人和公開兩個獨立 Apps Script 專案、同步 Script Properties、只發布不同權限包、實際驗證匿名讀寫和管理員刪除、備份及資料恢復。
 - 下一批優先進行**公司帳號授權後的端對端驗收**、備份、跨專案競態與大量工作日誌性能測試。開發流程依舊：每批測試 → PR → 使用者 Merge。
+
+## v0.9.0 — 出勤表／加班費與公司維護帳號（PR #9）
+
+- 起始 main 已含 v0.8.0 PR #8（commit 0477bab78fa8941c454f992055beac5eef862a12），獨立分支 feat/workpulse-v0.9.0-attendance。
+- 新增出勤頁，位於工作總覽後，與工作日誌共用人員下拉清單。每日日期、星期、上班及下班時間、休息分鐘、出勤日別、加班時數及估算費用、請假種類與時數、備註。月統計：總工時、加班時數、加班費、應出勤天數、請假天數與請假時數。
+- apps-script/Attendance.gs / AttendanceSave.gs：按月在 Google Sheets 新增 Attendance 分頁，資料版本、重送去重、時間驗證與費用計算。apps-script/OwnerAttendance.gs 僅私人版可存取，依員工和月份設定月薪基準及應上班天數，控制表新增 AttendanceSettings。
+- 依勞動部官方資訊計算一般月薪制平日（4/3、5/3）、休息日（4/3、5/3、8/3）、國定假日另發一天工資及超時部分；例假、變形工時、時薪制、週工時和國定假日調班需人工核對。未設薪資時不虛構加班費。
+- 設定 WORKPULSE_OPERATOR_EMAIL 可允許 design.dev@xicloudpay.com.tw 在授權及共用 Drive 權限下使用私人管理介面；首次初始化與遷移仍由 hello.murui.lab@xicloudpay.com.tw 主責，不因同一網域自動分享權限。
+- 網站 UI 延續灰藍色柔邊、主要文字 16px、卡片 min-width 0 及明細內部橫向捲動；手機底部導航增加可水平捲動避免擠壓。
+- 既有公司月檔採懶增 Attendance，控制表由私人編輯器執行 workPulseUpgradeAttendance 安全補建設定表。部署與驗收見 ATTENDANCE.md。
+- 尚未取得公司 Google Drive 的可核對寫入權限，Google Workspace／跨裝置端對端、歷史資料和真實工時排班未正式驗證；不得宣稱已上線。

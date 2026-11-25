@@ -14,7 +14,9 @@ var WP_HEADERS={
   Audit:['auditId','occurredAt','actorEmail','action','journalId','revision','requestId'],
   Reviews:['reviewId','journalId','journalRevision','status','actorEmail','comment','requestId','createdAt'],
   Meta:['key','value'],
-  MonthIndex:['month','spreadsheetId','createdAt']
+  MonthIndex:['month','spreadsheetId','createdAt'],
+  Attendance:['attendanceId','date','employeeId','dayType','startTime','endTime','breakMinutes','workedMinutes','overtimeMinutes','leaveType','leaveMinutes','overtimePay','notes','revision','updatedAt','requestId'],
+  AttendanceSettings:['employeeId','month','monthlyWage','expectedDays','revision','updatedAt','requestId']
 };
 var WP_CATEGORIES=['前端開發','展店設計','現場勘查','行政／會議','其他'];
 var WP_STATUS=['done','doing','blocked'];
@@ -28,9 +30,10 @@ function wpConfig_(){
   var domain=String(props.getProperty('WORKPULSE_ALLOWED_DOMAIN')||'').trim().toLowerCase().replace(/^@/,'');
   var adminEmail=String(props.getProperty('WORKPULSE_ADMIN_EMAIL')||'').trim().toLowerCase();
   var folderId=String(props.getProperty('WORKPULSE_FOLDER_ID')||'').trim();
-  if(!sheetId||!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)||!adminEmail.endsWith('@'+domain))
+  var operatorEmail=String(props.getProperty('WORKPULSE_OPERATOR_EMAIL')||'').trim().toLowerCase();
+  if(!sheetId||!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)||!adminEmail.endsWith('@'+domain)||operatorEmail&&!operatorEmail.endsWith('@'+domain))
     throw Error('尚未設定公司控制表、網域及管理員。');
-  return {sheetId:sheetId,domain:domain,adminEmail:adminEmail,folderId:folderId};
+  return {sheetId:sheetId,domain:domain,adminEmail:adminEmail,folderId:folderId,operatorEmail:operatorEmail};
 }
 function wpSheet_(book,name){
   var sheet=book.getSheetByName(name);
@@ -73,7 +76,15 @@ function wpOwnerAssert_(){
   var cfg=wpConfig_();
   var active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
   var effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
-  if(active!==cfg.adminEmail||effective!==cfg.adminEmail)
-    throw Error('管理員帳號未通過雙重身分驗證。請由公司帳號使用私人管理入口。');
+  if(!((active===cfg.adminEmail&&effective===cfg.adminEmail)||(cfg.operatorEmail&&active===cfg.operatorEmail&&effective===cfg.operatorEmail)))
+    throw Error('管理員雙重身分驗證失敗：管理帳號未通過驗證或尚未獲公司管理者授權。');
   return cfg;
+}
+
+function wpPrimaryOwnerAssert_(){
+ var cfg=wpConfig_();
+ if(String(Session.getActiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail||
+    String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail)
+  throw Error('首次建檔與資料遷移雙重身分驗證失敗：只能由公司資料持有帳號執行');
+ return cfg;
 }
