@@ -9,10 +9,9 @@ function wpOwnerSaveAttendanceConfig(input){
  wpOwnerAssert_();
  if(!input||typeof input!=='object')throw Error('設定格式錯誤');
  var id=String(input.employeeId||''),month=wpMonth_(input.month);
- var amount=input.monthlyWage==null||input.monthlyWage===''?null:Number(input.monthlyWage);
+ if(Object.prototype.hasOwnProperty.call(input,'monthlyWage'))throw Error('月薪只能於出勤頁面臨時計算，禁止儲存');
  var days=input.expectedDays==null||input.expectedDays===''?null:Number(input.expectedDays);
  var revision=Number(input.expectedRevision),request=String(input.requestId||'');
- if(amount!==null&&(!Number.isFinite(amount)||amount<1||amount>10000000))throw Error('月薪基準錯誤');
  if(days!==null&&(!Number.isInteger(days)||days<0||days>31))throw Error('預計工作天數無效');
  if(!Number.isSafeInteger(revision)||revision<0||!/^[\w-]{12,120}$/.test(request))throw Error('版本或請求識別碼無效');
  var lock=LockService.getScriptLock();lock.waitLock(20000);
@@ -25,7 +24,7 @@ function wpOwnerSaveAttendanceConfig(input){
    return {ok:true,deduplicated:true,config:wpAttConfig_(control,id,month)};}
   var oldRevision=previous?Number(previous.revision)||0:0;
   if(oldRevision!==revision)throw Error('CONFLICT:設定已被修改');
-  var values=[id,month,amount==null?'':amount,days==null?'':days,
+  var values=[id,month,'',days==null?'':days,
     oldRevision+1,new Date().toISOString(),request];
   if(previous)sheet.getRange(previous.__row,1,1,values.length).setValues([values]);else sheet.appendRow(values);
   SpreadsheetApp.flush();
