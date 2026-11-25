@@ -25,7 +25,7 @@ export function overtimeMinutes(type,workedMinutes){
 }
 export function payEstimate(type,workedMinutes,monthlyWage){
  const work=Math.max(0,Number(workedMinutes)||0),wage=Number(monthlyWage);
- if(!work)return 0;
+ if(!work||(type==='workday'&&work<=480))return 0;
  if(type==='weekly')return null; // statutory weekly day: emergency exceptions, compensatory rest
  if(!Number.isFinite(wage)||wage<=0)return null;
  const r=wage/240,ot=Math.max(0,work-480)/60,h=work/60;
