@@ -1,7 +1,7 @@
 /** Payroll settings are private to the admin Apps Script deployment. */
-function wpOwnerAttendanceConfig(month,employeeId){
+function wpOwnerAttendanceConfig(payload){
  wpOwnerAssert_();
- var m=wpMonth_(month),book=wsBook_(),id=String(employeeId||'');
+ var m=wpMonth_(payload&&payload.month),book=wsBook_(),id=String(payload&&payload.employeeId||'');
  wpAttEmployee_(book,id);
  return wpAttConfig_(book,id,m);
 }
