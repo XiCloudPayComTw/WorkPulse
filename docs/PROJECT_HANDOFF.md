@@ -188,3 +188,13 @@
 - tests/payroll.test.mjs 與 tests/monthly.test.mjs 增加閏年、跨月、安全、缺資料與 OOXML 驗證。真實 Google Workspace、Excel 現場開啟與行動版瀏覽器需公司完成部署驗收。
 - 報表下載至會計裝置後有機密薪資，應限制權限。WorkPulse 網頁和共用 Sheets 不保存計算薪資資料。
 - 交付文件：docs/PAYROLL_EXPORT.md；待使用者自行 Merge PR #11。
+
+## v0.10.1 — 模組檔案結構與出勤深連結初始化（PR #13）
+
+- 以 PR #12 已合併且 Pages 成功部署的 main（a63df999dc2c290e52f43f31b470d933e607619f）建立獨立分支 fix/workpulse-v0.10.1-structure-attendance-boot。
+- 原本 `src/app.js` 本機模式只在頁面切換時啟動出勤查詢；直接 `#/attendance` 或 F5 刷新會讓 attendanceState.phase 持續 idle 並顯示「正在讀取出勤資料」。現在用 `src/app/attendance-lifecycle.js` 統一啟動，直接落地載入本機出勤；GAS 雲端則待 bootstrap 完成才載入，所有入口一致。
+- `attendance-state.js` 使用遞增查詢序號，只允許最後一次人員／月份查詢覆蓋資料，防止併行導致舊資料回寫。
+- 原始碼依功能拆到 `src/features/{journals,attendance,payroll,reports,admin}`；共用工具放 `src/shared`、雲端 API 放 `src/services`、主介面整合放 `src/app`，入口 src/app.js 只 import 新主程式。
+- CSS 拆分為 styles/index.css 加 8 個功能 CSS layer，瀏覽器透過 @import 依順序載入，GAS builder 依相同順序直接拼接 CSS 到 Index.html。
+- Apps Script 原始檔移入 `shared`、`journals`、`attendance`、`admin`、`legacy` 資料夾；發布時仍產生 public／admin 分離且檔案平面化的 dist-gas，不混入舊版管理員 API。歷史測試與部署建置腳本均已更新路徑。
+- 新增直接 deep link 本機／雲端回歸與資料夾結構測試。詳細架構 docs/ARCHITECTURE.md。未操作 Google Drive 公司正式資料。
