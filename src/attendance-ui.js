@@ -177,5 +177,5 @@ document.addEventListener('change',event=>{
 
 // The temporary wage must not survive navigation away from the attendance page.
 window.addEventListener('hashchange',()=>{
- if(location.hash.replace(/^#\\/?/,'')!=='attendance')clearTemporarySalary();
+ if(location.hash.replace('#/','').replace('#','')!=='attendance')clearTemporarySalary();
 });
