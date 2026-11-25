@@ -1,6 +1,6 @@
 // Small, per-browser writing helpers. The company cloud record is ALWAYS stored by Apps Script;
 // this module only holds an unsubmitted draft / personal shortcuts in browser storage.
-import { uid } from './utils.js';
+import { uid } from '../../shared/utils.js';
 
 const DRAFT_PREFIX = 'workpulse:v0.5:draft:';
 const TEMPLATE_PREFIX = 'workpulse:v0.5:templates:';

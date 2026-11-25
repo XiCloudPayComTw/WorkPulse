@@ -1,6 +1,6 @@
-import { cloudCall } from './cloud.js';
-import { esc, uid } from './utils.js';
-import { icon } from './icons.js';
+import { cloudCall } from '../../services/cloud.js';
+import { esc, uid } from '../../shared/utils.js';
+import { icon } from '../../shared/icons.js';
 
 export const adminState={phase:'idle',data:null,tab:'employees',draft:null,dirty:false,saving:false,error:'',requestId:null};
 export async function loadAdmin(){
