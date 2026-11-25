@@ -14,7 +14,9 @@ var WP_HEADERS={
   Audit:['auditId','occurredAt','actorEmail','action','journalId','revision','requestId'],
   Reviews:['reviewId','journalId','journalRevision','status','actorEmail','comment','requestId','createdAt'],
   Meta:['key','value'],
-  MonthIndex:['month','spreadsheetId','createdAt']
+  MonthIndex:['month','spreadsheetId','createdAt'],
+  Attendance:['attendanceId','date','employeeId','dayType','startTime','endTime','breakMinutes','workedMinutes','overtimeMinutes','leaveType','leaveMinutes','overtimePay','notes','revision','updatedAt','requestId'],
+  AttendanceSettings:['employeeId','month','monthlyWage','expectedDays','revision','updatedAt','requestId']
 };
 var WP_CATEGORIES=['前端開發','展店設計','現場勘查','行政／會議','其他'];
 var WP_STATUS=['done','doing','blocked'];
