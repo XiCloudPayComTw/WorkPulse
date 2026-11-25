@@ -77,7 +77,7 @@ function wpOwnerAssert_(){
   var active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
   var effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
   if(!((active===cfg.adminEmail&&effective===cfg.adminEmail)||(cfg.operatorEmail&&active===cfg.operatorEmail&&effective===cfg.operatorEmail)))
-    throw Error('管理帳號未通過驗證或尚未獲公司管理者授權。');
+    throw Error('管理員雙重身分驗證失敗：管理帳號未通過驗證或尚未獲公司管理者授權。');
   return cfg;
 }
 
