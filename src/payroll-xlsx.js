@@ -69,6 +69,8 @@ function makeSummary(report,detail){
  put(rows,13,[c('已登記天數',12),c(report.recordedDays,13),undefined,c('未登記天數',12),c(report.missingDays,report.missingDays?11:13),
   undefined,c('需人工核對',12),c(report.manualReviewDays,report.manualReviewDays?11:13),
   undefined,c('範圍日數',12),c(report.days,13)]);
+ put(rows,14,[c('請假換算天數',12),c(report.leaveDays,13),undefined,c('預估應上班天數',12),c(report.estimatedWorkingDays,13),undefined,
+  c('說明',12),c('週一至週五估算；尚未扣國定假日、調班與輪班',15)]);
  put(rows,16,[c('試算限制與核對提醒',3)]);
  put(rows,18,[c('01',12),c('缺少紀錄',3),c('本次範圍有 '+report.missingDays+' 天未登記。這些日期不視為無出勤，不列入已計算工時。',15)]);
  put(rows,20,[c('02',12),c('特殊日別',3),c(report.manualReviewDays?'有 '+report.manualReviewDays+' 天須人工核算。總加班費顯示已能計算部分，尚非最終給付總額。':'例假、調移國定假日、變形工時及跨日特殊情況須人工確認。',15)]);
@@ -84,7 +86,7 @@ function makeSummary(report,detail){
    'A10:C11','D10:F11','G10:I11','J10:L11',
    'A16:N16','C18:N18','C20:N20','C22:N22','C24:N24',
    'A27:N27','E28:H28','A31:N31'],
-  heights:{1:39,2:29,4:27,6:30,8:29,9:26,10:36,13:35,16:28,18:35,20:35,22:35,24:35,27:26,28:35,31:32},
+  heights:{1:39,2:29,4:27,6:30,8:29,9:26,10:36,13:35,14:32,16:28,18:35,20:35,22:35,24:35,27:26,28:35,31:32},
   landscape:true};
 }
 function makeBasis(report){
