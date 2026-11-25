@@ -166,3 +166,13 @@
 - 網站 UI 延續灰藍色柔邊、主要文字 16px、卡片 min-width 0 及明細內部橫向捲動；手機底部導航增加可水平捲動避免擠壓。
 - 既有公司月檔採懶增 Attendance，控制表由私人編輯器執行 workPulseUpgradeAttendance 安全補建設定表。部署與驗收見 ATTENDANCE.md。
 - 尚未取得公司 Google Drive 的可核對寫入權限，Google Workspace／跨裝置端對端、歷史資料和真實工時排班未正式驗證；不得宣稱已上線。
+
+
+## v0.9.1 — Merge 後 Pages 部署及月薪臨時試算（PR #10）
+
+- 已查 PR #9 於 2026-11-26（臺灣時間）真正 Merge，main= b40c41d965cc530652fc85e5befae8e3e3d31820。main 的 check/build 成功，但 deploy-pages 回 HTTP 500；重跑相同 workflow 的失敗 job 因重複 github-pages artifacts 而失敗。v0.9.1 上傳與部署改為每次 run_id/run_attempt 唯一 artifact 名稱；需 Merge 後下一個全新 workflow push 才能實際驗證 Pages。
+- 使用者將「薪資基準待設定」改成會計在出勤頁面當次輸入的框。frontend src/attendance-state.js 使用純記憶體 temporarySalary，不走 localStorage/sessionStorage 或 API；離開頁面、換員工或月份清除。src/attendance-ui.js 逐格更新每日、當日預覽與月度金額，輸入框不失焦。
+- src/attendance.js attendanceSummary 不再信任任何 persisted overtimePay，一律按當前輸入月薪基準重算；無月薪且涉及加班則呈現待設定，沒加班則 0 元。
+- apps-script/AttendanceSave.gs 明確禁止月薪或 overtimePay 欄位上傳，新出勤記錄只存工時／請假等，Google Sheets 的歷史 overtimePay 欄位新寫入會留空。Attendance.gs 的 public wpAttendanceLoad 與 private wpOwnerAttendanceConfig 均不回傳舊版月薪／加班費。OwnerAttendance.gs 只儲存 expectedDays，拒絕儲存月薪。舊 localStorage 展示紀錄也在讀取時移除已保存的薪資與試算欄位。
+- **正式公司資料未改動**，如果已由 v0.9.0 真的存過工資或加班費，原 Sheets 儲存格、歷史版本或備份仍可能有舊資料。需公司擁有者自行核對、備份後再清理；本次只阻止後續洩漏，不能宣稱完全刪除。
+- CI、Pages 部署及實際 Google Workspace 尚需分別驗證，PR 不自動合併。
