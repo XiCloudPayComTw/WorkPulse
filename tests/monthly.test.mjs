@@ -175,7 +175,7 @@ test('attendance is stored in monthly Attendance sheet, with exact clock and bre
  const first=h.scope.wpAttendanceSave(payload);
  assert.equal(first.row.workedMinutes,600);
  assert.equal(first.row.overtimeMinutes,120);
- assert.equal(first.row.overtimePay,null);
+ assert.equal(first.row.overtimePay,undefined);
  assert.equal(h.scope.wpAttendanceSave(payload).deduplicated,true);
  assert.equal(h.scope.wpAttendanceLoad({month:'2026-11',employeeId:employee.id}).rows.length,1);
  assert.equal(h.scope.wpMonthIndex_(h.control)['2026-11']?.startsWith('file-'),true);
