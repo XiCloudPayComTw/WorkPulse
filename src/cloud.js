@@ -4,7 +4,7 @@ export function cloudEnabled() {
 }
 export function cloudCall(method, argument) {
   if (!cloudEnabled()) return Promise.reject(new Error('目前不是 Google Apps Script 工作環境'));
-  if (!['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig'].includes(method))
+  if (!['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','wpAttendanceRange'].includes(method))
     return Promise.reject(new Error('不允許呼叫未知的後端方法'));
   return new Promise((resolve,reject)=>{
     try {
