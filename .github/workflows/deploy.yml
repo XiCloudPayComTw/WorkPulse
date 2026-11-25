@@ -36,8 +36,13 @@ jobs:
           node-version: '22'
       - run: npm run build
       - uses: actions/configure-pages@v5
+      # Use a per-attempt artifact name. Rerunning a failed deployment must not
+      # pick up two artifacts named "github-pages" from the same workflow run.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          name: workpulse-pages-${{ github.run_id }}-${{ github.run_attempt }}
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: workpulse-pages-${{ github.run_id }}-${{ github.run_attempt }}
