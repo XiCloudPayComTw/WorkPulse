@@ -42,31 +42,51 @@ export function attendanceSelectDate(date){
  attendanceState.draft=newAttendanceDraft(date,attendanceState.rows.find(r=>r.date===date));
  attendanceState.requestId=null;attendanceState.dirty=false;
 }
+let attendanceLoadSequence=0;
+/**
+ * Always apply only the latest response. This prevents a slow cloud request for
+ * the previous month/person from leaving stale data after a newer selection.
+ */
 export async function loadAttendance(people,admin=false,month=attendanceState.month,employeeId=attendanceState.employeeId){
- if(!people?.length){clearTemporarySalary();attendanceState.month=month;attendanceState.phase='ready';attendanceState.employeeId='';attendanceState.rows=[];return;}
+ const seq=++attendanceLoadSequence;
+ if(!people?.length){
+  clearTemporarySalary();
+  attendanceState.month=month;attendanceState.phase='ready';
+  attendanceState.employeeId='';attendanceState.rows=[];
+  attendanceState.expectedDays=null;attendanceState.adminConfig=null;
+  attendanceState.draft=null;attendanceState.error='';
+  return true;
+ }
  if(!people.some(p=>p.id===employeeId))employeeId=people[0].id;
  if(attendanceState.employeeId!==employeeId||attendanceState.month!==month)clearTemporarySalary();
  attendanceState.month=month;
- attendanceState.employeeId=employeeId;attendanceState.phase='loading';attendanceState.error='';
+ attendanceState.employeeId=employeeId;
+ attendanceState.phase='loading';attendanceState.error='';
  try{
+  let rows,expectedDays=null,adminConfig=null;
   if(cloudEnabled()){
    const data=await cloudCall('wpAttendanceLoad',{month,employeeId});
-   attendanceState.rows=Array.isArray(data.rows)?data.rows:[];
-   attendanceState.expectedDays=data.expectedDays;
-   attendanceState.adminConfig=null;
-   if(admin){
-     attendanceState.adminConfig=await cloudCall('wpOwnerAttendanceConfig',{month,employeeId});
-   }
+   if(seq!==attendanceLoadSequence)return false;
+   rows=Array.isArray(data.rows)?data.rows:[];
+   expectedDays=data.expectedDays??null;
+   if(admin)adminConfig=await cloudCall('wpOwnerAttendanceConfig',{month,employeeId});
   }else{
-   attendanceState.rows=localRows().filter(r=>r.employeeId===employeeId&&r.date.startsWith(month));
-   attendanceState.expectedDays=null;
-   attendanceState.adminConfig=null;
+   rows=localRows().filter(r=>r.employeeId===employeeId&&r.date.startsWith(month));
   }
+  if(seq!==attendanceLoadSequence)return false;
+  attendanceState.rows=rows;
+  attendanceState.expectedDays=expectedDays;
+  attendanceState.adminConfig=adminConfig;
   const requested=attendanceState.date.startsWith(month)?attendanceState.date:month+'-01';
-  attendanceState.date=requested;
   attendanceSelectDate(requested);
   attendanceState.phase='ready';
- }catch(error){attendanceState.phase='error';attendanceState.error=error.message||'讀取出勤資料失敗';}
+  return true;
+ }catch(error){
+  if(seq!==attendanceLoadSequence)return false;
+  attendanceState.phase='error';
+  attendanceState.error=error?.message||'讀取出勤資料失敗';
+  return false;
+ }
 }
 export function updateAttendance(field,value){
  const a=attendanceState;
