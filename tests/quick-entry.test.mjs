@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readQuickDraft,saveQuickDraft,clearQuickDraft,readTemplates,addTemplate,removeTemplate,newTaskFromTemplate,recentPriorJournal} from '../src/quick-entry.js';
+import {readQuickDraft,saveQuickDraft,clearQuickDraft,readTemplates,addTemplate,removeTemplate,newTaskFromTemplate,recentPriorJournal} from '../src/features/journals/quick-entry.js';
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};};
 const draft=()=>({date:'2026-11-23',employeeId:'me',note:'項目',tasks:[{title:'配置施工圖',project:'案場'}]});
 test('draft persists and restores under same account',()=>{const db=storage();assert.equal(saveQuickDraft(db,'local',draft()),true);assert.equal(readQuickDraft(db,'local').tasks[0].title,'配置施工圖');assert.equal(readQuickDraft(db,'another'),null);});

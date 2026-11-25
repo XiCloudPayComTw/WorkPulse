@@ -1,8 +1,8 @@
 import {readFile,mkdir,writeFile,rm} from 'node:fs/promises';
 // WorkPulse v0.8: produce physically separate public and administrator Apps Script projects.
 // The public deployment MUST NOT include Owner.gs or the old Code.gs / Review.gs.
-const ordered=['src/utils.js','src/data.js','src/icons.js','src/cloud.js','src/admin.js',
- 'src/reports.js','src/xlsx.js','src/report-ui.js','src/quick-entry.js','src/attendance.js','src/payroll.js','src/payroll-xlsx.js','src/attendance-state.js','src/attendance-ui.js','src/payroll-ui.js','src/app.js'];
+const ordered=['src/shared/utils.js','src/features/journals/data.js','src/shared/icons.js','src/services/cloud.js','src/features/admin/admin.js',
+ 'src/features/reports/reports.js','src/shared/xlsx.js','src/features/reports/report-ui.js','src/features/journals/quick-entry.js','src/features/attendance/attendance.js','src/features/payroll/payroll.js','src/features/payroll/payroll-xlsx.js','src/features/attendance/attendance-state.js','src/features/attendance/attendance-ui.js','src/features/payroll/payroll-ui.js','src/app/attendance-lifecycle.js','src/app/main.js'];
 let js='';
 for(const name of ordered){
  let source=await readFile(name,'utf8');

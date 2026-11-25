@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {minutesBetween,overtimeMinutes,payEstimate,validateAttendanceDraft,weekdayLabel,
- weekdayCount,attendanceSummary} from '../src/attendance.js';
-import {attendanceState,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,loadAttendance} from '../src/attendance-state.js';
+ weekdayCount,attendanceSummary} from '../src/features/attendance/attendance.js';
+import {attendanceState,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,loadAttendance} from '../src/features/attendance/attendance-state.js';
 const draft=(overrides={})=>({date:'2026-11-25',dayType:'workday',startTime:'09:00',endTime:'18:00',
  breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',...overrides});
 test('workday records exact minutes, subtracts break and computes standard overtime',()=>{
