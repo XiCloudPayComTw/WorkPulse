@@ -34,11 +34,11 @@ function wpAttPay_(day,worked,wage){
 }
 function wpAttConfig_(control,id,month){
   var sheet=control.getSheetByName('AttendanceSettings');
-  if(!sheet)return {monthlyWage:null,expectedDays:null,revision:0};
+  if(!sheet)return {expectedDays:null,revision:0};
   var r=wpRows_(sheet).find(function(x){return String(x.employeeId)===id&&String(x.month)===month;});
-  if(!r)return {monthlyWage:null,expectedDays:null,revision:0};
-  return {monthlyWage:r.monthlyWage===''?null:Number(r.monthlyWage),
-    expectedDays:r.expectedDays===''?null:Number(r.expectedDays),revision:Number(r.revision)||0};
+  if(!r)return {expectedDays:null,revision:0};
+  // Legacy monthlyWage column intentionally never leaves the server.
+  return {expectedDays:r.expectedDays===''?null:Number(r.expectedDays),revision:Number(r.revision)||0};
 }
 function wpAttRecord_(row){
   return {id:String(row.attendanceId),date:String(row.date),employeeId:String(row.employeeId),
@@ -46,7 +46,6 @@ function wpAttRecord_(row){
     breakMinutes:Number(row.breakMinutes)||0,workedMinutes:Number(row.workedMinutes)||0,
     overtimeMinutes:Number(row.overtimeMinutes)||0,leaveType:String(row.leaveType||'none'),
     leaveMinutes:Number(row.leaveMinutes)||0,
-    overtimePay:row.overtimePay===''||row.overtimePay==null?null:Number(row.overtimePay),
     notes:wpPlainText_(row.notes),revision:Number(row.revision)||0,updatedAt:String(row.updatedAt||'')};
 }
 function wpAttRows_(book,id){
@@ -63,6 +62,5 @@ function wpAttendanceLoad(payload){
   var m=wpMonth_(payload&&payload.month),control=wsBook_(),id=String(payload&&payload.employeeId||'');
   wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,m,false),settings=wpAttConfig_(control,id,m);
-  return {month:m,employeeId:id,rows:wpAttRows_(file,id),expectedDays:settings.expectedDays,
-    wageConfigured:settings.monthlyWage!=null&&settings.monthlyWage>0};
+  return {month:m,employeeId:id,rows:wpAttRows_(file,id),expectedDays:settings.expectedDays};
 }
