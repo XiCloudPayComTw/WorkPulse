@@ -43,7 +43,7 @@
 
 ## v0.22.0 — 單一 Apps Script 三檔案部署
 
-- 基於 PR #32 CI 全綠但尚未合併的 c624e29a73d49b6c85104fb0c028b1e3eb2586f6，分支 feat/workpulse-v0.22.0-unified-deploy，PR 疊在 #32 分支；必須先合併 #32 再將本批 base 調整為 main 並核對 CI，不自動 Merge。
+- 基於 PR #32 CI 全綠但尚未合併的 c624e29a73d49b6c85104fb0c028b1e3eb2586f6，分支 feat/workpulse-v0.22.0-unified-deploy，開發基礎疊在 #32，PR 改指 main 以觸發既有 CI；必須先合併 #32，再核對本批差異及 CI，不自動 Merge。
 - npm run gas:build 新增 dist-gas/unified，僅 Code.gs、Index.html、appsscript.json 三檔。原始碼維持模組化，保留 dist-gas/public 和 admin 作為舊架構回退，不可混裝或同時開放同一資料庫寫入。統一入口以持有者執行、限制公司網域，強制 WORKPULSE_ACCESS_MODE=domain；空白 active email、外部帳號、錯誤 effective email 或 legacy 模式全部拒絕。管理角色由伺服器 bootstrap 判斷，所有特權 RPC 逐一核對主資料持有者 active/effective，拒絕一般員工與維護帳號；不支援單一入口委派管理員。公司網域同仁仍可選其他姓名，並非個別員工資料隔離。實際 Workspace 必須驗證 active email 可取得，不能降級匿名。
 - 單入口管理員可正常日誌/出勤寫入，也可進入管理功能；保留停寫、版本、日誌刪除等待、原請求手動重送。原兩包行為不變。建置時稽核公開函式清單與重複名稱，測試直接呼叫全部特權端點；UI 標誌不是安全邊界。
 - 自動備份不再是單入口設定通過的必要條件；無登記排程時標示手動備份、須人工完成備份還原驗收。若指定不安全備份資料夾仍拒絕；已登記自動排程則照舊核對。保留選用自動觸發器及 script.scriptapp scope，既有逐檔手動備份可用（須設定獨立私人資料夾）。不等於已完成備份；不得自動覆寫或整庫還原。

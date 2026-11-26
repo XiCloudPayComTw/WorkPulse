@@ -21,3 +21,7 @@ Node.js >=20，專案根目錄執行 `npm run gas:build`。只用 `dist-gas/unif
 ## 5. 日後更新
 
 先備份及停寫，重新建置三檔、更新同一測試專案，驗收後再更新正式部署版本。不得混裝兩包。回退必須確認 schema 相容、停用新入口後才啟用經驗證的舊入口。舊雙包與原部署手冊保留作回退參考。
+
+## 6. 不必在本機安裝 Node.js 的下載方法
+
+GitHub Actions 的 check 通過後，該 run 的 Artifacts 區域會有 workpulse-gas-unified-<run_id>-<run_attempt> ZIP（保留 30 天，登入 GitHub 才可下載）。只選已合併版本且完整 CI 通過的 run；解壓後即三個部署檔案，不必自己執行建置。過期時可重新以原始碼執行 gas:build。發布包沒有公司帳號密碼、Script Properties、資料庫或授權憑證。
