@@ -64,7 +64,7 @@ test('administrator can switch between people and project lists and rename draft
  assert.match(renderTeam({role:'admin'}),/小明/);
  assert.doesNotMatch(renderTeam({role:'guest'}),/專案清單/);
 });
-test('attendance places payroll calculator directly above the compact labor-law section',async()=>{
+test('attendance places Excel export above the compact labor-law section, without website salary controls',async()=>{
  const oldDocument=globalThis.document,oldWindow=globalThis.window;
  try{
   globalThis.document={addEventListener(){}};
@@ -76,9 +76,10 @@ test('attendance places payroll calculator directly above the compact labor-law 
   attendanceState.draft={date:'2026-11-26',employeeId:'E-1',dayType:'workday',startTime:'',
    endTime:'',breakMinutes:0,leaveType:'none',leaveMinutes:0,notes:'',revision:0};
   const html=renderAttendance([{id:'E-1',name:'小明'}],false);
-  const table=html.indexOf('本月出勤明細'),salary=html.indexOf('薪資基準 · 即時計算');
+  const table=html.indexOf('本月出勤明細'),exportPanel=html.indexOf('出勤紀錄 · Excel 匯出');
   const law=html.indexOf('加班費計算公式（勞基法）');
-  assert.ok(table>0&&salary>table&&law>salary);
+  assert.ok(table>0&&exportPanel>table&&law>exportPanel);
+  assert.doesNotMatch(html,/data-att-salary|data-att-monthly-pay|data-att-preview-pay|data-att-row-pay|薪資基準 · 即時計算/);
   assert.match(html,/att-law-panel/);
   assert.match(html,/data-action="payroll-start"/);
  }finally{
