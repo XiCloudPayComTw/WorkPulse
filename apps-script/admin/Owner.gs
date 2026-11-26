@@ -126,13 +126,16 @@ function wpBackupWorkbook_(input,scheduled){
  var id=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim();
  if(!id||id===cfg.folderId)throw Error('請設定獨立私人備份資料夾 WORKPULSE_BACKUP_FOLDER_ID');
  var folder=DriveApp.getFolderById(id);wpBackupAssertPrivate_(folder,cfg.adminEmail);
- var control=wsBook_(),source=target==='control'?control:wpMonthFile_(control,target,false);
+ var control=wsBook_(),index=wpMonthIndex_(control);
+ if(new Set(Object.values(index)).size!==Object.keys(index).length||Object.values(index).indexOf(cfg.sheetId)>=0)throw Error('月份索引異常，停止備份');
+ var source=target==='control'?control:wpMonthFile_(control,target,false);
  if(!source)throw Error('沒有該月份資料，不建立空白備份');
  var file=DriveApp.getFileById(source.getId());
- if(String(file.getOwner()?.getEmail()||'').toLowerCase()!==cfg.adminEmail)throw Error('來源檔案非指定持有者');
+ wpBackupAssertPrivate_(file,cfg.adminEmail);
  var lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
   wpBackupActor_(scheduled);wpBackupAssertPrivate_(folder,cfg.adminEmail);
+  if(input.requiredPausedAt&&wpFieldPause_(control)!==input.requiredPausedAt)throw Error('停寫狀態已改變，停止全部備份');
   var before=wpBackupContent_(source);
   var title='WorkPulse_Backup_'+target+'_'+request,matching=folder.getFilesByName(title),copy,duplicate=false;
   if(matching.hasNext()){copy=matching.next();duplicate=true;if(matching.hasNext())throw Error('備份名稱重複，請人工核對');}
@@ -445,9 +448,12 @@ function wpOwnerMonthIntegrity(input){
 /** Editor-only workflow: compare two private, non-live monthly files selected by owner.
  * Never remaps MonthIndex, never opens a restore target for writes. */
 function workPulseCompareRestoredMonth(){
- var cfg=wpPrimaryOwnerAssert_(),props=PropertiesService.getScriptProperties(),control=wsBook_(),index=wpMonthIndex_(control);
- var month=wpMonth_(props.getProperty('WORKPULSE_RESTORE_VERIFY_MONTH')),
- a=String(props.getProperty('WORKPULSE_RESTORE_SOURCE_ID')||'').trim(),b=String(props.getProperty('WORKPULSE_RESTORE_COPY_ID')||'').trim();
+ wpPrimaryOwnerAssert_();var props=PropertiesService.getScriptProperties();
+ return wpOwnerCompareBackupCopies({month:props.getProperty('WORKPULSE_RESTORE_VERIFY_MONTH'),sourceId:props.getProperty('WORKPULSE_RESTORE_SOURCE_ID'),copyId:props.getProperty('WORKPULSE_RESTORE_COPY_ID')});
+}
+function wpOwnerCompareBackupCopies(input){
+ var cfg=wpPrimaryOwnerAssert_(),control=wsBook_(),index=wpMonthIndex_(control);
+ var month=wpMonth_(input&&input.month),a=String(input&&input.sourceId||'').trim(),b=String(input&&input.copyId||'').trim();
  var live=new Set([cfg.sheetId].concat(Object.values(index)));
  if(!a||!b||a===b||live.has(a)||live.has(b))throw Error('須指定兩份不同且不在正式索引中的私人月檔');
  function open(id){
@@ -461,4 +467,52 @@ function workPulseCompareRestoredMonth(){
  }
  var source=open(a),copy=open(b),before=wpBackupContent_(source),actual=wpBackupContent_(copy),stable=before===wpBackupContent_(source)&&actual===wpBackupContent_(copy);
  return {readOnly:true,productionVerified:false,month:month,checkedAt:new Date().toISOString(),valuesMatch:stable&&before===actual,stableDuringCheck:stable,sourceRows:wpBackupShape_(source),copyRows:wpBackupShape_(copy)};
+}
+
+
+/** Primary-owner only; list known targets, never creates a month or backup. */
+function wpOwnerBackupPlan(){
+ var cfg=wpPrimaryOwnerAssert_(),control=wsBook_(),index=wpMonthIndex_(control),
+ id=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim();
+ var months=Object.keys(index).sort();
+ if(new Set(Object.values(index)).size!==months.length||months.some(function(m){return index[m]===cfg.sheetId;}))throw Error('月份索引異常，停止備份');
+ if(id){if(id===cfg.folderId)throw Error('備份與日常資料夾不可相同');wpBackupAssertPrivate_(DriveApp.getFolderById(id),cfg.adminEmail);}
+ return {readOnly:true,folderConfigured:!!id,targets:['control'].concat(months),pausedAt:wpFieldPause_(control),checkedAt:new Date().toISOString()};
+}
+/** Explicit owner action, idempotent when already configured. No sharing changes. */
+function wpOwnerPrepareBackupFolder(){
+ var cfg=wpPrimaryOwnerAssert_(),props=PropertiesService.getScriptProperties(),lock=LockService.getScriptLock();lock.waitLock(20000);
+ try{
+  var id=String(props.getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim(),folder,created=false;
+  if(id){if(id===cfg.folderId)throw Error('備份與日常資料夾不可相同');folder=DriveApp.getFolderById(id);}
+  else{folder=DriveApp.createFolder('WorkPulse_Backups');created=true;}
+  wpBackupAssertPrivate_(folder,cfg.adminEmail);
+  if(created)props.setProperty('WORKPULSE_BACKUP_FOLDER_ID',folder.getId());
+  return {ok:true,created:created,folderConfigured:true};
+ }finally{lock.releaseLock();}
+}
+/** Portable read-only values export; not an importable full-fidelity backup. */
+function wpOwnerExportBackupJson(input){
+ var cfg=wpPrimaryOwnerAssert_(),target=input&&input.target==='control'?'control':wpMonth_(input&&input.target),lock=LockService.getScriptLock();lock.waitLock(20000);
+ try{
+  var control=wsBook_(),index=wpMonthIndex_(control);
+  if(new Set(Object.values(index)).size!==Object.keys(index).length||Object.values(index).indexOf(cfg.sheetId)>=0)throw Error('月份索引異常');
+  var book=target==='control'?control:wpMonthFile_(control,target,false);
+  if(!book)throw Error('該月沒有資料');
+  wpBackupAssertPrivate_(DriveApp.getFileById(book.getId()),cfg.adminEmail);
+  var parts=JSON.parse(wpBackupContent_(book)),redacted=0;
+  var sheets=parts.map(function(p){
+   var headers=WP_HEADERS[p[0]],rows=p[2];
+   if(!rows.length||JSON.stringify(rows[0])!==JSON.stringify(headers))throw Error('資料表表頭不符：'+p[0]);
+   var safe=rows.slice(1).map(function(row){return row.map(function(value,i){
+    if(['monthlyWage','overtimePay'].indexOf(headers[i])>=0){if(value!==''&&value!=null)redacted++;return '';}
+    // Dates become ISO strings through JSON serialization; preserve other scalar values.
+    return value;
+   });});
+   return {name:p[0],headers:headers.slice(),rows:safe};
+  });
+  var out={format:'workpulse-values-v1',readOnly:true,restoreSupported:false,target:target,generatedAt:new Date().toISOString(),redactedSalaryCells:redacted,sheets:sheets};
+  if(JSON.stringify(out).length>1500000)throw Error('JSON 資料量超過 150 萬字元，請使用 Drive 原始副本');
+  return out;
+ }finally{lock.releaseLock();}
 }
