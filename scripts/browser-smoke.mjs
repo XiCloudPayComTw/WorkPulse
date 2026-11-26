@@ -28,6 +28,8 @@ const probe=`<script>
    setTimeout(()=>{
      const title=document.querySelector('h1.page-title')?.textContent.trim()||'';
      const attendance=Boolean(document.querySelector('.att-page .att-fields'));
+     const noSalary=!document.querySelector('[data-att-salary],[data-att-monthly-pay],[data-att-preview-pay],[data-att-row-pay]');
+     const exportButton=Boolean(document.querySelector('[data-action="payroll-start"]'));
      const fieldHome=document.querySelector('.wp-field-home');
      const mobileLauncher=Boolean(fieldHome&&getComputedStyle(fieldHome).display!=='none');
      const mobileTabs=[...document.querySelectorAll('.mobile-nav .nav-link')].map(x=>x.textContent.trim());
@@ -69,7 +71,7 @@ const probe=`<script>
      const output=document.createElement('output');
      output.id='workpulse-smoke-result';
      output.dataset.title=title;
-     output.dataset.attendance=attendance?'1':'0';
+     output.dataset.attendance=attendance?'1':'0';output.dataset.noSalary=noSalary?'1':'0';output.dataset.exportButton=exportButton?'1':'0';
      output.dataset.mobileLauncher=mobileLauncher?'1':'0';
      output.dataset.noAdminTabs=noAdminTabs?'1':'0';
      output.dataset.loading=loading?'1':'0';
@@ -125,7 +127,7 @@ try{
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
-      (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'))||
+      (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'))||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}px, no page overflow`);
