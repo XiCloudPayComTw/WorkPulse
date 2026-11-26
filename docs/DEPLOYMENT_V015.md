@@ -23,3 +23,14 @@
 - [ ] GitHub Pages 的既有本機資料先以原有 JSON 匯出保存。未提供自動遷移正式 Sheets，須另行核對人員及日期，不能把本機資料視為已同步。
 
 未完成上述前不得對公司宣稱正式上線。
+
+
+## v0.15.1 — Google Drive 驗收工具與本機移轉準備
+
+- 基於已合併 PR #22/#23、main Pages CI 通過的 c93c440bbe23361264f0ce2880c75f461febee94；分支 feat/workpulse-v0.15.1-drive-verification，不自動 Merge。Google Drive／Sheets 唯一雲端方案，Firebase 取消不變。
+- 私人編輯器 workPulseVerifyMonthFiles()：逐批核對最多 12 個索引月檔（預設最新），驗證持有者與私人分享初步條件、索引唯一、月份標籤、6 個分頁及表頭；回傳各表資料列數與 nextFromMonth；設定 WORKPULSE_VERIFY_FROM_MONTH 繼續舊月份。唯讀，不創檔、不改表，不代表完整資料一致性或還原驗收。
+- 本機展示版手機／桌面提示新增「下載移轉封包」：保存已儲存日誌、工作明細、員工、專案、類型及全月份出勤；不取未提交草稿、不自動上傳、不包含薪資或未知出勤欄位；缺人員、重複與 demo ID 提醒，使用既有日誌格式正規化。非原始資料無損備份，仍須保留原 JSON、逐筆核對人員對應及資料；尚無自動匯入正式庫。資料應由公司私下保存。
+- 弱網路：待同步區提示其他人員待處理筆數、可下載目前人員未確認的原始請求 JSON 供人工核對，原 requestId／revision 保留；不自動重送、不宣稱已儲存，不取代 sessionStorage／IndexedDB。窄手機按鈕重排為可觸控全寬與雙欄。
+- 公司實際 Google Workspace 尚未授權，未建立真實資料或排程，個別員工身份授權、備份還原、跨裝置與真實手機驗收仍待完成；v0.15.2 優先完成公司部署及安全驗收，v0.16.0 進階離線與 PWA。不得把本機展示版當正式雲端。
+
+操作：先在本機展示版下載移轉封包並保管；由公司管理者建立測試環境。私人編輯器執行 workPulseDeploymentCheck，再執行 workPulseVerifyMonthFiles；逐批核對 nextFromMonth，勿將檢查成功當作正式驗收。
