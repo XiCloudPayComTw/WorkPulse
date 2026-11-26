@@ -31,6 +31,8 @@ self.addEventListener('activate',event=>{
 self.addEventListener('fetch',event=>{
  const request=event.request;if(request.method!=='GET')return;
  const url=new URL(request.url);
+ // Navigation fragments are client routes, never part of the static cache key.
+ url.hash='';
  if(url.origin!==root.origin||url.search||request.headers.has('range'))return;
  const key=request.mode==='navigate'&&(url.href===root.href||url.href===index)?index:allowed.has(url.href)&&request.mode!=='navigate'?url.href:'';
  if(!key)return;

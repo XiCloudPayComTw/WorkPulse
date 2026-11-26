@@ -17,3 +17,6 @@
 - 升級後開舊視窗填草稿；核對不會強制重整，保存後關閉所有視窗再重開，新版才接管。
 - Android Chrome、iOS Safari、桌面 Chrome/Edge 實際安裝、啟動、鍵盤、橫向及儲存保留政策需人工驗收。移除捷徑不保證清除資料；清除網站資料可能移除本機日誌。先匯出再操作。
 - 正式員工入口只提供捷徑，仍需先連線登入；公司資料以 Drive 保存。不得將 Pages 連結發給員工作為正式儲存入口。
+
+- PR #28 修正（實機 iOS 回報）：日期欄位超出卡片。手機 `.form-group` 單欄 minmax(0,1fr)，原生 date/month/time/datetime-local 欄位明確 border-box、inline-size、min/max width、移除 WebKit 原生外觀及內部 value/edit 置中最小尺寸，保留原生選擇器與 16px 字體；Chrome 全路由檢查可見日期／月份／時間欄位矩形是否超出 form-group／卡片，不只量整頁 scrollWidth。實際 iOS Safari 仍需確認。
+- PR #28 原 CI 163/163 通過，但原生 PWA probe `FAIL offline: wait timed out`。靜態 worker 導覽快取 key 明確去除 hash fragment，測試改為來源 503 後建立新的 iframe 文件（非沿用舊已載入 app 或 hash-only navigation），保留指定 entry 路由、controller、表單及本機提示的驗證；若失敗回傳 URL、標題、body 片段供診斷。原生 IndexedDB 和 60 項響應式測試保留，未確認新 CI 通過前勿 Merge。

@@ -15,7 +15,7 @@ test('static build emits relative manifest, PNG icons and exact integrity allowl
   assert.equal(manifest.scope,'./');assert.equal(manifest.start_url,'./#/overview');assert.equal(manifest.display,'standalone');
   assert.ok(!result.paths.includes('private.json'));assert.ok(!result.paths.includes('sw.js'));
   assert.ok(worker.includes(createHash('sha256').update('const a=1;').digest('hex')));
-  assert.match(worker,/request.method!=='GET'/);assert.match(worker,/url.search/);assert.match(worker,/crypto.subtle.digest/);
+  assert.match(worker,/request.method!=='GET'/);assert.match(worker,/url.search/);assert.match(worker,/url.hash=''/);assert.match(worker,/crypto.subtle.digest/);
   assert.doesNotMatch(worker,/self\.skipWaiting\s*\(/);
   for(const icon of manifest.icons){const png=await readFile(join(dir,icon.src));assert.equal(png.readUInt32BE(16),Number(icon.sizes.split('x')[0]));}
   assert.match(await readFile(join(dir,'index.html'),'utf8'),/workpulse-pwa-build/);

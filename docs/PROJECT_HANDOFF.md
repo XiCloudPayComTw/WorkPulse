@@ -376,3 +376,6 @@
 - 安裝提示使用 beforeinstallprompt（若支援），其餘提供 Safari/Chrome/Edge 手動說明；standalone 模式，非原生 App，實際安裝按鈕與啟動畫面由 OS/browser 決定。保留 safe-area 與手機功能限制。新版下載提示不強制刷新。
 - 增加建置與原生 Chrome 子目錄測試：快取完整、未知路徑不寫入、來源伺服器回 503 時重新載入日誌表單。這是模擬來源不可用，不是實機飛航模式或 OS 安裝驗收。保留 60 項響應式及 IndexedDB 原生測試。
 - 正式 Apps Script iframe 無本專案控制的同 origin worker URL／scope，不能直接套用 Pages worker；仍須雲端驗證，已開啟頁面的 opt-in IndexedDB 草稿與手動重送不變。不自動改為匿名代理、外部 API 或雙主庫。公司正式 Google Drive 未操作，Firebase 取消。下一批 v0.18.0 全站效能穩定性，v1.0.0 正式部署與驗收。
+
+- PR #28 修正（實機 iOS 回報）：日期欄位超出卡片。手機 `.form-group` 單欄 minmax(0,1fr)，原生 date/month/time/datetime-local 欄位明確 border-box、inline-size、min/max width、移除 WebKit 原生外觀及內部 value/edit 置中最小尺寸，保留原生選擇器與 16px 字體；Chrome 全路由檢查可見日期／月份／時間欄位矩形是否超出 form-group／卡片，不只量整頁 scrollWidth。實際 iOS Safari 仍需確認。
+- PR #28 原 CI 163/163 通過，但原生 PWA probe `FAIL offline: wait timed out`。靜態 worker 導覽快取 key 明確去除 hash fragment，測試改為來源 503 後建立新的 iframe 文件（非沿用舊已載入 app 或 hash-only navigation），保留指定 entry 路由、controller、表單及本機提示的驗證；若失敗回傳 URL、標題、body 片段供診斷。原生 IndexedDB 和 60 項響應式測試保留，未確認新 CI 通過前勿 Merge。

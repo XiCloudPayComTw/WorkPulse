@@ -25,10 +25,15 @@ export async function nativePwaSmoke(browser,root){
   if(!(await cache.match(location.origin+'/WorkPulse/src/app.js')))throw Error('module missing');
   step='unknown path';await frame.contentWindow.fetch('/WorkPulse/private.json');
   if(await cache.match(location.origin+'/WorkPulse/private.json'))throw Error('arbitrary request cached');
-  step='offline';await fetch('/block/'+TOKEN);await new Promise(r=>{frame.onload=r;frame.src='/WorkPulse/index.html#/entry';});
-  await wait(()=>frame.contentDocument?.querySelector('h1.page-title')?.textContent==='填寫工作日誌');
-  if(!frame.contentDocument.querySelector('.wp-storage-banner')?.textContent.includes('尚未同步'))throw Error('local warning missing');
-  if(!frame.contentDocument.querySelector('#entry-date'))throw Error('form unavailable');
+  step='offline';await fetch('/block/'+TOKEN);
+  // New document, not hash-only navigation in an already running application.
+  const fresh=document.createElement('iframe');fresh.src='/WorkPulse/index.html#/entry';
+  const loaded=new Promise(r=>{fresh.onload=r;});document.body.append(fresh);await loaded;
+  try{await wait(()=>fresh.contentDocument?.querySelector('h1.page-title')?.textContent==='填寫工作日誌');}
+  catch(e){const d=fresh.contentDocument;throw Error(e.message+'; url='+fresh.contentWindow?.location.href+'; title='+d?.querySelector('h1.page-title')?.textContent+'; body='+d?.body?.textContent?.trim().slice(0,180));}
+  if(!fresh.contentWindow.navigator.serviceWorker.controller)throw Error('offline document not controlled');
+  if(!fresh.contentDocument.querySelector('.wp-storage-banner')?.textContent.includes('尚未同步'))throw Error('local warning missing');
+  if(!fresh.contentDocument.querySelector('#entry-date'))throw Error('form unavailable');
   outcome='PASS';
  }catch(e){outcome='FAIL '+step+': '+e.message;}
  await fetch('/result/'+TOKEN+'?value='+encodeURIComponent(outcome));
