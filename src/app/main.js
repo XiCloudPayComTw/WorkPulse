@@ -148,18 +148,35 @@ function summaryTiles(stats){
  ].map(([i,label,value,foot])=>`<div class="soft-card stat-card"><div class="row-between"><span class="surface-label">${label}</span><span class="stat-icon">${icon(i,18)}</span></div><div class="stat-number">${value}</div><div class="stat-foot">${foot}</div></div>`).join('')}</div>`;
 }
 function recentGroups(limit=3){
- const groups = groupJournals(state.store.journals.filter(j=>j.date.startsWith(state.month))).slice(0,limit);
+ const groups = groupJournals(state.store.journals.filter(j=>j.date.startsWith(state.month)&&j.employeeId===state.selectedPersonId)).slice(0,limit);
  if(!groups.length) return empty('calendar','還沒有工作紀錄','新增第一筆日誌，這裡就會開始出現你的工作摘要。','開始填寫','new-journal');
  return `<div>${groups.map(g=>`<div class="record-group"><div class="record-date"><div class="row"><span class="date-icon">${icon('calendar',16)}</span><div><div style="font-size:13px;font-weight:500">${formatDate(g.date)}</div><div class="xs muted">${g.journals.length} 位人員 · ${g.journals.flatMap(j=>j.tasks).length} 個項目</div></div></div><span class="tag">${formatHours(totalHours(g.journals))}</span></div>
  ${g.journals.flatMap(j=>j.tasks).slice(0,4).map(t=>`<div class="record-line"><span class="record-bullet ${esc(t.status)}"></span><span class="record-line-title" title="${esc(t.title)}">${esc(t.title)}</span><span class="tag ${esc(t.status)}">${STATUSES[t.status]}</span></div>`).join('')}
  </div>`).join('')}</div>`;
 }
+function renderFieldHome(){
+ const links=[
+  {view:'attendance',title:'出勤表',hint:'登記上下班與請假',iconName:'clock'},
+  {view:'entry',title:'填寫工作日誌',hint:'快速記錄今日工作',iconName:'pen'},
+  {view:'history',title:'歷史紀錄',hint:'查閱與修改已存資料',iconName:'calendar'},
+  ...(isCloud&&state.cloud.user?.role==='admin'?[{view:'team',title:'管理員控制台',hint:'管理人員、專案及工作類型',iconName:'users'}]:[])
+ ];
+ return `<section class="wp-field-home" aria-label="外勤功能首頁">
+  <div class="wp-field-hero"><span class="overline">WORKPULSE / FIELD</span>
+  <h2>今天要處理什麼工作？</h2>
+  <p>目前人員：${esc(employeeName(state.selectedPersonId))}。請直接選擇要使用的功能。</p></div>
+  <div class="wp-field-grid">${links.map(item=>`<button class="wp-field-tile" type="button" data-action="navigate" data-view="${item.view}">
+   <span class="wp-field-tile-icon">${icon(item.iconName,25)}</span>
+   <span class="wp-field-tile-body"><strong>${item.title}</strong><small>${item.hint}</small></span>
+   ${icon('arrowRight',18)}</button>`).join('')}</div>
+ </section>`;
+}
 function renderOverview(){
- const stats=monthStats(state.store,state.month);
- return `${syncBanner()}<section class="soft-card hero"><div><div class="overline">A BETTER WAY TO WORK</div><h2>讓每一天的進展，<br/>都變得清晰可見。</h2><p>在下班前花幾分鐘整理工作，讓記錄、查閱與回顧成為自然的習慣。</p><button class="soft-button primary" data-action="new-journal">${icon('pen',16)} 填寫今日工作 ${icon('arrowRight',15)}</button></div><div class="hero-graphic" aria-hidden="true">W<span class="dot">.</span></div></section>
+ const stats=monthStats({...state.store,journals:state.store.journals.filter(j=>j.employeeId===state.selectedPersonId)},state.month);
+ return `${syncBanner()}${renderFieldHome()}<div class="wp-desktop-overview"><section class="soft-card hero"><div><div class="overline">A BETTER WAY TO WORK</div><h2>讓每一天的進展，<br/>都變得清晰可見。</h2><p>在下班前花幾分鐘整理工作，讓記錄、查閱與回顧成為自然的習慣。</p><button class="soft-button primary" data-action="new-journal">${icon('pen',16)} 填寫今日工作 ${icon('arrowRight',15)}</button></div><div class="hero-graphic" aria-hidden="true">W<span class="dot">.</span></div></section>
  ${state.store.mode==='demo'?`<div class="notice section-space">${icon('info',18)}<div>目前看到的是<strong style="font-weight:550">示範資料</strong>，首次儲存正式工作紀錄時會自動移除示範內容。請勿在此版本輸入機密資料。</div></div>`:''}
  ${summaryTiles(stats)}<div class="two-col section-space"><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">最近工作紀錄</h2><p class="card-sub">依日期整合當日所有工作內容</p></div><button class="soft-button ghost sm" data-action="navigate" data-view="history">查看全部 ${icon('arrowRight',15)}</button></div>${recentGroups()}</section>
- <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">本月工作狀態</h2><p class="card-sub">工作完成概況與投入分布</p></div>${icon('target',19)}</div><div class="insight-pair"><span class="muted">完成率</span><span style="font-size:26px;line-height:1">${stats.rate}<span class="small">%</span></span></div><div class="progress-track"><div class="progress-fill" style="width:${stats.rate}%"></div></div><div class="divider"></div><div class="row-between"><span class="small muted">已完成項目</span><span class="small">${stats.completed} 項</span></div><div class="row-between" style="margin-top:13px"><span class="small muted">未完成項目</span><span class="small">${stats.pending} 項</span></div><div class="divider"></div><div class="overline">WORK DISTRIBUTION</div>${categoryBars(stats)}</section></div>`;
+ <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">本月工作狀態</h2><p class="card-sub">工作完成概況與投入分布</p></div>${icon('target',19)}</div><div class="insight-pair"><span class="muted">完成率</span><span style="font-size:26px;line-height:1">${stats.rate}<span class="small">%</span></span></div><div class="progress-track"><div class="progress-fill" style="width:${stats.rate}%"></div></div><div class="divider"></div><div class="row-between"><span class="small muted">已完成項目</span><span class="small">${stats.completed} 項</span></div><div class="row-between" style="margin-top:13px"><span class="small muted">未完成項目</span><span class="small">${stats.pending} 項</span></div><div class="divider"></div><div class="overline">WORK DISTRIBUTION</div>${categoryBars(stats)}</section></div></div>`;
 }
 function categoryBars(stats){
  if(!stats.byCategory.length) return '<p class="small muted">目前沒有可統計的工作分類。</p>';
