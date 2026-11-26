@@ -12,6 +12,9 @@ import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,sub
 import {renderAttendance} from '../features/attendance/attendance-ui.js';
 import {shouldLoadAttendance,activateAttendance} from './attendance-lifecycle.js';
 import {viewFromHash,visibleNavigation,renderNavigationButton} from './navigation.js';
+import {readSelectedPerson,writeSelectedPerson,shortPersonName,isMobileViewport} from './person.js';
+import {addWorkCategory,renameWorkCategory} from '../features/journals/categories.js';
+import {rememberDescriptions,descriptionSuggestions} from '../features/journals/description-memory.js';
 import {validateReportPeriod,applyReportPeriod} from '../features/reports/periods.js';
 
 const root = document.querySelector('#app');
@@ -20,12 +23,17 @@ const isCloud = cloudEnabled();
 const isOwnerPortal = isCloud && typeof window!=='undefined' && window.WORKPULSE_ADMIN_PORTAL===true;
 const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
-  filters:{query:'',employee:'all',status:'all'},localRename:null,
+  filters:{query:'',employee:'all',status:'all'},localRename:null,selectedPersonId:'',
   expanded:new Set([today,shiftDate(today,-1)]),draft:null,dirty:false,draftRestored:false,draftStatus:'未有暫存草稿',templates:[],
   toast:null,cloud:{phase:isCloud?'loading':'local',user:null,error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
   report:{filters:{startDate:today.slice(0,7)+'-01',endDate:today,employeeId:'all',departmentId:'all',project:'all',category:'all',status:'all'},phase:'idle',error:'',payload:null,applied:null,token:0}
 };
-state.draft = makeDraft(today, state.store.employees[0]?.id);
+const permanentStorage=()=>{try{return globalThis.localStorage;}catch{return null;}};
+state.selectedPersonId=readSelectedPerson(permanentStorage(),state.store.employees);
+state.filters.employee=state.selectedPersonId;
+state.report.filters.employeeId=state.selectedPersonId;
+if(isMobileViewport()&&['settings','insights'].includes(state.view))state.view='overview';
+state.draft=makeDraft(today,state.selectedPersonId);
 const draftStorage = () => { try { return isCloud ? window.sessionStorage : window.localStorage; }catch { return null; } };
 const draftAccount = () => isCloud ? `selected:${state.draft?.employeeId||'none'}` : 'local-device';
 let draftTimer = null;
@@ -62,6 +70,31 @@ function appendReusableTasks(rows){
 if(!isCloud)restoreQuickDraft();
 function fromHash(){return viewFromHash(location.hash);}
 function visibleNav(){return visibleNavigation(isCloud,state.cloud.user?.role);}
+function mobileNav(){return visibleNav().filter(n=>!['settings','insights'].includes(n.id));}
+function allowedMobileView(view){return !isMobileViewport()||!['settings','insights'].includes(view);}
+function selectPersonId(id){
+ if(!state.store.employees.some(p=>p.id===id))return false;
+ state.selectedPersonId=id;
+ writeSelectedPerson(permanentStorage(),id);
+ state.filters.employee=id;
+ state.report.filters.employeeId=id;state.report.phase='idle';
+ state.report.payload=null;state.report.applied=null;
+ return true;
+}
+function changeSelectedPerson(id,{fromAttendance=false}={}){
+ if(id===state.selectedPersonId)return true;
+ if(!state.store.employees.some(p=>p.id===id))return false;
+ if(state.dirty&&!confirm('切換人員後，未提交的工作內容會先暫存，確定切換？'))return false;
+ flushQuickDraft();selectPersonId(id);
+ state.draft=makeDraft(state.draft?.date||today,id);
+ state.dirty=false;state.saveRequestId=null;
+ restoreQuickDraft();
+ if(state.view==='attendance'&&!fromAttendance){
+  const task=loadAttendance(state.store.employees,isOwnerPortal,attendanceState.month,id);
+  render();void task.then(render);
+ }else render();
+ return true;
+}
 function makeItem(source={}) {return {id:source.id||uid(),project:source.project||'',category:source.category||'前端開發',title:source.title||'',description:source.description||'',result:source.result||'',status:source.status||'doing',hours:source.hours??0};}
 function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord=null) {
   const record = fromRecord ?? (state.store.mode==='demo'?null:journalFor(state.store,date,employeeId));
@@ -70,6 +103,22 @@ function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord
 function canEditJournal(employeeId){return !isCloud || Boolean(state.cloud.user?.canWriteIds?.includes(employeeId));}
 function employeeName(id){return state.store.employees.find(e=>e.id===id)?.name || '未指定人員';}
 function navButton(n,mobile=false){return renderNavigationButton(n,state.view,mobile);}
+function renderPersonMenu(){
+ const people=state.store.employees||[];
+ const person=people.find(p=>p.id===state.selectedPersonId);
+ return `<div class="wp-person-picker">
+  <button class="wp-person-trigger" type="button" data-action="person-menu"
+   aria-label="目前人員：${esc(person?.name||'尚未選擇')}，點擊切換" aria-expanded="false">
+   <span>${esc(shortPersonName(person?.name||'人員'))}</span>${icon('chevronDown',14)}</button>
+  <div class="wp-person-menu" hidden role="group" aria-label="切換填寫人員">
+   <div class="wp-person-menu-title">目前操作人員</div>
+   ${people.map(p=>`<button type="button" class="wp-person-option ${p.id===state.selectedPersonId?'selected':''}"
+    data-action="person-select" data-id="${esc(p.id)}" aria-pressed="${p.id===state.selectedPersonId}">
+    <span class="wp-person-avatar">${esc(shortPersonName(p.name))}</span><span>${esc(p.name)}</span>
+    ${p.id===state.selectedPersonId?icon('checkCircle',15):''}</button>`).join('')}
+   <p class="wp-person-hint">切換後，其他頁面會同步使用此人員</p>
+  </div></div>`;
+}
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班費與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
  const modeName=isCloud?(state.cloud.user?.role==='admin'?'管理員':'共用'):'展示版';
