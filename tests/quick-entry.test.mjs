@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readQuickDraft,saveQuickDraft,clearQuickDraft,readTemplates,addTemplate,removeTemplate,newTaskFromTemplate,recentPriorJournal} from '../src/features/journals/quick-entry.js';
+import {readQuickDraft,saveQuickDraft,clearQuickDraft,readTemplates,addTemplate,removeTemplate,newTaskFromTemplate,recentPriorJournal,countExpiredQuickDrafts,pruneExpiredQuickDrafts} from '../src/features/journals/quick-entry.js';
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};};
 const draft=()=>({date:'2026-11-23',employeeId:'me',note:'項目',tasks:[{title:'配置施工圖',project:'案場'}]});
 test('draft persists and restores under same account',()=>{const db=storage();assert.equal(saveQuickDraft(db,'local',draft()),true);assert.equal(readQuickDraft(db,'local').tasks[0].title,'配置施工圖');assert.equal(readQuickDraft(db,'another'),null);});
@@ -22,4 +22,12 @@ test('legacy draft upgrades without losing original day; cap does not evict',()=
  const db=storage();db.setItem('workpulse:v0.5:draft:local',JSON.stringify({account:'local',savedAt:Date.now(),draft:draft()}));
  for(let day=1;day<=31;day++){if(day===23)continue;assert.equal(saveQuickDraft(db,'local',{...draft(),date:'2026-12-'+String(day).padStart(2,'0')}),true);}
  assert.equal(saveQuickDraft(db,'local',{...draft(),date:'2027-01-01'}),false);assert.ok(readQuickDraft(db,'local',86400000,'2026-11-23','me'));
+});
+
+test('invalid calendar day rejected and explicit expired cleanup preserves valid drafts',()=>{
+ const db=storage();db.setItem('workpulse:v0.5:draft:local',JSON.stringify({account:'local',savedAt:Date.now()-8*86400000,draft:draft()}));
+ assert.equal(saveQuickDraft(db,'local',{...draft(),date:'2026-02-30'}),false);
+ assert.equal(saveQuickDraft(db,'local',{...draft(),date:'2026-11-24'}),true);
+ assert.equal(countExpiredQuickDrafts(db,'local'),1);assert.equal(pruneExpiredQuickDrafts(db,'local'),1);
+ assert.ok(readQuickDraft(db,'local',86400000,'2026-11-24','me'));
 });

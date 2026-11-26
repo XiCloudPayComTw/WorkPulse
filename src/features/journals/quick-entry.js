@@ -9,7 +9,7 @@ const safeKey = account => encodeURIComponent(String(account || 'local-device').
 const draftKey = account => DRAFT_PREFIX + safeKey(account);
 const templateKey = account => TEMPLATE_PREFIX + safeKey(account);
 const plain = (value, limit) => String(value ?? '').slice(0, limit);
-const isDay = text => /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(String(text));
+const isDay = text => {if(!/^\d{4}-\d{2}-\d{2}$/.test(String(text)))return false;const d=new Date(text+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===text;};
 const normalizeTask = task => ({
   id:plain(task?.id || uid(),120), project:plain(task?.project,100),
   category:plain(task?.category || '其他',100), title:plain(task?.title,TITLE_MAX),
@@ -32,6 +32,8 @@ function quickDraftValid(row,maxAgeMs){
 function quickDraftNormalize(d){
  return {date:d.date,employeeId:plain(d.employeeId,180),note:plain(d.note,2000),tomorrow:plain(d.tomorrow,2000),tasks:d.tasks.map(normalizeTask),editing:!!d.editing,revision:Number(d.revision)||0};
 }
+export function countExpiredQuickDrafts(storage,account,maxAgeMs=7*86400000){try{return quickDraftRows(storage,account).filter(row=>!quickDraftValid(row,maxAgeMs)).length;}catch{return 0;}}
+export function pruneExpiredQuickDrafts(storage,account,maxAgeMs=7*86400000){try{const rows=quickDraftRows(storage,account),keep=rows.filter(row=>quickDraftValid(row,maxAgeMs));if(rows.length===keep.length)return 0;if(keep.length)storage.setItem(draftKey(account),JSON.stringify({account:String(account),version:2,rows:keep}));else storage.removeItem(draftKey(account));return rows.length-keep.length;}catch{return -1;}}
 export function listQuickDrafts(storage,account,maxAgeMs=7*86400000,employeeId=''){
  try{return quickDraftRows(storage,account).filter(row=>quickDraftValid(row,maxAgeMs)&&(!employeeId||row.draft.employeeId===employeeId)).sort((a,b)=>b.savedAt-a.savedAt).map(row=>({date:row.draft.date,employeeId:row.draft.employeeId,savedAt:row.savedAt}));}catch{return [];}
 }

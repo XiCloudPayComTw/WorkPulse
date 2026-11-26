@@ -12,7 +12,7 @@ import {renameLocalEmployee,renameLocalProject} from '../features/admin/rename.j
 import { buildReport, reportCsv, reportSheets } from '../features/reports/reports.js';
 import { buildXlsx } from '../shared/xlsx.js';
 import { renderReportWorkspace } from '../features/reports/report-ui.js';
-import { readQuickDraft, saveQuickDraft, clearQuickDraft, listQuickDrafts, readTemplates, addTemplate, removeTemplate, renameTemplatesProject,renameTemplatesCategory, newTaskFromTemplate, recentPriorJournal } from '../features/journals/quick-entry.js';
+import { readQuickDraft, saveQuickDraft, clearQuickDraft, listQuickDrafts, countExpiredQuickDrafts, pruneExpiredQuickDrafts, readTemplates, addTemplate, removeTemplate, renameTemplatesProject,renameTemplatesCategory, newTaskFromTemplate, recentPriorJournal } from '../features/journals/quick-entry.js';
 import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig} from '../features/attendance/attendance-state.js';
 import {renderAttendance} from '../features/attendance/attendance-ui.js';
 import {shouldLoadAttendance,activateAttendance} from './attendance-lifecycle.js';
@@ -232,6 +232,7 @@ function renderEntry(){
   <div class="quick-tool-actions"><button class="soft-button sm" data-action="copy-previous" ${!previous?'disabled':''}>${icon('calendar',16)} ${previous?`複製上次工作 · ${formatDate(previous.date,false)}`:'沒有可複製的上次工作'}</button>
    <span class="small muted" id="draft-save-status" role="status" aria-live="polite">${esc(state.draftStatus)}</span>
    <button class="soft-button ghost sm" data-action="discard-draft" ${state.dirty?'':'disabled'}>${icon('trash',15)} 捨棄草稿</button></div>
+  ${countExpiredQuickDrafts(draftStorage(),draftAccount(),draftAge())?`<button type="button" class="soft-button mini" data-action="prune-drafts">清理超期草稿（${countExpiredQuickDrafts(draftStorage(),draftAccount(),draftAge())}）</button>`:''}
   ${draftDates().length?`<div class="wp-draft-dates"><strong>未提交草稿</strong>${draftDates().map(x=>`<button type="button" class="soft-button mini" data-action="open-date-draft" data-date="${esc(x.date)}">${esc(x.date)}</button>`).join('')}</div>`:''}
   ${templates.length?`<div class="quick-template-list" aria-label="常用工作項目">${templates.map(t=>`<div class="quick-template"><button class="quick-template-use" data-action="use-template" data-id="${esc(t.id)}" title="${esc(t.title)}">${icon('plus',14)}<span>${esc(t.title)}</span></button><button class="quick-template-remove" data-action="remove-template" data-id="${esc(t.id)}" title="移除 ${esc(t.title)}" aria-label="移除 ${esc(t.title)}">${icon('x',13)}</button></div>`).join('')}</div>`:'<p class="xs muted quick-template-empty">可在下方工作項目按「設為常用」，以後一鍵加入。</p>'}
   <p class="xs muted quick-shortcuts">快捷鍵：Ctrl / Cmd + S 正式儲存，Ctrl / Cmd + Enter 新增項目。${isCloud?'草稿僅暫存於目前瀏覽器，不代表已同步至 Google Sheets。':'草稿會暫存於這個瀏覽器，正式紀錄仍需點擊儲存。'}</p>
@@ -246,7 +247,7 @@ function renderTask(t,i){
  const key=`task-${i}`;
  const options=(items,value)=>[...(value&&!items.includes(value)?[value]:[]),...items].map(v=>`<option value="${esc(v)}" ${value===v?'selected':''}>${esc(v||'未指定專案')}</option>`).join('');
  const closed=collapsedTasks.has(t.id);
- return `<article class="task-card"><div class="task-heading"><button type="button" class="wp-task-toggle" data-action="task-collapse" data-index="${i}" aria-expanded="${!closed}" aria-controls="${key}-fields"><span class="task-number-spot">${String(i+1).padStart(2,'0')}</span><span><strong>${esc(t.category||'工作內容')}</strong><small data-task-preview="${i}">${esc(t.description?.trim().slice(0,55)||'尚未填寫內容')} · ${formatHours(Number(t.hours)||0)}</small></span>${icon('chevronDown',16)}</button><div class="task-heading-actions"><button class="soft-button ghost mini" data-action="save-template" data-index="${i}" title="儲存此工作為常用項目">${icon('sparkles',15)} 設為常用</button><button class="soft-button ghost mini danger" aria-label="刪除第 ${i+1} 項工作" data-action="remove-task" data-index="${i}">${icon('trash',16)}</button></div></div>
+ return `<article class="task-card"><div class="task-heading"><button type="button" class="wp-task-toggle" data-action="task-collapse" data-index="${i}" aria-expanded="${!closed}" aria-controls="${key}-fields"><span class="task-number-spot">${String(i+1).padStart(2,'0')}</span><span><strong data-task-category-preview="${i}">${esc(t.category||'工作內容')}</strong><small data-task-preview="${i}">${esc(t.description?.trim().slice(0,55)||'尚未填寫內容')} · ${formatHours(Number(t.hours)||0)}</small></span>${icon('chevronDown',16)}</button><div class="task-heading-actions"><button class="soft-button ghost mini" data-action="save-template" data-index="${i}" title="儲存此工作為常用項目">${icon('sparkles',15)} 設為常用</button><button class="soft-button ghost mini danger" aria-label="刪除第 ${i+1} 項工作" data-action="remove-task" data-index="${i}">${icon('trash',16)}</button></div></div>
  <div class="form-fields wp-task-fields" id="${key}-fields" ${closed?'hidden':''}><label class="form-group full"><span class="field-label">工作類型 *</span><select class="input" data-task="${i}" data-field="category">${options(state.store.categories||CATEGORIES,t.category)}</select></label>
  <label class="form-group"><span class="field-label">所屬專案</span><select class="input" data-task="${i}" data-field="project"><option value="" ${!t.project?'selected':''}>未指定專案</option>${options(state.store.projects,t.project)}</select></label>
  <label class="form-group full wp-description-field"><span class="field-label">執行內容</span>
@@ -267,9 +268,9 @@ function updateDescriptionSuggestions(textarea,force=false){
  target.innerHTML=suggestions.map((value,i)=>`<button type="button" class="wp-description-suggestion"
  data-action="description-use" data-index="${index}" data-suggestion="${i}" data-all="${force?'1':'0'}"
  title="${esc(value)}">${esc(value.slice(0,100))}</button>`).join('');
- target.hidden=!suggestions.length;
+ if(force&&!suggestions.length)target.textContent='目前沒有可帶入的常用內容';target.hidden=!force&&!suggestions.length;
 }
-function updateTaskPreview(index){const task=state.draft.tasks[index],preview=document.querySelector('[data-task-preview="'+index+'"]');if(preview&&task)preview.textContent=(task.description?.trim().slice(0,55)||'尚未填寫內容')+' · '+formatHours(Number(task.hours)||0);}
+function updateTaskPreview(index){const task=state.draft.tasks[index],preview=document.querySelector('[data-task-preview="'+index+'"]');const category=document.querySelector('[data-task-category-preview="'+index+'"]');if(category&&task)category.textContent=task.category||'工作內容';if(preview&&task)preview.textContent=(task.description?.trim().slice(0,55)||'尚未填寫內容')+' · '+formatHours(Number(task.hours)||0);}
 function setTaskCollapsed(index,closed){const task=state.draft.tasks[index],button=document.querySelector('[data-action="task-collapse"][data-index="'+index+'"]'),fields=document.querySelector('#task-'+index+'-fields');if(!task||!button||!fields)return;if(closed)collapsedTasks.add(task.id);else collapsedTasks.delete(task.id);fields.hidden=closed;button.setAttribute('aria-expanded',String(!closed));}
 function totalDraftHours(){return state.draft.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);}
 function updateDraftSummary(){
@@ -435,7 +436,8 @@ async function initCloud(){
 }
 async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  if(!isCloud)return;
- if(state.cloud.phase!=='ready')return;
+ if(state.cloud.phase!=='ready'||state.cloud.saving)return;
+ if(!flushQuickDraft())return;
  state.cloud.loadingMonth=true;const token=++state.cloud.monthToken;render();
  try{
   const result=await cloudCall('wpSharedLoadMonth',month);
@@ -656,8 +658,12 @@ root.addEventListener('click', event=>{
  if(action==='new-journal'){openNew();return;}
  if(action==='task-collapse'){setTaskCollapsed(Number(button.dataset.index),button.getAttribute('aria-expanded')==='true');return;}
  if(action==='tasks-collapse'||action==='tasks-expand'){state.draft.tasks.forEach((_,i)=>setTaskCollapsed(i,action==='tasks-collapse'));return;}
+ if(action==='prune-drafts'){
+  if(!confirm('清除目前暫存範圍內超過讀取期限或格式異常的草稿？不影響正式紀錄與待同步請求。'))return;
+  const count=pruneExpiredQuickDrafts(draftStorage(),draftAccount(),draftAge());notify(count<0?'清理失敗':'已移除 '+count+' 筆超期或異常草稿',count<0);render();return;
+ }
  if(action==='open-date-draft'){
-  if(!requireDiscard())return;const date=button.dataset.date,person=state.selectedPersonId;
+  if(state.cloud.saving||state.cloud.loadingMonth||!requireDiscard())return;const date=button.dataset.date,person=state.selectedPersonId;
   if(!readQuickDraft(draftStorage(),draftAccount(),draftAge(),date,person)){notify('找不到可復原的草稿',true);return;}
   if(isCloud&&state.month!==date.slice(0,7)){void loadCloudMonth(date.slice(0,7),date,person);return;}
   state.draft=makeDraft(date,person);state.dirty=false;state.saveRequestId=null;restoreQuickDraft(date);render();return;
@@ -682,7 +688,7 @@ root.addEventListener('click', event=>{
  }
  if(action==='discard-draft'){
   if(!confirm('要捨棄目前尚未正式儲存的草稿嗎？'))return;
-  clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount(),state.draft.date,state.draft.employeeId);
+  if(!clearQuickDraft(draftStorage(),draftAccount(),state.draft.date,state.draft.employeeId)){notify('草稿清除失敗，請先核對本機儲存狀態',true);return;}clearTimeout(draftTimer);
   state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;state.saveRequestId=null;state.draftStatus='草稿已捨棄';render();return;
  }
  if(action==='add-task'){if(state.cloud.saving||state.cloud.loadingMonth)return;if(state.draft.tasks.length>=100){notify('同一天最多可填寫 100 項工作',true);return;}state.draft.tasks.push(makeItem());markDraftDirty();render();((isMobileViewport()?document.querySelector('.task-card:last-child select[data-field="category"] + .wp-sheet-trigger'):null)||document.querySelector('.task-card:last-child select[data-field="category"]'))?.focus();return;}
@@ -697,6 +703,7 @@ root.addEventListener('click', event=>{
    }catch(e){notify(e.message||'無法儲存日誌',true);}return;
  }
  if(action==='history-jump'){
+  if(state.cloud.saving||state.cloud.loadingMonth)return;
   const date=document.querySelector('#history-jump-date')?.value;if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return;
   const month=date.slice(0,7),jump=()=>{if(state.view!=='history'||state.month!==month)return;const groups=filteredGroups();if(!groups.some(g=>g.date===date)){notify('這一天沒有符合目前篩選的紀錄',true);return;}state.expanded.add(date);const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults(groups);document.getElementById('day-'+date)?.closest('.history-record')?.scrollIntoView({block:'start',behavior:'instant'});};
   if(isCloud&&state.month!==month){void loadCloudMonth(month).then(jump);return;}if(state.month!==month){state.month=month;render();}jump();return;
@@ -776,6 +783,7 @@ root.addEventListener('change',event=>{
  }
  if(el.matches('[data-identity]')){
    const field=el.dataset.identity;const value=el.value;
+   if(field==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(value)){el.value=state.draft.date;return;}
    if(!requireDiscard()){el.value=state.draft[field];return;}
    const date=field==='date'?value:state.draft.date;const employee=field==='employeeId'?value:state.draft.employeeId;
    state.saveRequestId=null;
