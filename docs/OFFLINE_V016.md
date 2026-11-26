@@ -15,3 +15,5 @@
 在獨立測試部署設定 domain 與 WORKPULSE_OFFLINE_SCOPE（正式及測試不得共用），先以公司測試帳號登入，開啟持久暫存、填寫日誌與出勤、確認本機寫入完成、關閉並重開瀏覽器，重新完成雲端登入後查閱草稿。測試第二分頁、不同登入帳號、離線提交、手動重送、版本衝突、配額失敗與停用清除。Chrome 模擬不取代 iOS Safari／Android Chrome 或 GAS iframe 實際驗收。禁止共用裝置啟用；離職、交接及裝置遺失按公司資料政策清除，不能依賴此功能作永久保存。
 
 - Chrome CI 新增原生 IndexedDB／Web Locks 測試（合成資料、同一 origin，重新建立 storage instance、第二實例拒絕鎖及清除），不是關閉實體手機或 GAS iframe 實測。跨月草稿不在錯誤月份自動載入；待同步資料若只能留在記憶體，持久模式不發送 RPC。
+
+- PR #26 CI 修正：原生 IndexedDB 探針在 Chrome --virtual-time-budget 下觸發「離線資料庫開啟逾時」。改用獨立 loopback 測試伺服器、真實時鐘、隔離暫存 Chrome profile，等待實際瀏覽器回報結果（45 秒上限，原產品 5 秒開啟／交易逾時不變）。保留原生啟用、寫入、第二實例鎖定、復原及清除檢查，並回報失敗階段；其他 60 個響應式路由測試不變。最新 CI 通過前勿 Merge，正式 GAS 實機仍待驗收。
