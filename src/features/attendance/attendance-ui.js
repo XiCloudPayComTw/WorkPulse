@@ -1,7 +1,8 @@
-import {esc} from '../../shared/utils.js';
+import {esc,localISODate} from '../../shared/utils.js';
+import {attendanceCalendar,attendancePlannedDay,previousAttendanceTimes} from './calendar.js';
 import {cloudEnabled} from '../../services/cloud.js';
 import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,TWD_FORMAT,validateAttendanceDraft,payEstimate} from './attendance.js';
-import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,discardAttendanceDraft} from './attendance-state.js';
+import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,discardAttendanceDraft,copyPreviousAttendance,updateAttendanceSchedule,saveAttendanceSchedule} from './attendance-state.js';
 function opts(items,selected){
  return Object.entries(items).map(([key,value])=>'<option value="'+esc(key)+'" '+(selected===key?'selected':'')+'>'+esc(value)+'</option>').join('');
 }
@@ -20,7 +21,9 @@ export function renderAttendance(people,isAdmin=false){
  if(a.phase==='idle'||a.phase==='loading')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="status">正在讀取出勤資料…</section></div>';
  if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'</section></div>';
  const wage=currentTemporaryWage();
- const info=attendanceSummary(a.rows,a.month,a.expectedDays,wage);
+ const days=attendanceCalendar(a.month,a.rows,a.schedule.days,localISODate(),a.date,a.dirty?a.draft:null);
+ const expected=a.expectedDays??(Object.keys(a.schedule.days).length?days.filter(x=>x.planned==='workday').length:null);
+ const info=attendanceSummary(a.rows,a.month,expected,wage);
  const salaryPanel='<section class="soft-card card-pad-lg att-salary-panel" aria-label="本次臨時薪資試算">'+
   '<div><h3 class="card-title">薪資基準 · 即時計算</h3>'+
   '<p class="card-sub">會計輸入選定人員月薪，立即試算當月所有加班費。切換人員、月份或離開出勤頁後即清除。</p></div>'+
@@ -44,8 +47,10 @@ export function renderAttendance(people,isAdmin=false){
   previewPay=payEstimate(d.dayType,worked,wage);
  }catch(e){previewError=e.message;}
  const field=(label,key,type='text',extraProps='')=>'<label class="form-group"><span class="field-label">'+label+'</span><input class="input" type="'+type+'" data-att-field="'+key+'" value="'+esc(String(d[key]??''))+'" '+extraProps+'></label>';
+ const previous=previousAttendanceTimes(a.rows,a.date,a.employeeId);
  const editor='<section class="soft-card card-pad-lg att-panel">'+
  '<div class="card-head"><div><h3 class="card-title">每日出勤登記</h3><p class="card-sub">時間記錄至分鐘；跨午夜下班自動視為隔日。工作時間會扣除未提供勞務的休息時間。</p></div></div>'+
+ '<div class="att-copy-row"><button class="soft-button sm" data-action="attendance-copy-previous" '+(!previous||a.saving?'disabled':'')+'>複製前一天上下班時間</button><span class="small muted">只複製時間與休息分鐘，不複製假別、備註或日別。</span></div>'+
  '<div class="att-fields"><label class="form-group"><span class="field-label">日期</span><input class="input" type="date" data-att-date value="'+esc(d.date)+'"></label>'+
  '<div class="form-group"><span class="field-label">星期</span><div class="att-static">星期'+weekdayLabel(d.date)+'</div></div>'+
  '<label class="form-group"><span class="field-label">出勤日別</span><select class="input" data-att-field="dayType">'+opts(DAY_TYPES,d.dayType)+'</select></label>'+
@@ -67,6 +72,8 @@ export function renderAttendance(people,isAdmin=false){
  '<label class="form-group"><span class="field-label">當月應上班天數</span><input class="input" type="number" min="0" max="31" data-att-config="expectedDays" value="'+esc(String(a.adminConfig.expectedDays??''))+'" placeholder="不填則為週一～五估計"></label></div>'+
  '<div class="att-actions"><span class="small muted">應上班天數會儲存。臨時月薪和試算加班費不儲存。</span>'+
  '<button class="soft-button" data-action="attendance-config-save" '+(a.configSaving?'disabled':'')+'>儲存設定</button></div></section>':'';
+ const calendar=renderAttendanceCalendar(days);
+ const scheduleEditor=isAdmin&&a.adminConfig?renderAttendanceSchedule(a):'';
  const table='<section class="soft-card card-pad-lg att-panel"><div class="card-head"><div><h3 class="card-title">本月出勤明細</h3>'+
  '<p class="card-sub">點選日期可編輯既有紀錄。表格可橫向捲動，不會撐開網站版型。</p></div><span class="tag">'+a.rows.length+' 筆</span></div>'+
  (a.rows.length?'<div class="att-scroll"><table class="att-table"><thead><tr><th>日期</th><th>星期</th><th>出勤日別</th><th>上班</th><th>下班</th><th>當日上班時數</th><th>當日加班時數</th><th>加班費（估）</th><th>請假</th><th>備註</th><th>操作</th></tr></thead><tbody>'+
@@ -85,10 +92,27 @@ export function renderAttendance(people,isAdmin=false){
  '<a href="https://calcr2.mol.gov.tw/Index" target="_blank" rel="noopener noreferrer">勞動部加班費試算</a></p></section>';
  return '<div class="att-page">'+toolbar+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
  (info.expectedIsEstimate?'<p class="small muted att-estimate">應上班天數暫用週一至週五推估，未扣除國定假日與調班，管理員可設定確切天數。</p>':'')+
- '<div class="att-layout">'+editor+admin+'</div>'+table+salaryPanel+law+'</div>';
+ calendar+'<div class="att-layout">'+editor+admin+scheduleEditor+'</div>'+table+salaryPanel+law+'</div>';
 }
 
 /** Attendance interactions are delegated here to avoid coupling the journal editor. */
+function renderAttendanceCalendar(days){
+ const a=attendanceState,offset=days.length?new Date(days[0].date+'T00:00:00Z').getUTCDay():0;
+ const labels={recorded:'有紀錄',leave:'請假',review:'待核對',missing:'缺紀錄',future:'未到日期',today:'今日',off:'休假／休息'};
+ const missing=days.filter(d=>d.missing).length,review=days.filter(d=>d.issues.length).length;
+ return '<section class="soft-card card-pad-lg att-panel att-calendar"><div class="card-head"><div><h3 class="card-title">出勤月曆</h3><p class="card-sub">點選日期登記／編輯，未來日期不列入缺漏。班表未設定時以週一至五、六休息、日例假暫估，國定假日及調班須管理員設定。</p></div></div>'+
+ '<p class="small muted">待補紀錄 '+missing+' 天 · 待核對 '+review+' 天（僅提示，非缺勤判定）</p>'+
+ '<div class="att-calendar-grid">'+['日','一','二','三','四','五','六'].map(x=>'<span class="att-cal-week">'+x+'</span>').join('')+
+ Array.from({length:offset},()=>'<span aria-hidden="true"></span>').join('')+
+ days.map(d=>'<button type="button" class="att-cal-day '+d.status+(d.selected?' selected':'')+'" data-action="attendance-edit" data-date="'+esc(d.date)+'" aria-pressed="'+d.selected+'" aria-label="'+esc(d.date+' '+labels[d.status]+' '+(DAY_TYPES[d.planned]||'')+' '+d.issues.join('；'))+'" title="'+esc(d.issues.join('；')||labels[d.status])+'"><strong>'+Number(d.date.slice(-2))+'</strong><small>'+labels[d.status]+'</small></button>').join('')+'</div>'+
+ '<div class="att-cal-issues">'+days.filter(d=>d.issues.length||d.missing).map(d=>'<p class="small muted">'+esc(d.date)+'：'+esc([...d.issues,...(d.missing?['預計工作日尚無紀錄']:[])].join('；'))+'</p>').join('')+'</div></section>';
+}
+function renderAttendanceSchedule(a){
+ const dates=attendanceCalendar(a.month,[],a.schedule.days,localISODate());
+ return '<section class="soft-card card-pad-lg att-panel"><div class="card-head"><div><h3 class="card-title">每日班表設定（管理員）</h3><p class="card-sub">只調整預計日別；既有出勤、工時與加班費不會被自動覆寫。未指定使用週曆暫估。</p></div></div>'+
+ '<div class="att-schedule-grid">'+dates.map(d=>'<label class="form-group"><span class="field-label">'+esc(d.date.slice(-2))+' 日／週'+weekdayLabel(d.date)+'</span><select class="input" data-att-schedule="'+esc(d.date)+'"><option value="">預設：'+esc(DAY_TYPES[attendancePlannedDay(d.date)])+'</option>'+opts(DAY_TYPES,a.schedule.days[d.date]||'')+'</select></label>').join('')+'</div>'+
+ '<div class="att-actions"><span class="small muted">'+(a.scheduleDirty?'班表尚未儲存':'班表已載入')+'</span><button class="soft-button" data-action="attendance-schedule-save" '+(!a.scheduleDirty||a.scheduleSaving?'disabled':'')+'>儲存班表</button></div></section>';
+}
 function refreshAttendanceDom(){
  const element=document.querySelector('.att-page');
  if(element){element.outerHTML=renderAttendance(knownPeople,knownAdmin);if(attendanceState.saving)for(const input of document.querySelectorAll('.att-page input,.att-page select,.att-page textarea'))input.disabled=true;}
@@ -103,12 +127,18 @@ async function changeAttendanceMonth(month,employee){
 document.addEventListener('click',event=>{
  const el=event.target.closest('[data-action]');
  if(!el||!el.closest('.att-page'))return;
- if(attendanceState.saving)return;
+ if(attendanceState.saving||attendanceState.scheduleSaving)return;
  const action=el.dataset.action;
  if(action==='attendance-refresh'){
+  if(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定重新讀取？'))return;
   changeAttendanceMonth(attendanceState.month,attendanceState.employeeId)
    .catch(e=>{attendanceNotice=e.message;refreshAttendanceDom();});
+ }else if(action==='attendance-copy-previous'){
+  if(copyPreviousAttendance()){attendanceNotice='已帶入前一天時間，請核對後儲存。';refreshAttendanceDom();}
+ }else if(action==='attendance-schedule-save'){
+  saveAttendanceSchedule().then(()=>attendanceNotice='班表已儲存；既有出勤紀錄不變。').catch(e=>attendanceNotice=e.message).finally(refreshAttendanceDom);refreshAttendanceDom();
  }else if(action==='attendance-edit'){
+  if(attendanceState.dirty&&!confirm('目前出勤尚未正式儲存，確定切換日期？'))return;
   attendanceNotice='';attendanceSelectDate(el.dataset.date);refreshAttendanceDom();
   document.querySelector('.att-layout')?.scrollIntoView({behavior:'smooth',block:'start'});
  }else if(action==='attendance-discard'){
@@ -158,9 +188,10 @@ document.addEventListener('input',event=>{
 document.addEventListener('change',event=>{
  const el=event.target;
  if(!el.closest('.att-page'))return;
- if(attendanceState.saving){refreshAttendanceDom();return;}
+ if(attendanceState.saving||attendanceState.scheduleSaving){refreshAttendanceDom();return;}
+ if(el.matches('[data-att-schedule]')){updateAttendanceSchedule(el.dataset.attSchedule,el.value);refreshAttendanceDom();return;}
  if(el.matches('[data-att-person]')||el.matches('[data-att-month]')){
-  if(attendanceState.dirty&&!confirm('出勤資料尚未儲存，確定要切換？')){refreshAttendanceDom();return;}
+  if((attendanceState.dirty||attendanceState.scheduleDirty)&&!confirm('出勤資料或班表尚未儲存，確定要切換？')){refreshAttendanceDom();return;}
   const month=el.matches('[data-att-month]')?el.value:attendanceState.month;
   const employee=el.matches('[data-att-person]')?el.value:attendanceState.employeeId;
   if(el.matches('[data-att-person]')){

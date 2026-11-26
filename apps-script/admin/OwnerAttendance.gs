@@ -35,3 +35,29 @@ function workPulseUpgradeAttendance(){
  wpOwnerAssert_();wpInitializeSheet_(wsBook_(),'AttendanceSettings');
  return '已建立出勤設定表，既有月份將於首次寫入時建立 Attendance 分頁';
 }
+
+// Private only; never alter actual attendance or store salary.
+function wpOwnerSaveAttendanceSchedule(input){
+ wpOwnerAssert_();
+ if(!input||typeof input!=='object'||Array.isArray(input))throw Error('班表格式無效');
+ var id=String(input.employeeId||''),month=wpMonth_(input.month),days=wpAttScheduleValidate_(input.days,month);
+ var revision=Number(input.expectedRevision),request=String(input.requestId||'');
+ if(!Number.isSafeInteger(revision)||revision<0||!/^[\w-]{12,120}$/.test(request))throw Error('班表版本或識別碼無效');
+ var lock=LockService.getScriptLock();lock.waitLock(20000);
+ try{
+  wpOwnerAssert_();var control=wsBook_();wpAttEmployee_(control,id);
+  var old=wpAttSchedule_(control,id,month);
+  if(old.requestId===request){
+   if(JSON.stringify(old.days)!==JSON.stringify(days))throw Error('請求識別碼已被使用');
+   return {ok:true,deduplicated:true,schedule:{days:old.days,revision:old.revision}};
+  }
+  if(old.revision!==revision)throw Error('CONFLICT:班表已被修改');
+  var key=wpAttScheduleKey_(id,month),sheet=wpSheet_(control,'Meta');
+  var row=wpRows_(sheet).find(function(x){return x.key===key;});
+  var next={days:days,revision:revision+1,requestId:request},values=[key,JSON.stringify(next)];
+  if(row)sheet.getRange(row.__row,1,1,2).setValues([values]);else sheet.appendRow(values);
+  wpSheet_(control,'Audit').appendRow([Utilities.getUuid(),new Date().toISOString(),wpConfig_().adminEmail,'attendance.schedule.saved',id+':'+month,next.revision,request]);
+  SpreadsheetApp.flush();
+  return {ok:true,schedule:{days:days,revision:next.revision}};
+ }finally{lock.releaseLock();}
+}

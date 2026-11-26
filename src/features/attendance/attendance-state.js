@@ -2,13 +2,14 @@ import {cloudEnabled,cloudCall} from '../../services/cloud.js';
 import {fieldSave} from '../../services/field-recovery.js';
 import {saveAttendanceDraft,readAttendanceDraft,clearAttendanceDraft} from './attendance-draft.js';
 import {currentMonth,localISODate,uid} from '../../shared/utils.js';
-import {validateAttendanceDraft} from './attendance.js';
+import {validateAttendanceDraft,DAY_TYPES} from './attendance.js';
+import {attendancePlannedDay,previousAttendanceTimes,attendanceMonthDates} from './calendar.js';
 const KEY='workpulse-attendance-v1';
 export const attendanceState={month:currentMonth(),employeeId:'',date:localISODate(),rows:[],
   draft:null,phase:'idle',error:'',saving:false,requestId:null,expectedDays:null,
-  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true};
+  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true,schedule:{days:{},revision:0},scheduleDirty:false,scheduleSaving:false,scheduleRequest:null};
 export function newAttendanceDraft(date=attendanceState.date,source=null){
- return {date,employeeId:attendanceState.employeeId,dayType:source?.dayType||'workday',
+ return {date,employeeId:attendanceState.employeeId,dayType:source?.dayType||attendancePlannedDay(date,attendanceState.schedule.days),
    startTime:source?.startTime||'',endTime:source?.endTime||'',breakMinutes:source?.breakMinutes||0,
    leaveType:source?.leaveType||'none',leaveMinutes:source?.leaveMinutes||0,
    notes:source?.notes||'',revision:source?.revision||0};
@@ -57,7 +58,7 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
   clearTemporarySalary();
   attendanceState.month=month;attendanceState.phase='ready';
   attendanceState.employeeId='';attendanceState.rows=[];
-  attendanceState.expectedDays=null;attendanceState.adminConfig=null;
+  attendanceState.expectedDays=null;attendanceState.adminConfig=null;attendanceState.schedule={days:{},revision:0};attendanceState.scheduleDirty=false;
   attendanceState.draft=null;attendanceState.error='';
   return true;
  }
@@ -67,12 +68,13 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
  attendanceState.employeeId=employeeId;
  attendanceState.phase='loading';attendanceState.error='';
  try{
-  let rows,expectedDays=null,adminConfig=null;
+  let rows,expectedDays=null,adminConfig=null,schedule={days:{},revision:0};
   if(cloudEnabled()){
    const data=await cloudCall('wpAttendanceLoad',{month,employeeId});
    if(seq!==attendanceLoadSequence)return false;
    rows=Array.isArray(data.rows)?data.rows:[];
    expectedDays=data.expectedDays??null;
+   schedule=data.schedule||schedule;
    if(admin)adminConfig=await cloudCall('wpOwnerAttendanceConfig',{month,employeeId});
   }else{
    rows=localRows().filter(r=>r.employeeId===employeeId&&r.date.startsWith(month));
@@ -81,6 +83,7 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
   attendanceState.rows=rows;
   attendanceState.expectedDays=expectedDays;
   attendanceState.adminConfig=adminConfig;
+  attendanceState.schedule=schedule;attendanceState.scheduleDirty=false;attendanceState.scheduleRequest=null;
   const requested=attendanceState.date.startsWith(month)?attendanceState.date:month+'-01';
   attendanceSelectDate(requested);
   attendanceState.phase='ready';
@@ -152,4 +155,30 @@ export async function saveAttendanceConfig(){
   a.adminConfig=result.config;a.configRequest=null;a.expectedDays=result.config.expectedDays;
   return result;
  }finally{a.configSaving=false;}
+}
+
+export function copyPreviousAttendance(){
+ const a=attendanceState;if(a.saving||!a.draft)return false;
+ const times=previousAttendanceTimes(a.rows,a.date,a.employeeId);if(!times)return false;
+ for(const [field,value] of Object.entries(times))updateAttendance(field,value);
+ return true;
+}
+export function updateAttendanceSchedule(date,day){
+ const a=attendanceState;
+ if(!a.adminConfig||a.scheduleSaving||!attendanceMonthDates(a.month).includes(date))return false;
+ if(day!==''&&!Object.hasOwn(DAY_TYPES,day))return false;
+ const days={...a.schedule.days};if(day==='')delete days[date];else days[date]=day;
+ a.schedule={...a.schedule,days};a.scheduleDirty=true;a.scheduleRequest=null;return true;
+}
+export async function saveAttendanceSchedule(){
+ const a=attendanceState;
+ if(!cloudEnabled()||!a.adminConfig||a.scheduleSaving)throw Error('僅私人管理員可儲存班表');
+ a.scheduleSaving=true;a.scheduleRequest=a.scheduleRequest||uid();
+ const employeeId=a.employeeId,month=a.month,requestId=a.scheduleRequest;
+ try{
+  const result=await cloudCall('wpOwnerSaveAttendanceSchedule',{employeeId,month,requestId,expectedRevision:a.schedule.revision,days:a.schedule.days});
+  if(!result?.ok||!result.schedule)throw Error('班表未確認儲存');
+  if(a.employeeId===employeeId&&a.month===month&&a.scheduleRequest===requestId){a.schedule=result.schedule;a.scheduleDirty=false;a.scheduleRequest=null;}
+  return result;
+ }finally{a.scheduleSaving=false;}
 }

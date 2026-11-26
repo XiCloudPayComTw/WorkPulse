@@ -4,11 +4,11 @@ const METHODS = new Set([
  'wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
  'wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
- 'wpOwnerSaveAttendanceConfig','wpAttendanceRange'
+ 'wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule','wpAttendanceRange'
 ]);
 const MUTATIONS = new Set([
  'wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
- 'wpAttendanceSave','wpOwnerSaveAttendanceConfig'
+ 'wpAttendanceSave','wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule'
 ]);
 
 export function cloudEnabled(){
