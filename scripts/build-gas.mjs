@@ -22,6 +22,7 @@ const core=await readFile('apps-script/shared/Core.gs','utf8');
 const monthly=await readFile('apps-script/shared/Monthly.gs','utf8');
 const simple=await readFile('apps-script/journals/Simple.gs','utf8');
 const owner=await readFile('apps-script/admin/Owner.gs','utf8');
+const ownerProjects=await readFile('apps-script/admin/OwnerProjects.gs','utf8');
 const attendance=await readFile('apps-script/attendance/Attendance.gs','utf8');
 const attendanceSave=await readFile('apps-script/attendance/AttendanceSave.gs','utf8');
 const attendanceRange=await readFile('apps-script/attendance/AttendanceRange.gs','utf8');
@@ -51,7 +52,8 @@ for(const [portal,isOwner] of [['public',false],['admin',true]]){
    writeFile(directory+'/AttendanceRange.gs',attendanceRange),
    writeFile(directory+'/appsscript.json',manifest)
  ]);
- if(isOwner){await writeFile(directory+'/Owner.gs',owner);
+ if(isOwner){await writeFile(directory+'/OwnerProjects.gs',ownerProjects);
+  await writeFile(directory+'/Owner.gs',owner);
   await writeFile(directory+'/OwnerAttendance.gs',attendanceOwner);}
 }
 console.log('Built dist-gas/public (no admin endpoints) and dist-gas/admin (owner-only endpoints).');
