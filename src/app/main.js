@@ -360,7 +360,7 @@ function notify(text,error=false){state.toast={text,error};showToast(text,error)
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;flushQuickDraft();return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
-function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
+function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;selectPersonId(record.employeeId);state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
 function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=state.selectedPersonId;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
@@ -602,7 +602,10 @@ root.addEventListener('click', event=>{
    const id=button.dataset.id;if(state.store.employees.length<=1){notify('至少保留一位人員',true);return;}
    if(state.store.journals.some(j=>j.employeeId===id)){notify('此人員已有工作紀錄，不能直接移除',true);return;}
    if(!confirm('確定移除此人員？'))return;
-   if(saveStore({...state.store,employees:state.store.employees.filter(e=>e.id!==id)})){state.draft=makeDraft();render();}return;
+   if(saveStore({...state.store,employees:state.store.employees.filter(e=>e.id!==id)})){
+    selectPersonId(readSelectedPerson(permanentStorage(),state.store.employees));
+    state.draft=makeDraft(today,state.selectedPersonId);render();
+   }return;
  }
  if(action==='add-project'){if(isCloud){notify('雲端專案由管理員維護',true);return;}
    const name=document.querySelector('#new-project')?.value.trim();if(!name){notify('請輸入專案名稱',true);return;}
@@ -619,7 +622,7 @@ root.addEventListener('click', event=>{
  if(action==='import-json'){if(isCloud)return;document.querySelector('#import-file')?.click();return;}
  if(action==='reset-data'){if(isCloud)return;
    if(!confirm('確定清除目前瀏覽器中的所有 WorkPulse 工作日誌？此操作無法復原，建議先匯出備份。'))return;
-   if(saveStore(emptyState())){clearQuickDraft(draftStorage(),draftAccount());state.draft=makeDraft();state.dirty=false;render();notify('本機資料已清空');}return;
+   if(saveStore(emptyState())){clearQuickDraft(draftStorage(),draftAccount());selectPersonId(readSelectedPerson(permanentStorage(),state.store.employees));state.draft=makeDraft(today,state.selectedPersonId);state.dirty=false;render();notify('本機資料已清空');}return;
  }
 });
 root.addEventListener('input',event=>{
@@ -682,7 +685,7 @@ root.addEventListener('change',async event=>{
    if(file.size>10_000_000)throw Error('備份檔案超過 10 MB 上限');
    const payload=validateState(JSON.parse(await file.text()));
    if(!confirm(`匯入將取代目前所有本機紀錄（${payload.journals.length} 筆日誌），確定繼續？`))return;
-   if(saveStore(payload)){state.draft=makeDraft();state.dirty=false;state.filters={query:'',employee:'all',status:'all'};render();notify('備份資料匯入成功');}
+   if(saveStore(payload)){selectPersonId(readSelectedPerson(permanentStorage(),state.store.employees));state.draft=makeDraft(today,state.selectedPersonId);state.dirty=false;state.filters={query:'',employee:state.selectedPersonId,status:'all'};render();notify('備份資料匯入成功');}
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
 window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
@@ -696,6 +699,13 @@ document.addEventListener('click',event=>{
   menu.hidden=true;
   menu.closest('.wp-person-picker')?.querySelector('[data-action="person-menu"]')
    ?.setAttribute('aria-expanded','false');
+ }
+});
+root.addEventListener('change',event=>{
+ const node=event.target;
+ if(node.matches?.('[data-field="description"][data-task]')){
+  const entry=state.draft.tasks[Number(node.dataset.task)];
+  if(entry)rememberDescriptions(permanentStorage(),state.selectedPersonId,[entry]);
  }
 });
 root.addEventListener('focusin',event=>{
