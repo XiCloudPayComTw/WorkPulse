@@ -249,7 +249,8 @@ function activateAttendancePage(){
  void activateAttendance({
    load:()=>loadAttendance(state.store.employees,isOwnerPortal),
    render,
-   isActive:()=>shouldLoadAttendance({view:state.view,isCloud,cloudPhase:state.cloud.phase})
+   isActive:()=>shouldLoadAttendance({view:state.view,isCloud,cloudPhase:state.cloud.phase}),
+   onError:error=>{attendanceState.phase='error';attendanceState.error=error?.message||'出勤表讀取失敗';}
  });
 }
 function changeView(view){if(!visibleNav().some(n=>n.id===view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
@@ -263,15 +264,19 @@ function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const ta
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
 
+let cloudBootstrapSequence=0;
 async function initCloud(){
  if(!isCloud)return;
+ const sequence=++cloudBootstrapSequence;
  state.cloud.phase='loading';state.cloud.error='';state.report.payload=null;state.report.applied=null;state.report.phase='idle';render();
  try{
   const payload=await cloudCall('wpSharedBootstrap',state.month);
+  if(sequence!==cloudBootstrapSequence)return;
   if(!payload?.store || !payload?.user)throw Error('雲端回應格式不完整');
   state.store={...payload.store,mode:'cloud'};
   if(isOwnerPortal){
     const owner=await cloudCall('wpOwnerBootstrap');
+    if(sequence!==cloudBootstrapSequence)return;
     if(!owner || !Array.isArray(owner.employees))throw Error('管理員身分未通過驗證');
     payload.user={...payload.user,role:'admin',name:'管理員'};
   }
@@ -281,18 +286,18 @@ async function initCloud(){
   if(state.view==='team'&&payload.user.role==='admin')refreshTeam();
   if(state.view==='insights'&&state.report.phase==='idle')loadCloudReport();
   if(state.view==='attendance')activateAttendancePage();
- }catch(e){state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';render();}
+ }catch(e){if(sequence!==cloudBootstrapSequence)return;state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';render();}
 }
 async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  if(!isCloud)return;
- if(state.cloud.loadingMonth)return;
+ if(state.cloud.phase!=='ready')return;
  state.cloud.loadingMonth=true;const token=++state.cloud.monthToken;render();
  try{
   const result=await cloudCall('wpSharedLoadMonth',month);
   if(token!==state.cloud.monthToken)return;
   state.store={...state.store,journals:result.journals};state.month=month;
   if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.draft?.employeeId||state.store.employees[0]?.id);state.dirty=false;}
- }catch(e){notify('雲端讀取失敗：'+(e.message||'未知錯誤'),true);}
+ }catch(e){if(token===state.cloud.monthToken)notify('雲端讀取失敗：'+(e.message||'未知錯誤'),true);}
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
 }
 async function saveCloudJournal(){
