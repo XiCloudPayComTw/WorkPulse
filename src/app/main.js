@@ -154,23 +154,26 @@ function offlineVaultMarkup(){
  (records.length?'<p class="small muted">目前人員的草稿（未正式提交）</p>'+records.map(x=>'<div class="wp-vault-draft"><span>'+esc(x.date)+' · '+(x.kind==='journal'?'工作日誌':'出勤')+'</span><button class="soft-button mini" data-action="vault-open-draft" data-kind="'+x.kind+'" data-date="'+esc(x.date)+'" '+(locked?'disabled':'')+'>開啟草稿</button></div>').join(''):'')+'</div>';
 }
 function updateFieldRecovery(){const panel=document.querySelector('#wp-field-recovery');if(panel)panel.innerHTML=fieldRecoveryMarkup();const banner=document.querySelector('.sync-banner');if(banner)banner.outerHTML=syncBanner();}
+let wpToastTimer=null;
+function dismissToast(){clearTimeout(wpToastTimer);wpToastTimer=null;state.toast=null;const stack=document.querySelector('#toast-stack'),focused=stack?.contains(document.activeElement);stack?.replaceChildren();if(focused)focusPageContent();}
+function focusPageContent(){const title=document.querySelector('.main .page-title');const target=title&&title.getClientRects().length?title:document.querySelector('.wp-field-hero h2')||document.querySelector('#page-content');target?.focus({preventScroll:true});}
 function renderShell(){
  closeMobileSheet(false);
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班時數與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
- root.innerHTML = `<div class="shell">
+ root.innerHTML = `<div class="shell"><button type="button" class="wp-skip" data-action="skip-content">跳至主要內容</button>
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.18.0</div></div></aside>
-   <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.19.0</div></div></aside>
+   <main class="main" aria-label="主要內容"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title" tabindex="-1">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button>${renderPersonMenu()}</div></header>
-   ${!isCloud?'<div class="wp-storage-banner" role="status"><strong>本機展示版</strong><span>資料只保存在此瀏覽器，尚未同步至公司 Google Drive。</span><button type="button" class="soft-button sm" data-action="export-migration">下載移轉封包</button></div>':''}${isCloud&&isOwnerPortal?'<div class="wp-storage-banner"><strong>私人管理入口</strong><span>正式模式的日誌與出勤儲存請使用公司員工入口。</span></div>':''}${pwaMarkup(isCloud)}${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():state.cloud.loadingMonth?mobileSkeleton('正在讀取指定月份…'):renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.18.0</footer></main>
+   ${!isCloud?'<div class="wp-storage-banner" role="status"><strong>本機展示版</strong><span>資料只保存在此瀏覽器，尚未同步至公司 Google Drive。</span><button type="button" class="soft-button sm" data-action="export-migration">下載移轉封包</button></div>':''}${isCloud&&isOwnerPortal?'<div class="wp-storage-banner"><strong>私人管理入口</strong><span>正式模式的日誌與出勤儲存請使用公司員工入口。</span></div>':''}${pwaMarkup(isCloud)}${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash" tabindex="-1" aria-busy="${state.cloud.phase==='loading'||state.cloud.loadingMonth||state.cloud.saving}">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():state.cloud.loadingMonth?mobileSkeleton('正在讀取指定月份…'):renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.19.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${mobileNav().length}" aria-label="手機導覽">${mobileNav().map(n=>navButton(n,true)).join('')}</nav>
-   ${mobileDockMarkup()}<div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
+   ${mobileDockMarkup()}<div class="toast-stack" id="toast-stack" aria-label="操作通知"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
   </div>`;
  if(state.cloud.saving)for(const element of document.querySelectorAll('#page-content input,#page-content textarea,#page-content select'))element.disabled=true;
  enhanceMobileSelects();syncMobileDock();
- if(state.toast) showToast(state.toast.text,state.toast.error,true);
+ if(state.toast) showToast(state.toast.text,state.toast.error);
 }
 function renderCloudWaiting(){return mobileSkeleton('正在連接工作日誌資料庫，讀取人員與本月資料…');}
 function renderCloudError(){return `<section class="soft-card card-pad-lg sync-stage" role="alert"><span class="sync-dot failed"></span><h2>無法連接雲端工作日誌</h2><p>${esc(state.cloud.error)}</p><button class="soft-button" data-action="retry-cloud">${icon('arrowRight',16)} 重新驗證與載入</button><p class="xs muted">存取失敗時不會自動切換為本機資料，避免誤以為已同步。</p></section>`;}
@@ -201,7 +204,7 @@ function renderFieldHome(){
  ];
  return `<section class="wp-field-home" aria-label="外勤功能首頁">
   <div class="wp-field-hero"><span class="overline">WORKPULSE / FIELD</span>
-  <h2>今天要處理什麼工作？</h2>
+  <h2 tabindex="-1">今天要處理什麼工作？</h2>
   <p>目前人員：${esc(employeeName(state.selectedPersonId))}。請直接選擇要使用的功能。</p></div>
   <div class="wp-field-grid">${links.map(item=>`<button class="wp-field-tile" type="button" data-action="navigate" data-view="${item.view}">
    <span class="wp-field-tile-icon">${icon(item.iconName,25)}</span>
@@ -404,8 +407,8 @@ function activateAttendancePage(){
 }
 function changeView(view){if(state.view==='attendance'&&view!=='attendance'&&(attendanceState.scheduleSaving||(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定離開？'))))return;if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;if(!maintenanceState.month)maintenanceState.month=state.month;const promise=loadAdmin();render();await promise;render();}
-function notify(text,error=false){state.toast={text,error};showToast(text,error);}
-function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
+function notify(text,error=false){clearTimeout(wpToastTimer);state.toast={text,error};showToast(text,error);if(!error)wpToastTimer=setTimeout(dismissToast,6000);}
+function showToast(text,error=false){const container=document.querySelector('#toast-stack');if(!container)return;container.innerHTML=`<div class="toast ${error?'error':'wp-toast-success'}">${icon(error?'alert':'checkCircle',18)}<span class="wp-toast-text" role="${error?'alert':'status'}" aria-atomic="true">${esc(text)}</span><button type="button" class="wp-toast-close" data-action="dismiss-toast" aria-label="關閉通知">×</button></div>`;}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;if(!flushQuickDraft()){notify('草稿暫存失敗，請先正式儲存或捨棄目前草稿',true);return false;}return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
 function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;selectPersonId(record.employeeId);state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;restoreQuickDraft(record.date);changeView('entry');}
@@ -483,6 +486,8 @@ async function saveCloudJournal(){
 root.addEventListener('click', event=>{
  const button=event.target.closest('[data-action]');if(!button)return;
  const action=button.dataset.action;
+ if(action==='dismiss-toast'){dismissToast();return;}
+ if(action==='skip-content'){focusPageContent();return;}
  if(action==='pwa-install'||action==='pwa-help'){handlePwaAction(action);return;}
  if(offlineVaultStatus().busy)return;
  if(['vault-enable','vault-disable','vault-open-draft'].includes(action)){
@@ -664,7 +669,7 @@ root.addEventListener('click', event=>{
  if(action==='report-export-xlsx'){exportReport('xlsx');return;}
  if(action==='refresh-cloud'){if(requireDiscard())initCloud();return;}
  if(isCloud && state.cloud.saving)return;
- if(action==='navigate'){if(state.view==='entry' && !requireDiscard())return;if(state.view==='team'&&adminState.dirty&&!confirm('團隊資料尚未儲存，確定離開嗎？'))return;state.dirty=false;changeView(button.dataset.view);return;}
+ if(action==='navigate'){if(state.view==='entry' && !requireDiscard())return;if(state.view==='team'&&adminState.dirty&&!confirm('團隊資料尚未儲存，確定離開嗎？'))return;state.dirty=false;changeView(button.dataset.view);if(event.detail===0)focusPageContent();return;}
  if(action==='new-journal'){openNew();return;}
  if(action==='task-collapse'){setTaskCollapsed(Number(button.dataset.index),button.getAttribute('aria-expanded')==='true');return;}
  if(action==='tasks-collapse'||action==='tasks-expand'){state.draft.tasks.forEach((_,i)=>setTaskCollapsed(i,action==='tasks-collapse'));return;}

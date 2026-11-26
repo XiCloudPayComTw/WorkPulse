@@ -111,8 +111,8 @@ const probe=`<script>
          personChoice=(stored===id && inForm===id && after!==before)?'ok':'not-synced';
        }
      }
-     let calendarCheck='skip',spacingCheck='skip',historyDomCheck='skip';
-     if(location.hash.includes('/history')){const people=document.querySelector('select[data-filter="employee"]');if(people){people.value='all';people.dispatchEvent(new Event('change',{bubbles:true}));}const first=document.querySelector('[data-action="toggle-day"]'),sibling=document.querySelectorAll('.history-record')[1];if(first&&sibling){const before=first.getAttribute('aria-expanded');first.click();const after=first.getAttribute('aria-expanded'),same=document.querySelectorAll('.history-record')[1]===sibling;first.click();const second=sibling.querySelector('[data-action="toggle-day"]');if(second.getAttribute('aria-expanded')==='false')second.click();const details=sibling.querySelectorAll('.history-detail'),next=sibling.querySelector('[data-action="history-detail-page"][data-page="1"]');next?.click();const pageOk=details.length===5&&!!next&&sibling.querySelectorAll('.history-detail').length===2;historyDomCheck=before!==after&&same&&first.isConnected&&first.getAttribute('aria-expanded')===before&&pageOk?'ok':'replaced-or-page';}else historyDomCheck='missing';}
+     let calendarCheck='skip',spacingCheck='skip',historyDomCheck='skip',toastCheck='skip';
+     if(location.hash.includes('/history')){const people=document.querySelector('select[data-filter="employee"]');if(people){people.value='all';people.dispatchEvent(new Event('change',{bubbles:true}));}const first=document.querySelector('[data-action="toggle-day"]'),sibling=document.querySelectorAll('.history-record')[1];if(first&&sibling){const before=first.getAttribute('aria-expanded');first.click();const after=first.getAttribute('aria-expanded'),same=document.querySelectorAll('.history-record')[1]===sibling;first.click();const second=sibling.querySelector('[data-action="toggle-day"]');if(second.getAttribute('aria-expanded')==='false')second.click();const details=sibling.querySelectorAll('.history-detail'),next=sibling.querySelector('[data-action="history-detail-page"][data-page="1"]');next?.click();const pageOk=details.length===5&&!!next&&sibling.querySelectorAll('.history-detail').length===2;historyDomCheck=before!==after&&same&&first.isConnected&&first.getAttribute('aria-expanded')===before&&pageOk?'ok':'replaced-or-page';}else historyDomCheck='missing';const jump=document.querySelector('#history-jump-date');if(jump){jump.value=jump.value.slice(0,7)+'-20';document.querySelector('[data-action="history-jump"]')?.click();const toast=document.querySelector('.toast.error [role="alert"]'),close=document.querySelector('[data-action="dismiss-toast"]');close?.click();toastCheck=toast&&close&&!document.querySelector('.toast')?'ok':'wrong-toast';}else toastCheck='missing-jump';}
      if(location.hash.includes('/attendance')){
        const cell=document.querySelector('.att-cal-day[data-date]');
        if(cell){const date=cell.dataset.date;cell.click();calendarCheck=document.querySelector('[data-att-date]')?.value===date?'ok':'wrong-date';}else calendarCheck='missing';
@@ -142,6 +142,8 @@ const probe=`<script>
        }
        modal?.querySelector('[data-action="payroll-close"]')?.click();
      }
+     const skip=document.querySelector('[data-action="skip-content"]');skip?.click();const focusCheck=Boolean(skip&&document.activeElement?.matches('.page-title,.wp-field-hero h2,#page-content'));
+     const liveNav=document.querySelector('.mobile-nav'),liveDock=document.querySelector('#wp-mobile-dock');const requiredBottom=(liveNav?.getBoundingClientRect().height||0)+(liveDock&&!liveDock.hidden?liveDock.getBoundingClientRect().height:0);const bottomFit=window.innerWidth>900||parseFloat(getComputedStyle(document.querySelector('.shell')).paddingBottom)>=requiredBottom;
      const copyCheck=new Event('copy',{bubbles:true,cancelable:true});
      const titleElement=document.querySelector('h1.page-title');
      titleElement?.dispatchEvent(copyCheck);
@@ -158,7 +160,7 @@ const probe=`<script>
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
      output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.collapseCheck=collapseCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
-     output.dataset.spacingCheck=spacingCheck;output.dataset.historyDomCheck=historyDomCheck;
+     output.dataset.focusCheck=focusCheck?'1':'0';output.dataset.bottomFit=bottomFit?'1':'0';output.dataset.spacingCheck=spacingCheck;output.dataset.historyDomCheck=historyDomCheck;output.dataset.toastCheck=toastCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
@@ -205,12 +207,12 @@ try{
    if(Number(attrs.width)!==width)throw new Error(`${route}: expected exact ${width}px, got ${attrs.width}px`);
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
    if(attrs.title!==expected||attrs.overflow==='1'||attrs['temporal-overflow']!==''||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||attrs['storage-banner']!=='1'||(mobile&&Number(attrs.height)!==height)||
-      attrs['copy-blocked']!=='1'||
+      attrs['copy-blocked']!=='1'||attrs['focus-check']!=='1'||attrs['bottom-fit']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'||attrs['collapse-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
-      (route==='history'&&attrs['history-dom-check']!=='ok')||
+      (route==='history'&&(attrs['history-dom-check']!=='ok'||attrs['toast-check']!=='ok'))||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}x${attrs.height}, no page overflow`);
