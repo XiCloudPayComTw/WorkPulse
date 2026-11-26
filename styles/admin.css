@@ -7,3 +7,13 @@
 @media(max-width:370px){.mobile-nav .nav-link{font-size:11px}.mobile-nav{padding-left:2px;padding-right:2px}.team-tabs .soft-button{padding:9px 11px}.team-member-actions{padding-left:0}}
 
 
+
+
+/* v0.10.3 Local name editing: keep action controls inside each chip. */
+.local-named-chip{max-width:100%;display:inline-flex;align-items:center;gap:7px}
+.local-named-chip>span{max-width:min(245px,60vw);overflow-wrap:anywhere}
+.local-named-chip button{flex:none;min-width:29px;min-height:29px;display:inline-grid;place-items:center}
+.local-rename-editor{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;padding:8px 10px}
+.local-rename-editor .input{width:min(260px,55vw);min-width:125px;flex:1 1 125px;font-size:15px}
+.local-rename-editor .soft-button{min-height:33px;padding:5px 9px;font-size:13px}
+@media(max-width:480px){.local-rename-editor{width:100%}.local-rename-editor .input{width:100%}}
