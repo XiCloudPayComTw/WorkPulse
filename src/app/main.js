@@ -362,6 +362,40 @@ root.addEventListener('click', event=>{
    render();return;
  }
  if(state.cloud.phase==='error' || state.cloud.phase==='loading')return;
+ if(action==='local-rename-start'){
+   if(isCloud)return;
+   const kind=button.dataset.kind,id=button.dataset.id;
+   if(!((kind==='employee'&&state.store.employees.some(e=>e.id===id))||
+        (kind==='project'&&state.store.projects.includes(id))))return;
+   state.localRename={kind,id};render();
+   document.querySelector('[data-local-rename]')?.focus();return;
+ }
+ if(action==='local-rename-cancel'){
+   state.localRename=null;render();return;
+ }
+ if(action==='local-rename-save'){
+   if(isCloud||!state.localRename)return;
+   const {kind,id}=state.localRename;
+   const value=document.querySelector('[data-local-rename]')?.value;
+   try{
+    const before=kind==='project'?id:state.store.employees.find(e=>e.id===id)?.name;
+    const next=kind==='employee'?renameLocalEmployee(state.store,id,value):
+      renameLocalProject(state.store,id,value);
+    if(saveStore(next)){
+     if(kind==='project'&&id!==value?.trim()){
+      const target=value.trim();
+      state.draft.tasks=state.draft.tasks.map(t=>t.project===id?{...t,project:target}:t);
+      state.templates=renameTemplatesProject(draftStorage(),draftAccount(),id,target);
+      if(state.report.filters.project===id)state.report.filters.project=target;
+      if(state.dirty)scheduleQuickDraft();
+     }
+     state.localRename=null;render();
+     notify((kind==='employee'?'人員':'專案')+'已由「'+before+'」更名為「'+value.trim()+'」');
+    }
+   }catch(e){notify(e.message||'更名失敗',true);}
+   return;
+ }
+
  if(action==='admin-delete-journal'){
    if(!isCloud||state.cloud.user?.role!=='admin'||state.cloud.saving)return;
    const j=state.store.journals.find(x=>x.id===button.dataset.id);
@@ -488,6 +522,10 @@ window.addEventListener('keydown',event=>{
 root.addEventListener('keydown',event=>{
  if(event.key==='Enter'&&event.target.matches('#new-employee')){event.preventDefault();document.querySelector('[data-action="add-employee"]')?.click();}
  if(event.key==='Enter'&&event.target.matches('#new-project')){event.preventDefault();document.querySelector('[data-action="add-project"]')?.click();}
+ if(event.target.matches('[data-local-rename]')){
+  if(event.key==='Enter'){event.preventDefault();document.querySelector('[data-action="local-rename-save"]')?.click();}
+  if(event.key==='Escape'){event.preventDefault();document.querySelector('[data-action="local-rename-cancel"]')?.click();}
+ }
 });
 root.addEventListener('change',async event=>{
  if(event.target.id!=='import-file')return;
