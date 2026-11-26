@@ -698,3 +698,14 @@ test('JSON values export redacts legacy salary and does not change workbook',()=
  assert.equal(h.scope.wpOwnerExportBackupJson({target:'2026-11'}).format,'workpulse-values-v1');
  assert.throws(()=>h.scope.wpOwnerExportBackupJson({target:'2026-12'}),/沒有資料/);
 });
+
+test('unified initialization editor prints safe summary without revealing configured identifiers',()=>{
+ const h=harness();h.setup();h.scope.WP_PORTAL_KIND='unified';h.props.WORKPULSE_ACCESS_MODE='domain';
+ const logs=[];h.scope.console={log:x=>logs.push(x)};
+ const report=h.scope.workPulseInitializationCheck();
+ assert.equal(report.canInitialize,true);
+ const output=JSON.parse(logs[0]);assert.equal(output.canInitialize,true);assert.equal(output.productionVerified,false);
+ assert.ok(output.checks.every(x=>Object.keys(x).sort().join(',')==='key,ok,required'));
+ assert.ok(!logs[0].includes(h.props.WORKPULSE_ADMIN_EMAIL));assert.ok(!logs[0].includes(h.props.WORKPULSE_SHEET_ID));
+ h.scope.workPulseInitialize();assert.match(logs.at(-1),/初始化完成/);
+});

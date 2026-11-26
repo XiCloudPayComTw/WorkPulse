@@ -445,3 +445,5 @@
 - 新增 INSTALL_V024.md（GitHub Artifacts 下載、既有 TEST 三檔匯入、OAuth、前置檢查、初始化、單一 domain 部署、既有部署更新及回退）、EMPLOYEE_GUIDE_V024.md、ADMIN_GUIDE_V024.md；舊版雙入口文件保留歷史但現行安裝以 v0.24 為準。
 - gas:build 追加三檔案驗證：恰好 Code.gs、Index.html、appsscript.json，伺服器與內嵌腳本語法、unified 標誌、版本、manifest scopes 及時區。CI 僅在 verify 通過後上傳 ZIP，不包含公司資料、屬性或憑證；保留既有程式測試及瀏覽器驗證。這不是 Google Workspace 實機權限測試。
 - 本批不新增資料格式、權限模型或實際部署，不操作公司 Drive，不啟用排程。現有公司 TEST 專案與三項指令碼屬性可沿用；下一步應由公司持有者下載合併後完整 CI 通過的 main 發布包，依手冊安裝及逐項實測；未驗收前不得標記 v1.0.0。原共用姓名規則須公司確認。
+
+- 安裝便利修正：統一入口預檢直接輸出不含帳號／ID／原始錯誤詳情的 canInitialize 與各項 required/ok 摘要；初始化完成記錄不含 ID，不必新增臨時程式。驗收矩陣 A02、A11 及復原流程已改成單一入口與手動備份的現行規則，不再要求兩套發布或必裝排程。

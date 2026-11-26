@@ -49,15 +49,7 @@ flowchart LR
 
 在編輯器上方函式選單選 workPulseInitializationCheck → 執行。首次 Google OAuth 會要求授權；核對登入帳號與程式來源。試算表、Drive、電子郵件驗證及選用排程管理是資訊清單內宣告的 scopes；Drive 權限較廣，只核准公司已審核的自有程式。若 Google 提示需管理員核准或不明風險，停止並詢問公司 Workspace 管理員，不要降低安全設定。
 
-Apps Script 的執行記錄未必會直接顯示函式 return 值。可使用編輯器偵錯檢視回傳，或暫時新增 **只在測試專案** 的函式（只在尚未部署的 TEST 專案，內部仍呼叫持有者限定預檢）：
-
-```js
-function checkSetupForEditor() {
-  console.log(JSON.stringify(workPulseInitializationCheck(), null, 2));
-}
-```
-
-儲存後選 checkSetupForEditor → 執行，在執行記錄核對 JSON。此函式僅供安裝，確認後刪除，不要部署額外函式。確認 canInitialize=true，必要項目無失敗；備份資料夾未設定是待辦。核對完成後移除暫時函式，儲存。若錯誤指出身分、網域、權限或既有資料結構不符，停止，勿反覆初始化。
+新版已將預檢摘要直接寫入 Apps Script「執行記錄」，不必新增函式。確認 `canInitialize: true`，且 `required: true` 的檢查都為 `ok: true`。`backupFolder` 未設定時可為非必要待辦。摘要僅顯示檢查名稱與狀態，不包含帳號、檔案 ID 或原始錯誤詳情。必要項目失敗時先核對對應屬性與權限；需要詳細資訊可使用偵錯模式檢視 `report`，勿公開私人內容。若身分檢查直接拋錯，勿反覆初始化。
 
 ## 4｜建立測試資料庫
 

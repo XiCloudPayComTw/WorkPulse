@@ -72,7 +72,9 @@ function wpOwnerDeleteJournal(payload){
 function workPulseInitialize(){
   var preflight=workPulseInitializationCheck();
   if(!preflight.canInitialize)throw Error('初始化已停止：'+preflight.checks.filter(function(c){return c.required&&!c.ok;}).map(function(c){return c.detail;}).join('；'));
-  return wpPrivateCreateWorkspace_();
+  var result=wpPrivateCreateWorkspace_();
+  if(wpUnified_())console.log('WorkPulse 初始化完成；請於專案設定與 My Drive 核對控制表、資料夾及權限。');
+  return result;
 }
 function workPulseMigrateLegacy(){
   return wpPrivateMigrateLegacyMonthly_();
@@ -379,7 +381,11 @@ function workPulseInitializationCheck(){
   wpBackupAssertPrivate_(DriveApp.getFolderById(backupId),email);return '備份資料夾權限初步通過';
  });
  check('offlineScope',true,function(){if(scope&&!/^[A-Za-z0-9_-]{16,80}$/.test(scope))throw Error('離線範圍必須為 16–80 位英數、底線或連字號');return scope?'已設定，須確認與其他環境不同':'未啟用選用持久暫存範圍';});
- return {readOnly:true,canInitialize:checks.every(function(x){return !x.required||x.ok;}),productionVerified:false,checks:checks,checkedAt:new Date().toISOString()};
+ var report={readOnly:true,canInitialize:checks.every(function(x){return !x.required||x.ok;}),productionVerified:false,checks:checks,checkedAt:new Date().toISOString()};
+ // Editor execution does not display return values. Log only flags and known check keys,
+ // never Drive IDs, account names, workbook content, or raw exception details.
+ if(wpUnified_())console.log(JSON.stringify({canInitialize:report.canInitialize,productionVerified:false,checks:checks.map(function(x){return {key:x.key,required:x.required,ok:x.ok};})}));
+ return report;
 }
 
 
