@@ -269,3 +269,5 @@
 - Excel 試算總覽 B6 空白且可編輯，金額公式在薪資有效輸入前留白；公式與資料工作表保護避免誤改（非加密、可取消保護），保留 A4 橫向縮放列印。出勤原始資料與薪資不回寫網站。僅加班費估算，不含完整薪資扣繳；有人工核對資料須人工補算。實際 Excel 開啟、公式重新計算與公司 Workspace 驗收尚需實測。
 - 基於 PR #18 head ec8f52cfa66af98df98e17d736a2c76e4b2047ae（尚未合併時建立 stacked branch feat/workpulse-v0.13.0-excel-only），PR #19 base 已改為 main 以觸發現有 CI；先 Merge #18，再檢查 #19 的 diff／CI 並 Merge #19；不自動 Merge。
 - 下一批 v0.14.0 資料安全、備份與營運維護；v0.15.0 正式公司 Workspace；v1.0.0 驗收。薪資匯出原則以本批為準。
+
+- PR #19 CI 修正：桌面 Chrome 的匯出視窗測試失敗（attendance@1366, missing-export）。根因是靜態 src/app.js 未載入 payroll-ui.js，GAS 原已包含該模組。新增靜態入口 import，保留原測試並加驗查詢預覽及下載按鈕；結構測試確認兩套入口均包含模組。CI 以最新提交為準，未自動合併。

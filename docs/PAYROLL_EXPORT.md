@@ -45,3 +45,5 @@ Excel 中總覽 B6 是可調整的月薪基準；Excel 公式可依 B6 重新計
 若 v0.9.0 曾在真實 Sheets 內儲存過薪資欄位，這些歷史欄位不會在本批自動刪除，須由資料持有者先備份再審核清理。
 
 新 Apps Script 公開與管理員部署包須增加 AttendanceRange.gs；GitHub Pages 的展示版只查本機已有紀錄，無法直接代表公司 Google Drive 已部署。正式上線仍須用公司帳號驗證權限、出勤資料及 Excel 實際開啟情況。
+
+- PR #19 CI 修正：桌面 Chrome 的匯出視窗測試失敗（attendance@1366, missing-export）。根因是靜態 src/app.js 未載入 payroll-ui.js，GAS 原已包含該模組。新增靜態入口 import，保留原測試並加驗查詢預覽及下載按鈕；結構測試確認兩套入口均包含模組。CI 以最新提交為準，未自動合併。

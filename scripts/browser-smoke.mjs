@@ -69,6 +69,10 @@ const probe=`<script>
        document.querySelector('[data-action="payroll-start"]')?.click();
        const modal=document.querySelector('.payroll-modal');
        exportCheck=modal&&modal.querySelector('[data-payroll-person]')&&modal.querySelector('[data-payroll-start]')&&modal.querySelector('[data-payroll-pay-date]')&&!modal.querySelector('input[type="number"]')?'ok':'missing-export';
+       if(exportCheck==='ok'){
+         modal.querySelector('[data-action="payroll-confirm"]')?.click();
+         if(!modal.querySelector('[data-action="payroll-export"]')||!modal.querySelector('.payroll-preview'))exportCheck='missing-preview';
+       }
        modal?.querySelector('[data-action="payroll-close"]')?.click();
      }
      const copyCheck=new Event('copy',{bubbles:true,cancelable:true});
