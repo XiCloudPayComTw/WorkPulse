@@ -109,7 +109,8 @@ const probe=`<script>
          personChoice=(stored===id && inForm===id && after!==before)?'ok':'not-synced';
        }
      }
-     let calendarCheck='skip',spacingCheck='skip';
+     let calendarCheck='skip',spacingCheck='skip',historyDomCheck='skip';
+     if(location.hash.includes('/history')){const first=document.querySelector('[data-action="toggle-day"]'),sibling=document.querySelectorAll('.history-record')[1];if(first&&sibling){const before=first.getAttribute('aria-expanded');first.click();const after=first.getAttribute('aria-expanded'),same=document.querySelectorAll('.history-record')[1]===sibling;first.click();historyDomCheck=before!==after&&same&&first.isConnected&&first.getAttribute('aria-expanded')===before?'ok':'replaced';}else historyDomCheck='missing';}
      if(location.hash.includes('/attendance')){
        const cell=document.querySelector('.att-cal-day[data-date]');
        if(cell){const date=cell.dataset.date;cell.click();calendarCheck=document.querySelector('[data-att-date]')?.value===date?'ok':'wrong-date';}else calendarCheck='missing';
@@ -155,7 +156,7 @@ const probe=`<script>
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
      output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.collapseCheck=collapseCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
-     output.dataset.spacingCheck=spacingCheck;
+     output.dataset.spacingCheck=spacingCheck;output.dataset.historyDomCheck=historyDomCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
@@ -207,6 +208,7 @@ try{
       (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'||attrs['collapse-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
+      (route==='history'&&attrs['history-dom-check']!=='ok')||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}x${attrs.height}, no page overflow`);

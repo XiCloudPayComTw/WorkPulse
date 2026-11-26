@@ -1,4 +1,6 @@
 import { icon } from '../shared/icons.js';
+import {createHistorySelector,historyDetailPage} from '../features/journals/history-query.js';
+const selectHistoryGroups=createHistorySelector();
 import {pwaMarkup,initPwa,handlePwaAction} from './pwa-ui.js';
 import {migrationReviewState,renderMigrationReview,loadMigrationReview,clearMigrationReview,setMigrationReviewField,runMigrationReview,downloadMigrationReview} from '../features/admin/migration-review.js';
 import {closeMobileSheet,openMobileSheet,enhanceMobileSelects,syncMobileDock,mobileDockMarkup,initMobileWorkflow,mobileSkeleton} from './mobile-workflow.js';
@@ -158,10 +160,10 @@ function renderShell(){
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.17.0</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.18.0</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button>${renderPersonMenu()}</div></header>
-   ${!isCloud?'<div class="wp-storage-banner" role="status"><strong>本機展示版</strong><span>資料只保存在此瀏覽器，尚未同步至公司 Google Drive。</span><button type="button" class="soft-button sm" data-action="export-migration">下載移轉封包</button></div>':''}${isCloud&&isOwnerPortal?'<div class="wp-storage-banner"><strong>私人管理入口</strong><span>正式模式的日誌與出勤儲存請使用公司員工入口。</span></div>':''}${pwaMarkup(isCloud)}${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():state.cloud.loadingMonth?mobileSkeleton('正在讀取指定月份…'):renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.17.0</footer></main>
+   ${!isCloud?'<div class="wp-storage-banner" role="status"><strong>本機展示版</strong><span>資料只保存在此瀏覽器，尚未同步至公司 Google Drive。</span><button type="button" class="soft-button sm" data-action="export-migration">下載移轉封包</button></div>':''}${isCloud&&isOwnerPortal?'<div class="wp-storage-banner"><strong>私人管理入口</strong><span>正式模式的日誌與出勤儲存請使用公司員工入口。</span></div>':''}${pwaMarkup(isCloud)}${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():state.cloud.loadingMonth?mobileSkeleton('正在讀取指定月份…'):renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.18.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${mobileNav().length}" aria-label="手機導覽">${mobileNav().map(n=>navButton(n,true)).join('')}</nav>
    ${mobileDockMarkup()}<div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
@@ -208,6 +210,7 @@ function renderFieldHome(){
  </section>`;
 }
 function renderOverview(){
+ if(isMobileViewport())return `${syncBanner()}${renderFieldHome()}`;
  const stats=monthStats({...state.store,journals:state.store.journals.filter(j=>j.employeeId===state.selectedPersonId)},state.month);
  return `${syncBanner()}${renderFieldHome()}<div class="wp-desktop-overview"><section class="soft-card hero"><div><div class="overline">A BETTER WAY TO WORK</div><h2>讓每一天的進展，<br/>都變得清晰可見。</h2><p>在下班前花幾分鐘整理工作，讓記錄、查閱與回顧成為自然的習慣。</p><button class="soft-button primary" data-action="new-journal">${icon('pen',16)} 填寫今日工作 ${icon('arrowRight',15)}</button></div><div class="hero-graphic" aria-hidden="true">W<span class="dot">.</span></div></section>
  ${state.store.mode==='demo'?`<div class="notice section-space">${icon('info',18)}<div>目前看到的是<strong style="font-weight:550">示範資料</strong>，首次儲存正式工作紀錄時會自動移除示範內容。請勿在此版本輸入機密資料。</div></div>`:''}
@@ -284,33 +287,38 @@ function groupJournals(journals){
  return [...map].map(([date,journals])=>({date,journals}));
 }
 function totalHours(journals){return journals.flatMap(j=>j.tasks).reduce((sum,t)=>sum+(Number(t.hours)||0),0);}
-function filteredGroups(){
- const q=state.filters.query.trim().toLocaleLowerCase();
- const journals=state.store.journals.filter(j=>j.date.startsWith(state.month) && (state.filters.employee==='all'||j.employeeId===state.filters.employee)).map(j=>({
-  ...j,tasks:j.tasks.filter(t=>(state.filters.status==='all'||t.status===state.filters.status)&&(!q||[t.title,t.project,t.description,t.result,t.category,employeeName(j.employeeId)].join(' ').toLocaleLowerCase().includes(q)))
- })).filter(j=>j.tasks.length);
- return groupJournals(journals);
-}
+function filteredGroups(){return selectHistoryGroups(state.store.journals,state.store.employees,state.month,state.filters);}
 function renderHistory(){
+ const groups=filteredGroups();
  return `${syncBanner()}<section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">篩選工作日誌</h2><p class="card-sub">按日期、人員、狀態或關鍵字尋找工作</p></div>${icon('filter',18)}</div><div class="filters">
  <label class="form-group"><span class="field-label">搜尋</span><input class="input" data-filter="query" value="${esc(state.filters.query)}" placeholder="工作名稱、內容、專案…" /></label>
  <label class="form-group"><span class="field-label">月份</span><input class="input" type="month" data-month value="${esc(state.month)}" /></label>
  <label class="form-group"><span class="field-label">填寫人員</span><select class="input" data-filter="employee"><option value="all">所有人員</option>${state.store.employees.map(e=>`<option value="${esc(e.id)}" ${state.filters.employee===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></label>
  </div><div class="row-between" style="margin-top:17px"><div class="small muted">依日期群組顯示紀錄</div><label class="row small muted" for="status-filter">狀態<select id="status-filter" class="month-select" data-filter="status"><option value="all">全部</option>${Object.entries(STATUSES).map(([v,n])=>`<option value="${v}" ${state.filters.status===v?'selected':''}>${n}</option>`).join('')}</select></label></div></section>
- <div class="wp-history-jump"><label class="form-group"><span class="field-label">快速定位日期</span><input class="input" type="date" id="history-jump-date" value="${esc(state.month+'-01')}"></label><button class="soft-button" data-action="history-jump">前往日期</button></div><div class="section-head section-space"><h2 class="section-title">紀錄清單</h2><span class="tag" id="history-count">${filteredGroups().length} 個工作日</span></div>
- <div id="history-results" class="history-list">${renderHistoryResults()}</div>`;
+ <div class="wp-history-jump"><label class="form-group"><span class="field-label">快速定位日期</span><input class="input" type="date" id="history-jump-date" value="${esc(state.month+'-01')}"></label><button class="soft-button" data-action="history-jump">前往日期</button></div><div class="section-head section-space"><h2 class="section-title">紀錄清單</h2><span class="tag" id="history-count">${groups.length} 個工作日</span></div>
+ <div id="history-results" class="history-list">${renderHistoryResults(groups)}</div>`;
 }
 function renderHistoryResults(groups=filteredGroups()){
  if(!groups.length)return empty('search','找不到符合的紀錄','可以試試其他關鍵字、日期或工作狀態。','新增工作日誌','new-journal');
  return groups.map(g=>{
  const open=state.expanded.has(g.date);
- const tasks=g.journals.flatMap(j=>j.tasks);
- return `<article class="soft-card history-record"><button class="accordion-heading history-head" data-action="toggle-day" data-date="${g.date}" aria-expanded="${open}" aria-controls="day-${g.date}"><div class="row"><span class="date-icon">${icon('calendar',17)}</span><div><div class="history-date-name">${formatDate(g.date)}</div><div class="small muted">${g.date.slice(0,4)} 年 · ${g.journals.length} 位人員</div></div></div><div class="history-day-summary"><span>${tasks.length} 項工作</span><span>·</span><span>${formatHours(totalHours(g.journals))}</span>${icon('chevronDown',18,'accordion-arrow')}</div></button>
- <div id="day-${g.date}" ${open?'':'hidden'}>${open?g.journals.map(j=>`<div class="history-detail"><div class="row-between"><span class="small" style="font-weight:550">${icon('users',16)} &nbsp;${esc(employeeName(j.employeeId))}</span><span class="small muted">${j.tasks.length} 項</span></div>
+ return `<article class="soft-card history-record"><button class="accordion-heading history-head" data-action="toggle-day" data-date="${g.date}" aria-expanded="${open}" aria-controls="day-${g.date}"><div class="row"><span class="date-icon">${icon('calendar',17)}</span><div><div class="history-date-name">${formatDate(g.date)}</div><div class="small muted">${g.date.slice(0,4)} 年 · ${g.journals.length} 位人員</div></div></div><div class="history-day-summary"><span>${g.taskCount} 項工作</span><span>·</span><span>${formatHours(g.hours)}</span>${icon('chevronDown',18,'accordion-arrow')}</div></button>
+ <div id="day-${g.date}" ${open?'':'hidden'}>${open?renderHistoryDetail(g):''}</div></article>`;
+ }).join('');
+}
+function renderHistoryDetail(g,page=0){
+ const p=historyDetailPage(g,page);
+ const details=p.journals.map(j=>`<div class="history-detail"><div class="row-between"><span class="small" style="font-weight:550">${icon('users',16)} &nbsp;${esc(employeeName(j.employeeId))}</span><span class="small muted">${j.tasks.length} 項</span></div>
  ${j.tasks.map(t=>`<div class="history-task"><div><div class="pill-row"><span class="tag">${esc(t.category)}</span>${t.project?`<span class="tag">${esc(t.project)}</span>`:''}</div>${t.title&&t.title!==t.category?`<h4>${esc(t.title)}</h4>`:''}${t.description?`<p>${esc(t.description)}</p>`:''}${t.result?`<p>成果：${esc(t.result)}</p>`:''}</div><div style="text-align:right"><span class="tag ${t.status}">${STATUSES[t.status]}</span><p class="xs muted">${formatHours(t.hours)}</p></div></div>`).join('')}
   ${j.note?`<p class="small muted">當日備註：${esc(j.note)}</p>`:''}${j.tomorrow?`<p class="small muted">後續計畫：${esc(j.tomorrow)}</p>`:''}
-  <div class="history-foot"><span class="xs muted">最後更新：${esc((j.updatedAt||'').slice(0,10))}</span><div class="review-actions">${isCloud&&state.cloud.user?.role==='admin'?`<button class="soft-button sm danger" data-action="admin-delete-journal" data-id="${esc(j.id)}">${icon('trash',15)} 刪除此紀錄</button>`:''}${canEditJournal(j.employeeId)?`<button class="soft-button sm" data-action="edit-journal" data-id="${esc(j.id)}">${icon('edit',15)} 編輯這一天</button>`:'<span class="xs muted">僅供查閱</span>'}</div></div></div>`).join(''):''}</div></article>`;
- }).join('');
+  <div class="history-foot"><span class="xs muted">最後更新：${esc((j.updatedAt||'').slice(0,10))}</span><div class="review-actions">${isCloud&&state.cloud.user?.role==='admin'?`<button class="soft-button sm danger" data-action="admin-delete-journal" data-id="${esc(j.id)}">${icon('trash',15)} 刪除此紀錄</button>`:''}${canEditJournal(j.employeeId)?`<button class="soft-button sm" data-action="edit-journal" data-id="${esc(j.id)}">${icon('edit',15)} 編輯這一天</button>`:'<span class="xs muted">僅供查閱</span>'}</div></div></div>`).join('');
+ return details+(p.pages>1?`<div class="wp-history-pagination"><button type="button" class="soft-button sm" data-action="history-detail-page" data-date="${g.date}" data-page="${p.index-1}" ${p.index===0?'disabled':''}>上一頁</button><span role="status">第 ${p.start+1}–${p.end} / ${p.total} 筆 · ${p.index+1}/${p.pages} 頁</span><button type="button" class="soft-button sm" data-action="history-detail-page" data-date="${g.date}" data-page="${p.index+1}" ${p.index===p.pages-1?'disabled':''}>下一頁</button></div>`:'');
+}
+function setHistoryDay(date,open,page=0){
+ const group=filteredGroups().find(g=>g.date===date),target=document.getElementById('day-'+date);
+ const button=target?.previousElementSibling;if(!group||!target||!button)return false;
+ if(open){state.expanded.add(date);target.innerHTML=renderHistoryDetail(group,page);target.hidden=false;}else{state.expanded.delete(date);target.hidden=true;target.replaceChildren();}
+ button.setAttribute('aria-expanded',String(open));return true;
 }
 function reportMeta(){
  const source=isCloud?state.report.payload:null;
@@ -707,10 +715,11 @@ root.addEventListener('click', event=>{
  if(action==='history-jump'){
   if(state.cloud.saving||state.cloud.loadingMonth)return;
   const date=document.querySelector('#history-jump-date')?.value;if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return;
-  const month=date.slice(0,7),jump=()=>{if(state.view!=='history'||state.month!==month)return;const groups=filteredGroups();if(!groups.some(g=>g.date===date)){notify('這一天沒有符合目前篩選的紀錄',true);return;}state.expanded.add(date);const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults(groups);document.getElementById('day-'+date)?.closest('.history-record')?.scrollIntoView({block:'start',behavior:'instant'});};
+  const month=date.slice(0,7),jump=()=>{if(state.view!=='history'||state.month!==month)return;const groups=filteredGroups();if(!groups.some(g=>g.date===date)){notify('這一天沒有符合目前篩選的紀錄',true);return;}if(!setHistoryDay(date,true))return;document.getElementById('day-'+date)?.closest('.history-record')?.scrollIntoView({block:'start',behavior:'instant'});};
   if(isCloud&&state.month!==month){void loadCloudMonth(month).then(jump);return;}if(state.month!==month){state.month=month;render();}jump();return;
  }
- if(action==='toggle-day'){const date=button.dataset.date;if(state.expanded.has(date))state.expanded.delete(date);else state.expanded.add(date);const oldTop=window.scrollY;const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults();window.scrollTo(0,oldTop);return;}
+ if(action==='toggle-day'){const date=button.dataset.date;setHistoryDay(date,!state.expanded.has(date));return;}
+ if(action==='history-detail-page'){const date=button.dataset.date;if(setHistoryDay(date,true,Number(button.dataset.page))){const target=document.getElementById('day-'+date);target?.closest('.history-record')?.scrollIntoView({block:'start',behavior:'instant'});target?.previousElementSibling?.focus({preventScroll:true});}return;}
  if(action==='edit-journal'){const record=state.store.journals.find(j=>j.id===button.dataset.id);if(record&&canEditJournal(record.employeeId))openRecord(record);return;}
  if(action==='add-category'){
   if(isCloud)return;
@@ -865,5 +874,6 @@ document.addEventListener('workpulse:offline-vault',updateFieldRecovery);
 window.addEventListener('pagehide',()=>{if(state.dirty)flushQuickDraft();});
 window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty||attendanceState.scheduleDirty||(attendanceState.dirty&&!attendanceState.draftStored)||!fieldRecoveryDurable()){event.preventDefault();event.returnValue='';}});
 initMobileWorkflow();initPwa(isCloud);render();
+ const overviewMedia=window.matchMedia?.('(max-width:900px)');overviewMedia?.addEventListener?.('change',()=>{if(state.view==='overview')render();});
 if(isCloud)initCloud();
 else activateAttendancePage();

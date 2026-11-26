@@ -21,9 +21,10 @@ export function rememberDescriptions(storage,employeeId,rows){
 }
 export function descriptionSuggestions(storage,employeeId,query,journals=[],limit=6){
  const current=String(query||'').trim().toLocaleLowerCase();
- const records=journals.filter(j=>j.employeeId===employeeId)
-  .flatMap(j=>(j.tasks||[]).map(t=>t.description)).filter(Boolean);
- const choices=[...new Set([...readDescriptionMemory(storage,employeeId),...records])];
- return choices.filter(v=>v!==query&&(!current||v.toLocaleLowerCase().includes(current)))
-  .slice(0,Math.max(0,Math.min(12,limit)));
+ const max=Math.max(0,Math.min(12,Math.trunc(Number(limit)||0))),choices=[],seen=new Set();
+ if(!max)return choices;
+ function add(v){if(typeof v!=='string'||!v||v===query||seen.has(v)||current&&!v.toLocaleLowerCase().includes(current))return false;seen.add(v);choices.push(v);return choices.length>=max;}
+ for(const v of readDescriptionMemory(storage,employeeId))if(add(v))return choices;
+ for(const j of journals){if(j.employeeId!==employeeId)continue;for(const t of j.tasks||[])if(add(t.description))return choices;}
+ return choices;
 }
