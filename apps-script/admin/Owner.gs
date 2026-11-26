@@ -75,3 +75,57 @@ function workPulseInitialize(){
 function workPulseMigrateLegacy(){
   return wpPrivateMigrateLegacyMonthly_();
 }
+
+
+/** Private maintenance: metadata only, no writes. */
+function wpOwnerMaintenance(input){
+ wpOwnerAssert_();
+ if(!input||typeof input!=='object'||Array.isArray(input))throw Error('查詢格式無效');
+ var month=wpMonth_(input.month),control=wsBook_(),book=wpMonthFile_(control,month,false),people={};
+ wsPeople_(control,true).forEach(function(p){people[p.id]=p.name;});
+ var journals=book?wpRows_(wpSheet_(book,'Journals')):[],removed=book?wsDeleted_(book):{};
+ var deleted=journals.filter(function(j){return removed[String(j.journalId)];});
+ function auditRows(source,scope){
+  return wpRows_(wpSheet_(source,'Audit')).filter(function(row){
+   return scope!=='control'||String(row.occurredAt).slice(0,7)===month;
+  }).map(function(row){return {scope:scope,occurredAt:String(row.occurredAt),actor:String(row.actorEmail),action:String(row.action),recordId:String(row.journalId),revision:Number(row.revision)||0};});
+ }
+ var rows=auditRows(control,'control').concat(book?auditRows(book,month):[]);
+ rows.sort(function(a,b){return b.occurredAt.localeCompare(a.occurredAt);});
+ deleted.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+ return {month:month,exists:!!book,auditCount:rows.length,audit:rows.slice(0,100),deletedCount:deleted.length,
+  deleted:deleted.slice(0,100).map(function(j){return {id:String(j.journalId),date:String(j.date),employeeName:people[String(j.employeeId)]||String(j.employeeId),revision:Number(j.revision)||0};})};
+}
+/** Owner-only independent copy; not an atomic multi-file snapshot. */
+function wpBackupAssertPrivate_(item,email){
+ if(String(item.getOwner()?.getEmail()||'').toLowerCase()!==email||
+    item.getSharingAccess()!==DriveApp.Access.PRIVATE||
+    item.getEditors().some(function(u){return String(u.getEmail()).toLowerCase()!==email;})||
+    item.getViewers().some(function(u){return String(u.getEmail()).toLowerCase()!==email;}))
+   throw Error('備份目的地或檔案非資料持有者專用，已停止');
+}
+function wpBackupShape_(book){return book.getSheets().map(function(s){return {name:s.getName(),rows:s.getLastRow()};});}
+function wpOwnerBackupWorkbook(input){
+ var cfg=wpPrimaryOwnerAssert_();
+ if(!input||typeof input!=='object'||Array.isArray(input))throw Error('備份格式無效');
+ var target=input.target==='control'?'control':wpMonth_(input.target),request=String(input.requestId||'');
+ if(!/^[a-zA-Z0-9_-]{12,120}$/.test(request))throw Error('備份識別碼無效');
+ var id=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim();
+ if(!id||id===cfg.folderId)throw Error('請設定獨立私人備份資料夾 WORKPULSE_BACKUP_FOLDER_ID');
+ var folder=DriveApp.getFolderById(id);wpBackupAssertPrivate_(folder,cfg.adminEmail);
+ var control=wsBook_(),source=target==='control'?control:wpMonthFile_(control,target,false);
+ if(!source)throw Error('沒有該月份資料，不建立空白備份');
+ var file=DriveApp.getFileById(source.getId());
+ if(String(file.getOwner()?.getEmail()||'').toLowerCase()!==cfg.adminEmail)throw Error('來源檔案非指定持有者');
+ var lock=LockService.getScriptLock();lock.waitLock(20000);
+ try{
+  wpPrimaryOwnerAssert_();wpBackupAssertPrivate_(folder,cfg.adminEmail);
+  var title='WorkPulse_Backup_'+target+'_'+request,matching=folder.getFilesByName(title),copy,duplicate=false;
+  if(matching.hasNext()){copy=matching.next();duplicate=true;if(matching.hasNext())throw Error('備份名稱重複，請人工核對');}
+  else{SpreadsheetApp.flush();copy=file.makeCopy(title,folder);}
+  wpBackupAssertPrivate_(copy,cfg.adminEmail);
+  var shape=wpBackupShape_(SpreadsheetApp.openById(copy.getId()));
+  if(!shape.length||JSON.stringify(shape)!==JSON.stringify(wpBackupShape_(source)))throw Error('來源與副本工作表／列數不同，請人工核對，不可視為已驗證備份');
+  return {ok:true,deduplicated:duplicate,target:target,backupId:copy.getId(),name:title,sheets:shape};
+ }finally{lock.releaseLock();}
+}

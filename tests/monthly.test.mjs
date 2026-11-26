@@ -29,7 +29,7 @@ function harness(){
  }
  function makeFile(id,name){
   const file={id,name,folder:'',getId:()=>id,getName:()=>name,
-    getOwner:()=>({getEmail:()=> 'admin@example.com'}),moveTo:f=>{file.folder=f.getId();}};
+    getOwner:()=>({getEmail:()=> 'admin@example.com'}),getSharingAccess:()=> 'private',getEditors:()=>[],getViewers:()=>[],moveTo:f=>{file.folder=f.getId();},makeCopy:(title,dest)=>{const b=makeBook(title);b.sheets=books.get(id).sheets.map(s=>{const clone=new Sheet(s.name);clone.rows=s.rows.map(r=>[...r]);return clone;});const copy=files.get(b.id);copy.moveTo(dest);return copy;}};
   files.set(id,file);return file;
  }
  function makeBook(name,id){
@@ -42,9 +42,9 @@ function harness(){
   Session:{getActiveUser:()=>({getEmail:()=>current}),getEffectiveUser:()=>({getEmail:()=>effective})},
   SpreadsheetApp:{openById:id=>{if(!books.has(id))throw Error('Unknown spreadsheet');return books.get(id);},
     create:name=>makeBook(name),flush(){}},
-  DriveApp:{getFileById:id=>files.get(id),getFolderById:id=>{if(!folders.has(id))throw Error('Missing folder');return folders.get(id);},
+  DriveApp:{Access:{PRIVATE:'private'},getFileById:id=>files.get(id),getFolderById:id=>{if(!folders.has(id))throw Error('Missing folder');return folders.get(id);},
     createFolder:name=>{const id='folder-'+(counter++);
-      const folder={getId:()=>id,getOwner:()=>({getEmail:()=> 'admin@example.com'}),
+      const folder={getId:()=>id,getOwner:()=>({getEmail:()=> 'admin@example.com'}),getSharingAccess:()=> 'private',getEditors:()=>[],getViewers:()=>[],
         getFilesByName:query=>{const items=Array.from(files.values()).filter(f=>f.folder===id&&f.name===query);
           let k=0;return {hasNext:()=>k<items.length,next:()=>items[k++]};}};
       folders.set(id,folder);return folder;}},
@@ -401,4 +401,38 @@ test('attendance export range returns only read-only monthly schedule and no pay
  h.scope.wpOwnerSaveAttendanceSchedule({employeeId:e.id,month:'2026-11',days:{'2026-11-23':'holiday'},expectedRevision:0,requestId:'export-schedule-0001'});
  h.as('');const result=h.scope.wpAttendanceRange({employeeId:e.id,startDate:'2026-11-01',endDate:'2026-12-02'});
  assert.equal(result.scheduleByMonth['2026-11'].days['2026-11-23'],'holiday');assert.equal(result.scheduleByMonth['2026-12'].revision,0);assert.equal(result.rows.length,0);assert.equal(h.files.size,1);
+});
+
+test('maintenance is owner-only and lists soft-deleted journals',()=>{
+ const h=harness();h.setup();const p=h.employee();h.as('');
+ const row=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ assert.throws(()=>h.scope.wpOwnerMaintenance({month:'2026-11'}),/管理帳號/);
+ h.as('admin@example.com');h.scope.wpOwnerDeleteJournal({journalId:row.id,date:row.date,expectedRevision:1,requestId:'maintenance-delete-001'});
+ const data=h.scope.wpOwnerMaintenance({month:'2026-11'});
+ assert.equal(data.deletedCount,1);assert.equal(data.deleted[0].id,row.id);
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals.length,0);
+});
+test('backup rejects unverified account and missing private destination',()=>{
+ const h=harness();h.setup();h.as('');
+ assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'backup-test-001'}),/持有帳號/);
+ h.as('admin@example.com');assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'backup-test-001'}),/備份資料夾/);
+ assert.equal(h.files.size,1);
+});
+
+test('backup copies one workbook without modifying live index, retries same ID, rejects shared folder',()=>{
+ const h=harness();h.setup();const p=h.employee();h.as('');
+ const row=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ h.as('admin@example.com');const folder=h.scope.DriveApp.createFolder('Private backups');
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=folder.getId();
+ const index=JSON.stringify(h.scope.wpMonthIndex_(h.control));
+ const request={target:'2026-11',requestId:'backup-month-001'};
+ const result=h.scope.wpOwnerBackupWorkbook(request);
+ assert.equal(result.ok,true);assert.equal(result.sheets.length,6);
+ assert.equal(h.files.size,3);assert.equal(JSON.stringify(h.scope.wpMonthIndex_(h.control)),index);
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals[0].id,row.id);
+ assert.equal(h.scope.wpOwnerBackupWorkbook(request).backupId,result.backupId);
+ assert.equal(h.files.size,3);
+ folder.getViewers=()=>[{getEmail:()=> 'other@example.com'}];
+ assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'backup-control-001'}),/持有者專用/);
+ assert.equal(h.files.size,3);
 });

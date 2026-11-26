@@ -36,6 +36,10 @@ const probe=`<script>
      const noAdminTabs=!mobileTabs.some(x=>x.includes('統計分析')||x.includes('系統設定'));
      const loading=Boolean(document.querySelector('.att-page')?.textContent.includes('正在讀取出勤資料'));
      const overflow=document.documentElement.scrollWidth>window.innerWidth+2;
+     const nav=document.querySelector('.mobile-nav');
+     const mobileFit=window.innerWidth>900||Boolean(nav&&nav.scrollWidth<=nav.clientWidth+2&&[...nav.querySelectorAll('.nav-link')].every(n=>n.getBoundingClientRect().height>=44));
+     const field=document.querySelector('.main .input');
+     const inputReadable=window.innerWidth>900||!field||parseFloat(getComputedStyle(field).fontSize)>=16;
      const failed=window.__wpSmokeErrors.length>0;
      let personChoice='skip';
      if(location.hash.includes('/overview')){
@@ -86,7 +90,7 @@ const probe=`<script>
      output.dataset.mobileLauncher=mobileLauncher?'1':'0';
      output.dataset.noAdminTabs=noAdminTabs?'1':'0';
      output.dataset.loading=loading?'1':'0';
-     output.dataset.overflow=overflow?'1':'0';
+     output.dataset.overflow=overflow?'1':'0';output.dataset.mobileFit=mobileFit?'1':'0';output.dataset.inputReadable=inputReadable?'1':'0';
      output.dataset.failed=failed?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
@@ -134,7 +138,7 @@ try{
    const attrs=Object.fromEntries([...match[1].matchAll(/data-([\w-]+)="([^"]*)"/g)].map(([,k,v])=>[k,v]));
    if(Number(attrs.width)!==width)throw new Error(`${route}: expected exact ${width}px, got ${attrs.width}px`);
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
-   if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||
+   if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||

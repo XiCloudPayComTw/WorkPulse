@@ -4,6 +4,7 @@ import { icon } from '../../shared/icons.js';
 import {addWorkCategory,renameWorkCategory} from '../journals/categories.js';
 
 export const adminState={phase:'idle',data:null,tab:'employees',draft:null,dirty:false,saving:false,error:'',requestId:null};
+export const maintenanceState={month:'',data:null,error:'',backup:null,backupRequest:null,backupTarget:'',busy:false};
 export async function loadAdmin(){
  if(adminState.phase==='loading')return;
  adminState.phase='loading';adminState.error='';
@@ -107,4 +108,31 @@ export async function saveAdmin(){
   adminState.draft=null;adminState.dirty=false;adminState.requestId=null;adminState.phase='ready';
   return result;
  }finally{adminState.saving=false;}
+}
+
+export function renderMaintenance(){
+ const a=maintenanceState,d=a.data;
+ return '<section class="soft-card card-pad-lg section-space"><div class="card-head"><div><h2 class="card-title">營運維護與稽核</h2><p class="card-sub">私人管理員查閱操作紀錄及已刪除日誌。備份僅由資料持有者執行，不覆寫正式資料。</p></div></div>'+
+ '<div class="form-fields"><label class="form-group"><span class="field-label">查詢月份</span><input class="input" type="month" data-maintenance-month value="'+esc(a.month)+'" '+(a.busy?'disabled':'')+'></label>'+
+ '<div class="form-group"><span class="field-label">操作</span><button class="soft-button" data-action="maintenance-load" '+(a.busy?'disabled':'')+'>查詢操作紀錄</button></div></div>'+
+ (a.error?'<p role="alert" class="small">'+esc(a.error)+'</p>':'')+
+ (d?'<p class="small muted">'+esc(d.month)+' · 稽核 '+d.auditCount+' 筆 · 已刪除 '+d.deletedCount+' 筆（各顯示最近至多 100 筆）</p>'+
+ '<div class="maintenance-list">'+d.audit.map(x=>'<div><strong>'+esc(x.action)+'</strong><span>'+esc(x.occurredAt)+' · '+esc(x.actor)+' · '+esc(x.recordId)+'</span></div>').join('')+'</div>'+
+ '<h3 class="card-title section-space">已刪除日誌（唯讀）</h3><div class="maintenance-list">'+d.deleted.map(x=>'<div><strong>'+esc(x.date)+' · '+esc(x.employeeName)+'</strong><span>版本 '+x.revision+' · '+esc(x.id)+'</span></div>').join('')+'</div>':'')+
+ '<div class="divider"></div><h3 class="card-title">建立獨立備份</h3><p class="small muted">須預先配置持有者專用備份資料夾；建議於暫停填寫時執行。每次僅複製一份檔案，並非整庫原子快照。</p>'+
+ '<div class="row" style="flex-wrap:wrap"><button class="soft-button" data-action="maintenance-backup" data-target="control" '+(a.busy?'disabled':'')+'>備份控制表</button><button class="soft-button" data-action="maintenance-backup" data-target="month" '+(a.busy?'disabled':'')+'>備份所選月份</button></div>'+
+ (a.backup?'<p class="small muted" role="status">副本：'+esc(a.backup.name)+' · '+a.backup.sheets.length+' 個工作表。請在私人 Drive 確認。</p>':'')+'</section>';
+}
+export async function loadMaintenance(month){
+ const a=maintenanceState;if(a.busy)return;
+ a.month=month;a.busy=true;a.data=null;a.error='';
+ try{const result=await cloudCall('wpOwnerMaintenance',{month});if(result?.month!==month||!Array.isArray(result.audit)||!Array.isArray(result.deleted))throw Error('稽核回應格式錯誤');a.data=result;}
+ catch(e){a.error=e.message;}finally{a.busy=false;}
+}
+export async function backupMaintenance(target){
+ const a=maintenanceState;if(a.busy)return;
+ if(a.backupTarget!==target||!a.backupRequest){a.backupTarget=target;a.backupRequest=uid();}
+ a.busy=true;a.error='';a.backup=null;
+ try{const result=await cloudCall('wpOwnerBackupWorkbook',{target,requestId:a.backupRequest},{timeoutMs:180000});if(!result?.ok||!Array.isArray(result.sheets))throw Error('未確認備份結果');a.backup=result;a.backupRequest=null;a.backupTarget='';}
+ catch(e){a.error=e.message+'；如結果未確認，請先檢查私人 Drive，再使用同一目標重試。';}finally{a.busy=false;}
 }

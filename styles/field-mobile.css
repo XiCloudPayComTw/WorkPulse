@@ -77,3 +77,28 @@ input,textarea,select,[contenteditable="true"]{user-select:text;-webkit-user-sel
 .wp-recovery-panel{margin:0 0 14px;padding:12px 14px;border-radius:16px;background:#e5edf3;box-shadow:var(--inset);color:#415d70;font-size:13px;overflow-wrap:anywhere;min-width:0}.wp-recovery-status{line-height:1.65}.wp-recovery-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid #d3e0e9;margin-top:8px}.wp-recovery-row>div{display:flex;gap:7px;flex-wrap:wrap}.wp-recovery-row button{min-height:40px}@media(max-width:430px){.wp-recovery-row{align-items:flex-start;flex-direction:column}.wp-recovery-panel{padding:10px}.wp-recovery-row button{min-height:44px}}
 
 @media(max-width:350px){.main{padding-left:12px;padding-right:12px}.card-pad-lg,.history-record{padding:16px}.wp-field-tile{padding:13px;gap:10px}.wp-field-tile-icon{width:46px;height:46px}.wp-field-tile-body strong{font-size:17px}.quick-tool-actions{grid-template-columns:minmax(0,1fr)}.quick-tool-actions>#draft-save-status{grid-row:auto;grid-column:1}.quick-tool-actions>.soft-button{grid-column:1;width:100%}}
+
+
+/* v0.14.0: phone-first reading and tap targets. */
+.att-mobile-records{display:none}
+@media(max-width:900px){
+ .shell{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+ .main{padding-top:max(22px,env(safe-area-inset-top,0px));padding-left:max(17px,env(safe-area-inset-left,0px));padding-right:max(17px,env(safe-area-inset-right,0px))}
+ .mobile-nav{display:grid;grid-template-columns:repeat(var(--nav-count,4),minmax(0,1fr));gap:2px;overflow:visible;justify-content:stretch;padding-left:max(5px,env(safe-area-inset-left,0px));padding-right:max(5px,env(safe-area-inset-right,0px))}
+ .mobile-nav>.nav-link{width:100%;max-width:none;min-width:0;min-height:52px;white-space:normal;text-align:center;line-height:1.2}
+ .main .input,.main input:not([type=checkbox]):not([type=radio]),.main textarea,.main select{font-size:16px;min-width:0}
+ .main .soft-button,.main .accordion-heading{min-height:44px;white-space:normal}
+ .main .input{scroll-margin-top:20px;scroll-margin-bottom:110px}
+ .toast-stack{bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:45}
+ .att-page .att-scroll{display:none}
+ .att-mobile-records{display:grid;gap:12px;min-width:0}
+ .att-mobile-record{padding:14px;border:1px solid rgba(255,255,255,.85);border-radius:16px;background:#e8edf4;box-shadow:var(--shadow-sm);min-width:0;overflow-wrap:anywhere}
+ .att-mobile-record>.row-between{flex-wrap:wrap;gap:6px}
+ .att-mobile-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+ .att-mobile-values>div{min-width:0;padding:9px;border-radius:10px;background:#edf2f7}
+ .att-mobile-values dt{font-size:12px;color:#516879}
+ .att-mobile-values dd{font-size:16px;color:#2f4b5c;margin:3px 0 0;line-height:1.4}
+ .att-mobile-note{white-space:pre-wrap;font-size:14px;line-height:1.7;color:#40596a}
+ .att-mobile-record>.soft-button{width:100%}
+}
+@media(max-width:350px){.main{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.att-mobile-record{padding:10px}}
