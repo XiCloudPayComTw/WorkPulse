@@ -142,6 +142,8 @@ const probe=`<script>
        }
        modal?.querySelector('[data-action="payroll-close"]')?.click();
      }
+     const skip=document.querySelector('[data-action="skip-content"]');skip?.click();const focusCheck=Boolean(skip&&document.activeElement?.matches('.page-title,.wp-field-hero h2,#page-content'));
+     const liveNav=document.querySelector('.mobile-nav'),liveDock=document.querySelector('#wp-mobile-dock');const requiredBottom=(liveNav?.getBoundingClientRect().height||0)+(liveDock&&!liveDock.hidden?liveDock.getBoundingClientRect().height:0);const bottomFit=window.innerWidth>900||parseFloat(getComputedStyle(document.querySelector('.shell')).paddingBottom)>=requiredBottom;
      const copyCheck=new Event('copy',{bubbles:true,cancelable:true});
      const titleElement=document.querySelector('h1.page-title');
      titleElement?.dispatchEvent(copyCheck);
@@ -158,7 +160,7 @@ const probe=`<script>
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
      output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.collapseCheck=collapseCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
-     output.dataset.spacingCheck=spacingCheck;output.dataset.historyDomCheck=historyDomCheck;
+     output.dataset.focusCheck=focusCheck?'1':'0';output.dataset.bottomFit=bottomFit?'1':'0';output.dataset.spacingCheck=spacingCheck;output.dataset.historyDomCheck=historyDomCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
@@ -205,7 +207,7 @@ try{
    if(Number(attrs.width)!==width)throw new Error(`${route}: expected exact ${width}px, got ${attrs.width}px`);
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
    if(attrs.title!==expected||attrs.overflow==='1'||attrs['temporal-overflow']!==''||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||attrs['storage-banner']!=='1'||(mobile&&Number(attrs.height)!==height)||
-      attrs['copy-blocked']!=='1'||
+      attrs['copy-blocked']!=='1'||attrs['focus-check']!=='1'||attrs['bottom-fit']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'||attrs['collapse-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||

@@ -1,6 +1,20 @@
 /** Mobile controls delegate to existing form events; never save or mutate independently. */
 import {isMobileViewport} from './person.js';
-let wpSheet=null,wpSheetOrigin=null,wpViewportMax=0,wpViewportWidth=0;
+let wpSheet=null,wpSheetOrigin=null,wpViewportMax=0,wpViewportWidth=0,wpDockObserver=null,wpObservedDock=null,wpObservedNav=null;
+export function fieldBottomSpace(navHeight,dockHeight,gap=16){return Math.ceil(Math.max(0,Number(navHeight)||0)+Math.max(0,Number(dockHeight)||0)+Math.max(0,Number(gap)||0));}
+function wpMeasureBottom(){
+ const root=document.documentElement,nav=document.querySelector('.mobile-nav'),dock=document.querySelector('#wp-mobile-dock');
+ if(!root?.style||!isMobileViewport()||root.classList.contains('wp-keyboard-open'))return;
+ const n=nav?.getBoundingClientRect().height||0,d=dock?.hidden?0:dock?.getBoundingClientRect().height||0;
+ if(n<=0)return;
+ root.style.setProperty('--wp-nav-height',Math.ceil(n)+'px');root.style.setProperty('--wp-bottom-space',fieldBottomSpace(n,d)+'px');root.style.setProperty('--wp-toast-offset',fieldBottomSpace(n,d,8)+'px');
+}
+function wpObserveBottom(dock,nav){
+ if(typeof ResizeObserver==='undefined')return;
+ if(wpObservedDock===dock&&wpObservedNav===nav)return;
+ wpDockObserver?.disconnect();wpObservedDock=dock;wpObservedNav=nav;wpDockObserver=new ResizeObserver(wpMeasureBottom);
+ if(dock)wpDockObserver.observe(dock);if(nav)wpDockObserver.observe(nav);
+}
 export function sheetMatches(label,query){return String(label||'').normalize('NFKC').toLocaleLowerCase().includes(String(query||'').normalize('NFKC').trim().toLocaleLowerCase());}
 export function keyboardObscures(height,visible,focused){return Boolean(focused&&height-visible>140);}
 export function closeMobileSheet(restore=true){
@@ -61,11 +75,13 @@ export function syncMobileDock(){
  const entry=document.querySelector('.entry-actions [data-action="save-journal"]'),attendance=document.querySelector('.att-page [data-action="attendance-save"]'),source=entry||attendance;
  dock.hidden=!source;
  if(document.documentElement?.classList)document.documentElement.classList.toggle('wp-has-dock',!!source);
- if(!source)return;
+ wpObserveBottom(dock,nav);
+ if(!source){wpMeasureBottom();return;}
  const save=dock.querySelector('[data-dock="save"]'),add=dock.querySelector('[data-dock="add"]'),status=dock.querySelector('[data-dock-status]');
- save.disabled=source.disabled;save.textContent=source.textContent.trim();add.hidden=!entry;add.disabled=source.disabled;
+ save.disabled=source.disabled;if(save.textContent!==source.textContent.trim())save.textContent=source.textContent.trim();add.hidden=!entry;add.disabled=source.disabled;
  const draft=entry?document.querySelector('#draft-save-status')?.textContent:document.querySelector('.att-page [data-att-dock-status]')?.textContent;
- status.textContent=draft||(!entry?'出勤紀錄 · 儲存後才正式提交':'草稿與正式儲存狀態');
+ const label=draft||(!entry?'出勤紀錄 · 儲存後才正式提交':'草稿與正式儲存狀態');if(status.textContent!==label)status.textContent=label;
+ wpMeasureBottom();
 }
 export function mobileDockMarkup(){
  return '<div id="wp-mobile-dock" class="wp-mobile-dock" hidden><span data-dock-status role="status" aria-live="polite"></span><div><button type="button" class="soft-button" data-dock="add">新增項目</button><button type="button" class="soft-button primary" data-dock="save">儲存</button></div></div>';
