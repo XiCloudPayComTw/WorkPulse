@@ -139,3 +139,21 @@ input,textarea,select,[contenteditable="true"]{user-select:text;-webkit-user-sel
 
 /* v0.16.1 — compact, accessible long forms */
 .wp-task-tools,.wp-draft-dates{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}.wp-draft-dates strong{font-size:13px;color:#536f83}.wp-task-toggle{display:flex;align-items:center;gap:9px;min-width:0;flex:1;text-align:left;background:transparent;border:0;color:inherit;padding:6px 0;cursor:pointer}.wp-task-toggle>span:nth-child(2){display:grid;gap:3px;min-width:0}.wp-task-toggle strong,.wp-task-toggle small{overflow-wrap:anywhere}.wp-task-toggle small{font-size:12px;color:#536f83;font-weight:400}.wp-task-toggle[aria-expanded=false] svg{transform:rotate(-90deg)}.wp-task-fields[hidden]{display:none!important}.wp-history-jump{display:flex;align-items:end;gap:12px;margin-top:20px}.wp-history-jump label{flex:1;min-width:0}.history-record{scroll-margin-top:24px}.wp-description-open{align-self:start;margin-top:6px}.wp-task-toggle:focus-visible{outline:2px solid #577b95;outline-offset:3px}@media(max-width:900px){.wp-task-toggle,.wp-task-tools button,.wp-draft-dates button,.wp-description-open{min-height:44px}.task-heading{flex-wrap:wrap}.task-heading-actions{margin-left:auto}.wp-history-jump{gap:8px}.wp-history-jump button{min-height:44px;white-space:normal}.wp-draft-dates strong{width:100%}}@media(prefers-reduced-motion:reduce){.wp-task-toggle svg{transition:none}}
+
+/* v0.17.0 static PWA information, normal flow, no overlay on field forms. */
+.wp-pwa-panel{display:block;margin:0 0 14px;padding:12px 14px;border:1px solid #d5dfe8;border-radius:14px;background:#e6edf5;color:#38566c;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.wp-pwa-panel p{margin:6px 0 0;font-size:12px}.wp-pwa-panel summary{cursor:pointer;min-height:32px}.wp-pwa-row{display:flex;align-items:center;gap:10px;justify-content:space-between}.wp-pwa-row>div{display:grid;gap:2px;min-width:0}.wp-pwa-row span{font-size:12px}.wp-pwa-row button{flex-shrink:0;min-height:44px;white-space:normal}@media(max-width:350px){.wp-pwa-row{flex-wrap:wrap}.wp-pwa-row button{width:100%}}@media(display-mode:standalone){.wp-pwa-panel{padding-top:10px}}
+
+
+/* iOS/WebKit native temporal fields must fit their own grid cell, including internal padding.
+   Keep the native date/time picker and value semantics. Do not mask page overflow. */
+@media(max-width:900px){
+ .form-group{grid-template-columns:minmax(0,1fr)}
+ .form-group>.input{min-inline-size:0;max-inline-size:100%;inline-size:100%;box-sizing:border-box}
+ .main input.input:is([type=date],[type=month],[type=time],[type=datetime-local]){
+  -webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;
+  width:100%;min-width:0;max-width:100%;inline-size:100%;min-inline-size:0;max-inline-size:100%;
+  padding-inline:12px;min-height:44px;font-size:16px;text-align:left;
+ }
+ .main input.input::-webkit-date-and-time-value{min-width:0;max-width:100%;margin:0;text-align:left}
+ .main input.input::-webkit-datetime-edit{min-width:0;max-width:100%;padding:0}
+}

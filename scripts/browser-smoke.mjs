@@ -11,6 +11,7 @@ import {randomUUID} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
+import {nativePwaSmoke} from './pwa-smoke.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const browser=['google-chrome','google-chrome-stable','chromium','chromium-browser']
@@ -87,6 +88,8 @@ const probe=`<script>
      const mobileFit=window.innerWidth>900||Boolean(nav&&nav.scrollWidth<=nav.clientWidth+2&&[...nav.querySelectorAll('.nav-link')].every(n=>n.getBoundingClientRect().height>=44));
      const field=document.querySelector('.main .input');
      const inputReadable=window.innerWidth>900||!field||parseFloat(getComputedStyle(field).fontSize)>=16;
+     const temporalFields=[...document.querySelectorAll('.main input:is([type=date],[type=month],[type=time],[type=datetime-local])')].filter(x=>x.getClientRects().length&&x.closest('.form-group'));
+     const temporalOverflow=temporalFields.filter(x=>{const a=x.getBoundingClientRect(),b=x.closest('.form-group').getBoundingClientRect(),card=x.closest('.soft-card,.task-card')?.getBoundingClientRect();return a.left<b.left-1||a.right>b.right+1||(card&&(a.left<card.left-1||a.right>card.right+1));}).map(x=>x.id||x.type).join(',');
      const failed=()=>window.__wpSmokeErrors.length>0;
      let personChoice='skip';
      if(location.hash.includes('/overview')){
@@ -147,7 +150,7 @@ const probe=`<script>
      output.dataset.mobileLauncher=mobileLauncher?'1':'0';
      output.dataset.noAdminTabs=noAdminTabs?'1':'0';
      output.dataset.loading=loading?'1':'0';
-     output.dataset.overflow=overflow?'1':'0';output.dataset.mobileFit=mobileFit?'1':'0';output.dataset.inputReadable=inputReadable?'1':'0';
+     output.dataset.temporalOverflow=temporalOverflow;output.dataset.overflow=overflow?'1':'0';output.dataset.mobileFit=mobileFit?'1':'0';output.dataset.inputReadable=inputReadable?'1':'0';
      output.dataset.failed=failed()?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
@@ -175,6 +178,8 @@ try{
  }
  if(!available)throw new Error('WorkPulse 本機伺服器無法啟動');
  await nativeVaultSmoke();
+ execFileSync(process.execPath,['scripts/build.mjs'],{cwd:root,stdio:'inherit',timeout:30000});
+ await nativePwaSmoke(browser,root);
  const routes=[
   ['overview','工作總覽'],['attendance','出勤表'],['entry','填寫工作日誌'],
   ['history','歷史工作紀錄'],['insights','統計分析'],['settings','系統設定']];
@@ -196,7 +201,7 @@ try{
    const attrs=Object.fromEntries([...match[1].matchAll(/data-([\w-]+)="([^"]*)"/g)].map(([,k,v])=>[k,v]));
    if(Number(attrs.width)!==width)throw new Error(`${route}: expected exact ${width}px, got ${attrs.width}px`);
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
-   if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||attrs['storage-banner']!=='1'||(mobile&&Number(attrs.height)!==height)||
+   if(attrs.title!==expected||attrs.overflow==='1'||attrs['temporal-overflow']!==''||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||attrs['storage-banner']!=='1'||(mobile&&Number(attrs.height)!==height)||
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'||attrs['collapse-check']!=='ok'))||
