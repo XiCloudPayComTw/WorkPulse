@@ -43,12 +43,12 @@ function wpSharedBootstrap(month){
   var verified=wpFieldAccess_();
   var offlineScope=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_OFFLINE_SCOPE')||'');
   if(!verified||!/^[A-Za-z0-9_-]{16,80}$/.test(offlineScope))offlineScope='';
-  var book=wsBook_(),m=wpMonth_(month),people=wsPeople_(book,false);
+  var book=wsBook_(),m=wpMonth_(month),people=wsPeople_(book,false),admin=wpUnified_()&&verified===wpConfig_().adminEmail;
   return {month:m,offlineScope:offlineScope,store:{version:1,mode:'cloud',
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
       .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m)},
-    user:{id:'guest',name:'共用填寫',role:'guest',email:verified,
+    user:{id:admin?'admin':'guest',name:admin?'管理員':'共用填寫',role:admin?'admin':'guest',email:verified,
       canWriteIds:people.map(function(p){return p.id;})}};
 }
 function wpSharedLoadMonth(month){wpFieldAccess_();var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}

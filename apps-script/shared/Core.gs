@@ -20,7 +20,9 @@ var WP_HEADERS={
 };
 var WP_CATEGORIES=['前端開發','展店設計','現場勘查','行政／會議','其他'];
 var WP_STATUS=['done','doing','blocked'];
+function wpUnified_(){return typeof WP_PORTAL_KIND!=='undefined'&&WP_PORTAL_KIND==='unified';}
 function doGet(){
+  if(wpUnified_())wpFieldAccess_();
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('WorkPulse — 工作日誌')
     .addMetaTag('viewport','width=device-width, initial-scale=1, viewport-fit=cover');
 }
@@ -73,6 +75,8 @@ function wpPlainText_(value){
 }
 function wpActive_(value){return value===true||String(value).toLowerCase()==='true';}
 function wpOwnerAssert_(){
+  // Unified executes as the primary owner, never promote a delegated operator.
+  if(wpUnified_())return wpPrimaryOwnerAssert_();
   var cfg=wpConfig_();
   var active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
   var effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
@@ -82,6 +86,7 @@ function wpOwnerAssert_(){
 }
 
 function wpPrimaryOwnerAssert_(){
+ if(wpUnified_())wpFieldMode_();
  var cfg=wpConfig_();
  if(String(Session.getActiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail||
     String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail)
@@ -113,6 +118,7 @@ function wsCategoryRevision_(book){
  */
 function wpFieldMode_(){
  var mode=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_ACCESS_MODE')||'legacy');
+ if(wpUnified_()&&mode!=='domain')throw Error('單一入口必須設定 WORKPULSE_ACCESS_MODE=domain，禁止匿名模式');
  if(mode!=='legacy'&&mode!=='domain')throw Error('WORKPULSE_ACCESS_MODE 設定無效');
  return mode;
 }
@@ -121,6 +127,7 @@ function wpFieldAccess_(){
  var cfg=wpConfig_(),active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase(),
  effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
  if(!active||!active.endsWith('@'+cfg.domain))throw Error('請使用公司網域 Google 帳號登入，無法驗證身分時停止存取');
+ if(wpUnified_()&&effective!==cfg.adminEmail)throw Error('單一入口必須以公司資料持有者身分執行');
  if(effective!==cfg.adminEmail&&(!cfg.operatorEmail||effective!==cfg.operatorEmail))throw Error('雲端執行身分不符公司授權');
  return active;
 }
