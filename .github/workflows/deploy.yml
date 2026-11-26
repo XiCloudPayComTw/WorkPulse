@@ -22,8 +22,21 @@ jobs:
 
   # GitHub recommends finishing the Pages upload job before a separate deployment job.
   # This also ensures artifact indexing has time to become visible to the deployment API.
-  build_pages:
+  browser_smoke:
     needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify browser version
+        run: google-chrome --version
+      - name: Smoke test all routes in real headless Chrome
+        run: npm run smoke:browser
+
+  build_pages:
+    needs: [check, browser_smoke]
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ steps.naming.outputs.name }}
