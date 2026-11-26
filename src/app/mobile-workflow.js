@@ -1,6 +1,7 @@
 /** Mobile controls delegate to existing form events; never save or mutate independently. */
 import {isMobileViewport} from './person.js';
 let wpSheet=null,wpSheetOrigin=null,wpViewportMax=0,wpViewportWidth=0;
+export function sheetMatches(label,query){return String(label||'').normalize('NFKC').toLocaleLowerCase().includes(String(query||'').normalize('NFKC').trim().toLocaleLowerCase());}
 export function keyboardObscures(height,visible,focused){return Boolean(focused&&height-visible>140);}
 export function closeMobileSheet(restore=true){
  const dialog=wpSheet,origin=wpSheetOrigin;wpSheet=null;wpSheetOrigin=null;
@@ -19,7 +20,11 @@ export function openMobileSheet(origin,title,items,onChoose){
   const button=document.createElement('button');button.type='button';button.className='wp-sheet-option';button.textContent=item.label;button.dataset.sheetValue=item.value;button.setAttribute('aria-pressed',String(!!item.selected));button.disabled=!!item.disabled;
   button.addEventListener('click',()=>{closeMobileSheet();onChoose(item.value);});list.append(button);
  }
- dialog.append(list);document.body.append(dialog);wpSheet=dialog;wpSheetOrigin=origin;origin.setAttribute('aria-expanded','true');
+ const search=document.createElement('input');search.type='search';search.className='input wp-sheet-search';search.placeholder='搜尋選項…';search.setAttribute('aria-label','搜尋'+title);search.autocomplete='off';
+ const count=document.createElement('p');count.className='wp-sheet-count';count.setAttribute('role','status');count.textContent=items.length+' 個選項';
+ const empty=document.createElement('p');empty.className='wp-sheet-empty';empty.textContent='沒有符合的選項';empty.hidden=true;
+ search.addEventListener('input',()=>{let n=0;for(const option of list.querySelectorAll('button')){const matched=sheetMatches(option.textContent,search.value);option.hidden=!matched;if(matched)n++;}count.textContent=n+' 個選項';empty.hidden=n!==0;});
+ dialog.append(search,count,list,empty);document.body.append(dialog);wpSheet=dialog;wpSheetOrigin=origin;origin.setAttribute('aria-expanded','true');
  dialog.addEventListener('cancel',e=>{e.preventDefault();closeMobileSheet();});
  dialog.addEventListener('click',e=>{if(e.target===dialog){const rect=dialog.getBoundingClientRect();if(e.clientY<rect.top||e.clientY>rect.bottom||e.clientX<rect.left||e.clientX>rect.right)closeMobileSheet();}});
  try{dialog.showModal();(list.querySelector('[aria-pressed="true"]:not(:disabled)')||close).focus({preventScroll:true});}
@@ -28,7 +33,7 @@ export function openMobileSheet(origin,title,items,onChoose){
 }
 export function enhanceMobileSelects(){
  if(typeof HTMLDialogElement==='undefined'||typeof HTMLDialogElement.prototype.showModal!=='function')return;
- const selector='select[data-identity="employeeId"],select[data-field="category"],select[data-field="project"],select[data-filter],select[data-att-person]';
+ const selector='select[data-identity="employeeId"],select[data-field="category"],select[data-field="project"],select[data-filter],select[data-att-person],select[data-att-field="dayType"],select[data-att-field="leaveType"],select[data-field="status"]';
  for(const select of document.querySelectorAll(selector)){
   if(select.dataset.sheetEnhanced)continue;
   select.dataset.sheetEnhanced='1';
@@ -38,12 +43,13 @@ export function enhanceMobileSelects(){
   update();select.after(trigger);
   trigger.addEventListener('click',()=>{
    if(select.disabled)return;
-   openMobileSheet(trigger,title,[...select.options].map(o=>({value:o.value,label:o.textContent,selected:o.selected,disabled:o.disabled})),value=>{
+   const opened=openMobileSheet(trigger,title,[...select.options].map(o=>({value:o.value,label:o.textContent,selected:o.selected,disabled:o.disabled})),value=>{
     if(!select.isConnected||select.disabled||select.value===value)return;
     select.value=value;select.dispatchEvent(new Event('input',{bubbles:true}));
     if(select.isConnected)select.dispatchEvent(new Event('change',{bubbles:true}));
     if(select.isConnected)update();
    });
+   if(!opened){delete select.dataset.sheetEnhanced;trigger.remove();select.focus();}
   });
   select.addEventListener('change',update);
  }
@@ -58,7 +64,7 @@ export function syncMobileDock(){
  if(!source)return;
  const save=dock.querySelector('[data-dock="save"]'),add=dock.querySelector('[data-dock="add"]'),status=dock.querySelector('[data-dock-status]');
  save.disabled=source.disabled;save.textContent=source.textContent.trim();add.hidden=!entry;add.disabled=source.disabled;
- const draft=entry?document.querySelector('#draft-save-status')?.textContent:document.querySelector('.att-page .att-notice')?.textContent;
+ const draft=entry?document.querySelector('#draft-save-status')?.textContent:document.querySelector('.att-page [data-att-dock-status]')?.textContent;
  status.textContent=draft||(!entry?'出勤紀錄 · 儲存後才正式提交':'草稿與正式儲存狀態');
 }
 export function mobileDockMarkup(){
@@ -70,7 +76,8 @@ export function initMobileWorkflow(){
  const refresh=()=>{
   const vv=window.visualViewport,width=window.innerWidth,height=window.innerHeight,focused=document.activeElement?.matches?.('textarea,input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file])');
   if(wpViewportWidth!==width){wpViewportMax=height;wpViewportWidth=width;}else if(!focused)wpViewportMax=Math.max(wpViewportMax,height);
-  const visible=vv?.height??height,keyboard=media.matches&&keyboardObscures(Math.max(height,wpViewportMax),visible,focused);
+  const visible=vv?.height??height,keyboard=media.matches&&Math.abs((vv?.scale??1)-1)<.05&&keyboardObscures(Math.max(height,wpViewportMax),visible,focused);
+  document.documentElement.style.setProperty('--wp-visible-height',Math.round(visible)+'px');
   document.documentElement.classList.toggle('wp-keyboard-open',keyboard);
   if(!keyboard)syncMobileDock();
   if(!media.matches&&wpSheet)closeMobileSheet();

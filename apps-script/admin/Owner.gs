@@ -49,7 +49,7 @@ function wpOwnerDeleteJournal(payload){
     ||!Number.isSafeInteger(revision)||revision<1)throw Error('刪除請求或版本無效');
   var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
-    wsRequireOwner_();var control=wsBook_(),book=wpMonthFile_(control,date.slice(0,7),false);
+    wsRequireOwner_();var control=wsBook_();wpRequireMaintenanceWindow_(control,Date.now());var book=wpMonthFile_(control,date.slice(0,7),false);
     if(!book)throw Error('找不到該月份試算表');
     var audit=wpRows_(wpSheet_(book,'Audit'));
     var prior=audit.find(function(r){return r.action==='journal.deleted'&&r.requestId===requestId;});
@@ -95,7 +95,7 @@ function wpOwnerMaintenance(input){
  deleted.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
  var props=PropertiesService.getScriptProperties(),lastRun=null;
  try{lastRun=JSON.parse(props.getProperty('WORKPULSE_BACKUP_LAST_RUN')||'null');}catch(e){}
- return {month:month,exists:!!book,schedule:{configured:!!props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID'),lastRun:lastRun},auditCount:rows.length,audit:rows.slice(0,100),deletedCount:deleted.length,
+ return {month:month,exists:!!book,pausedAt:wpFieldPause_(control),accessMode:wpFieldMode_(),schedule:{configured:!!props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID'),lastRun:lastRun},auditCount:rows.length,audit:rows.slice(0,100),deletedCount:deleted.length,
   deleted:deleted.slice(0,100).map(function(j){return {id:String(j.journalId),date:String(j.date),employeeName:people[String(j.employeeId)]||String(j.employeeId),revision:Number(j.revision)||0};})};
 }
 /** Owner-only independent copy; not an atomic multi-file snapshot. */
@@ -214,4 +214,61 @@ function wpDailyBackup_(event){
  props.setProperty('WORKPULSE_BACKUP_LAST_RUN',JSON.stringify({day:day,completedAt:new Date().toISOString(),ok:!failed,results:results}));
  if(failed)throw Error('部分備份未通過驗證，請查看私人維護控制台及 Apps Script 執行紀錄');
  return {ok:true,results:results};
+}
+
+
+/** Editor-only operational workflow. Both upgraded portals consult shared controller Meta.
+ * This is a pause barrier, not a cross-project transaction lock.
+ */
+function wpSetFieldPause_(pause){
+ wpPrimaryOwnerAssert_();var lock=LockService.getScriptLock();lock.waitLock(20000);
+ try{
+  wpPrimaryOwnerAssert_();var control=wsBook_(),sheet=wpSheet_(control,'Meta');
+  var row=wpRows_(sheet).find(function(x){return x.key==='fieldWritesPausedAt';});
+  var current=wpFieldPause_(control),next=pause?(current||new Date().toISOString()):'';
+  if(next!==current){
+   if(row)sheet.getRange(row.__row,2,1,1).setValues([[next]]);else sheet.appendRow(['fieldWritesPausedAt',next]);
+   wpSheet_(control,'Audit').appendRow([Utilities.getUuid(),new Date().toISOString(),wpConfig_().adminEmail,pause?'maintenance.paused':'maintenance.resumed','fieldWrites',0,'']);
+   SpreadsheetApp.flush();
+  }
+  return {ok:true,pausedAt:next};
+ }finally{lock.releaseLock();}
+}
+function workPulsePauseFieldWrites(){return wpSetFieldPause_(true);}
+function workPulseResumeFieldWrites(){return wpSetFieldPause_(false);}
+
+/** Read-only configuration check. Does not create files, grant access, or declare production ready. */
+function workPulseDeploymentCheck(){
+ var cfg=wpPrimaryOwnerAssert_(),props=PropertiesService.getScriptProperties(),checks=[];
+ function check(key,fn){try{var detail=fn();checks.push({key:key,ok:true,detail:String(detail||'通過')});}catch(e){checks.push({key:key,ok:false,detail:String(e.message||e).slice(0,240)});}}
+ var control=null,index=null;
+ check('domainMode',function(){if(wpFieldMode_()!=='domain')throw Error('正式員工入口建議使用 domain 模式；仍須以實際員工帳號驗證');return '已設定公司網域存取';});
+ check('dataFolder',function(){wpBackupAssertPrivate_(wpMonthFolder_(),cfg.adminEmail);return '持有者私人資料夾';});
+ check('controller',function(){control=wsBook_();wpBackupAssertPrivate_(DriveApp.getFileById(control.getId()),cfg.adminEmail);return '控制表版本與持有者通過';});
+ check('headers',function(){
+  if(!control)throw Error('控制表尚未驗證');
+  ['Employees','Departments','Projects','Journals','Tasks','Requests','Audit','Reviews','Meta','MonthIndex','AttendanceSettings'].forEach(function(n){
+   var s=wpSheet_(control,n);if(JSON.stringify(s.getRange(1,1,1,WP_HEADERS[n].length).getValues()[0])!==JSON.stringify(WP_HEADERS[n]))throw Error(n+' 表頭不符');
+  });
+  return '控制表表頭符合 schema';
+ });
+ check('monthIndex',function(){
+  if(!control)throw Error('控制表尚未驗證');index=wpMonthIndex_(control);
+  var keys=Object.keys(index);if(new Set(Object.values(index)).size!==keys.length)throw Error('多個月份指向同一份試算表');
+  if(keys.length>120)throw Error('歷史月份超過單次檢查上限，請分批人工核對');
+  keys.forEach(function(m){if(index[m]===cfg.sheetId)throw Error('月份索引指向控制表');});
+  return keys.length+' 個月份索引（未逐檔核對）';
+ });
+ check('backupFolder',function(){
+  var id=String(props.getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim();
+  if(!id||id===cfg.folderId)throw Error('尚未設定獨立私人備份資料夾');
+  wpBackupAssertPrivate_(DriveApp.getFolderById(id),cfg.adminEmail);return '私人備份資料夾權限初步通過';
+ });
+ check('backupRegistration',function(){
+  if(!props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID'))throw Error('尚未登記每日備份觸發器');
+  var result=JSON.parse(props.getProperty('WORKPULSE_BACKUP_LAST_RUN')||'null');
+  if(!result||!result.ok||!Number.isFinite(Date.parse(result.completedAt))||Date.now()-Date.parse(result.completedAt)>48*3600000)throw Error('未有最近 48 小時成功的備份結果');
+  return '最近一次備份有成功紀錄，須核對實際觸發器與副本';
+ });
+ return {configurationPassed:checks.every(function(x){return x.ok;}),productionVerified:false,checks:checks,pausedAt:control?wpFieldPause_(control):'',checkedAt:new Date().toISOString()};
 }

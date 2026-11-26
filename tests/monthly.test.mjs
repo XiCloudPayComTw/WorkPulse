@@ -472,3 +472,34 @@ test('task index groups by journal and preserves revision filtering',()=>{
  const index=h.scope.wsTaskIndex_(tasks);assert.equal(index.get('a').length,2);
  const result=h.scope.wsRecord_(j,index.get('a'));assert.equal(result.tasks.length,1);assert.equal(result.tasks[0].title,'new');
 });
+
+test('domain mode denies unknown or outside users, accepts company account but selected name remains separate',()=>{
+ const h=harness();h.setup();const p=h.employee();h.props.WORKPULSE_ACCESS_MODE='domain';
+ h.as('');assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/公司網域/);
+ h.as('outside@elsewhere.com');assert.throws(()=>h.scope.wpSharedLoadMonth('2026-11'),/公司網域/);
+ assert.throws(()=>h.scope.wpAttendanceLoad({employeeId:p.id,month:'2026-11'}),/公司網域/);
+ assert.throws(()=>h.scope.wpAttendanceRange({employeeId:p.id,startDate:'2026-11-01',endDate:'2026-11-30'}),/公司網域/);
+ h.as('colleague@example.com');assert.equal(h.scope.wpSharedBootstrap('2026-11').user.email,'colleague@example.com');
+ h.scope.WP_PORTAL_KIND='admin';assert.throws(()=>h.scope.wpSharedSaveJournal(h.entry(p)),/員工入口/);
+ h.scope.WP_PORTAL_KIND='public';assert.equal(h.scope.wpSharedSaveJournal(h.entry(p)).ok,true);
+});
+test('shared pause blocks field writes in both portals; domain delete requires maintenance window',()=>{
+ const h=harness();h.setup();const p=h.employee();h.props.WORKPULSE_ACCESS_MODE='domain';
+ const j=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ assert.throws(()=>h.scope.wpOwnerDeleteJournal({journalId:j.id,date:j.date,expectedRevision:1,requestId:'pause-delete-001'}),/停寫/);
+ const first=h.scope.workPulsePauseFieldWrites();assert.equal(h.scope.workPulsePauseFieldWrites().pausedAt,first.pausedAt);
+ assert.throws(()=>h.scope.wpSharedSaveJournal(h.entry(p,'2026-12',0,'paused-write-001')),/暫停正式儲存/);
+ assert.throws(()=>h.scope.wpFieldWriteGuard_(h.control),/暫停正式儲存/);
+ assert.throws(()=>h.scope.wpOwnerDeleteJournal({journalId:j.id,date:j.date,expectedRevision:1,requestId:'pause-delete-001'}),/停寫/);
+ h.scope.wpRequireMaintenanceWindow_(h.control,Date.parse(first.pausedAt)+600001);
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals.length,1);
+ assert.equal(h.scope.workPulseResumeFieldWrites().pausedAt,'');
+ assert.equal(h.scope.wpSharedSaveJournal(h.entry(p,'2026-12',0,'paused-write-001')).ok,true);
+});
+test('deployment check is read-only and never reports formal verification',()=>{
+ const h=harness();h.setup();const before=h.files.size;
+ const result=h.scope.workPulseDeploymentCheck();
+ assert.equal(result.productionVerified,false);assert.equal(result.configurationPassed,false);
+ assert.equal(result.checks.find(x=>x.key==='backupFolder').ok,false);assert.equal(h.files.size,before);
+ h.as('');assert.throws(()=>h.scope.workPulseDeploymentCheck(),/持有帳號/);
+});

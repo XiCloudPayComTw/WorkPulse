@@ -106,3 +106,38 @@ function wsCategoryRevision_(book){
  var row=wpRows_(wpSheet_(book,'Meta')).find(function(item){return item.key==='workCategoriesRevision';});
  return row?Number(row.value)||0:0;
 }
+
+
+/** Production access is opt-in until the company verifies the actual Workspace deployment.
+ * Domain membership is not employee identity: a verified colleague can still select another name.
+ */
+function wpFieldMode_(){
+ var mode=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_ACCESS_MODE')||'legacy');
+ if(mode!=='legacy'&&mode!=='domain')throw Error('WORKPULSE_ACCESS_MODE 設定無效');
+ return mode;
+}
+function wpFieldAccess_(){
+ if(wpFieldMode_()!=='domain')return '';
+ var cfg=wpConfig_(),active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase(),
+ effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
+ if(!active||!active.endsWith('@'+cfg.domain))throw Error('請使用公司網域 Google 帳號登入，無法驗證身分時停止存取');
+ if(effective!==cfg.adminEmail&&(!cfg.operatorEmail||effective!==cfg.operatorEmail))throw Error('雲端執行身分不符公司授權');
+ return active;
+}
+function wpFieldPause_(control){
+ var row=wpRows_(wpSheet_(control,'Meta')).find(function(x){return x.key==='fieldWritesPausedAt';});
+ if(!row||!row.value)return '';
+ var value=String(row.value);if(!Number.isFinite(Date.parse(value)))throw Error('停寫設定損毀，請管理員核對');
+ return value;
+}
+function wpFieldWriteGuard_(control){
+ wpFieldAccess_();
+ if(wpFieldPause_(control))throw Error('維護中：工作日誌及出勤暫停正式儲存，請保留草稿，稍後手動重送');
+ if(wpFieldMode_()==='domain'&&typeof WP_PORTAL_KIND!=='undefined'&&WP_PORTAL_KIND==='admin')
+  throw Error('正式模式請使用員工入口儲存工作日誌及出勤，管理入口不接受日常寫入');
+}
+function wpRequireMaintenanceWindow_(control,now){
+ if(wpFieldMode_()!=='domain')return;
+ var paused=wpFieldPause_(control);
+ if(!paused||now-Date.parse(paused)<10*60*1000)throw Error('正式模式刪除須先停寫至少 10 分鐘，並確認舊部署及進行中的寫入已停止');
+}

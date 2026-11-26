@@ -30,3 +30,13 @@
 - 管理員可查閱已刪除日誌快照、檢查同人同日正式紀錄衝突、下載 JSON 人工核對；不變更正式資料，不自動解除刪除標記。跨專案寫入互斥未完成，直接復原與完整還原演練移至 v0.15.0 的正式環境驗收前置；普通使用者以姓名選取並非登入驗證。
 - 月份與跨月報表以 journalId 建立 task index，避免每份日誌掃描全部工作明細；保留 revision 過濾及原有查詢上限，無真實大型資料量基準測試。
 - 使用者確認將所有行動版提升納入正式路線，見 [ROADMAP.md](ROADMAP.md)。工作日誌及出勤正式保存仍使用公司 Drive 原生分月 Sheets；GitHub Pages 本機版不會自動上傳。薪資只在下載 Excel 處理。
+
+
+## v0.15.0 — Google Drive 正式部署準備與行動細節
+
+- 使用者確認 Google Drive／Sheets 唯一雲端方案，不採用 Firebase Firestore，取消原先候選第二備份，不增加外部資料庫；維持本機 Excel 計薪與手動 Drive 保存。資料持有以公司管控 My Drive 帳號為現階段相容方案；Shared Drive 尚未支援。
+- PR #22 最新 CI 通過但建立本批時未合併；基於其 head 2fcec48da6c68077b746e6d58313667d1687fe1a。分支 feat/workpulse-v0.15.0-drive-readiness，PR 目標 main，先合併 #22 再本批，不自動 Merge。
+- 私人編輯器新增 workPulseDeploymentCheck：唯讀檢查公司存取設定、控制表 schema、資料夾／控制表擁有者及分享初步檢查、索引、獨立備份資料夾及最近成功紀錄，不宣稱正式驗收。未連接公司 Google Drive、不建立真實檔案或觸發器。
+- 兩套專案可設 WORKPULSE_ACCESS_MODE=domain，公司 Google 登入無法辨識時拒絕讀寫。預設 legacy 保留既有姓名共用模式供相容；正式上線須核對實際 Workspace 政策。domain 只確認網域成員，仍可選別人姓名，不是每員工資料隔離。正式模式日常日誌與出勤寫入只走 public bundle，私人 admin bundle 的日常寫入拒絕；控制表 Meta 共用停寫標記，兩套新版日常寫入均拒絕。資料持有者執行 workPulsePauseFieldWrites / workPulseResumeFieldWrites，domain 下刪除須停寫至少 10 分鐘並人工確認舊部署與執行已停止。這不是跨專案原子鎖或完整交易保證，直接還原仍禁止，管理員設定競爭仍須驗收。
+- 手機 Bottom Sheet 增加搜尋／無結果、狀態及假別選擇；狹短橫向排版、可視高度限制、焦點樣式與縮放區分；明確本機提示與出勤草稿狀態。Chrome 新增 667×375、844×390 及搜尋驗證，實際 iOS/Android 鍵盤、觸控仍待驗收。
+- 正式部署前使用 [DEPLOYMENT_V015.md](DEPLOYMENT_V015.md)，下一階段 v0.15.x 真實公司授權、正式員工身份與跨裝置／備份還原演練；v0.16.0 持久草稿、離線與 PWA，v1.0.0 正式驗收。Firebase 不再列為候選。

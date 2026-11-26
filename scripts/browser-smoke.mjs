@@ -68,14 +68,14 @@ const probe=`<script>
        const heading=document.querySelector('.section-head.section-space');
        spacingCheck=heading&&parseFloat(getComputedStyle(heading).marginTop)>=26?'ok':'missing-gap';
      }
-     let dockCheck='skip',sheetCheck='skip';
+     let dockCheck='skip',sheetCheck='skip',searchCheck='skip';
      if(window.innerWidth<=900&&location.hash.includes('/entry')){
        const dock=document.querySelector('#wp-mobile-dock'),before=document.querySelectorAll('.task-card').length;
        dock?.querySelector('[data-dock="add"]')?.click();
        dockCheck=dock&&!dock.hidden&&document.querySelectorAll('.task-card').length===before+1?'ok':'missing-dock';
        const trigger=document.querySelector('select[data-field="category"] + .wp-sheet-trigger');trigger?.click();
        const sheet=document.querySelector('.wp-bottom-sheet[open]'),choice=sheet?.querySelector('[data-sheet-value]:not([aria-pressed="true"]):not(:disabled)');
-       if(choice){const value=choice.dataset.sheetValue;choice.click();sheetCheck=!document.querySelector('.wp-bottom-sheet')&&document.querySelector('select[data-field="category"]')?.value===value?'ok':'wrong-option';}else sheetCheck='missing-sheet';
+       if(choice){const search=sheet.querySelector('.wp-sheet-search');if(search){search.value='zz_no_match_123';search.dispatchEvent(new Event('input',{bubbles:true}));const hidden=[...sheet.querySelectorAll('.wp-sheet-option')].every(x=>x.hidden);search.value=choice.textContent;search.dispatchEvent(new Event('input',{bubbles:true}));searchCheck=hidden&&!choice.hidden?'ok':'wrong-filter';}else searchCheck='missing-search';const value=choice.dataset.sheetValue;choice.click();sheetCheck=!document.querySelector('.wp-bottom-sheet')&&document.querySelector('select[data-field="category"]')?.value===value?'ok':'wrong-option';}else sheetCheck='missing-sheet';
      }
      let exportCheck='skip';
      if(location.hash.includes('/attendance')&&window.innerWidth>900){
@@ -103,7 +103,7 @@ const probe=`<script>
      output.dataset.failed=failed()?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
-     output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.sheetCheck=sheetCheck;
+     output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
      output.dataset.spacingCheck=spacingCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
@@ -131,10 +131,10 @@ try{
   ['history','歷史工作紀錄'],['insights','統計分析'],['settings','系統設定']];
  let count=0;
  // Chrome clamps its top-level window to 500px. A same-origin iframe gives an exact CSS viewport.
- for(const width of [320,375,390,430,768,820,1024,1366]){
+ for(const [width,height] of [[320,900],[375,900],[390,900],[430,900],[768,900],[820,900],[1024,900],[1366,900],[667,375],[844,390]]){
   for(const [route,title] of routes){
    const mobile=width<900;
-   if(mobile)await writeFile(frameFile,`<!doctype html><html><body style="margin:0"><iframe title="Exact CSS viewport" style="display:block;border:0;width:${width}px;height:900px" src="/${fileName}#/${route}"></iframe></body></html>`);
+   if(mobile)await writeFile(frameFile,`<!doctype html><html><body style="margin:0"><iframe title="Exact CSS viewport" style="display:block;border:0;width:${width}px;height:${height}px" src="/${fileName}#/${route}"></iframe></body></html>`);
    const url=`http://127.0.0.1:${port}/${mobile?frameName:fileName+'#/'+route}`;
    const output=execFileSync(browser,[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
@@ -147,15 +147,15 @@ try{
    const attrs=Object.fromEntries([...match[1].matchAll(/data-([\w-]+)="([^"]*)"/g)].map(([,k,v])=>[k,v]));
    if(Number(attrs.width)!==width)throw new Error(`${route}: expected exact ${width}px, got ${attrs.width}px`);
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
-   if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||
+   if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||attrs['storage-banner']!=='1'||(mobile&&Number(attrs.height)!==height)||
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
-      (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'))||
+      (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
-   console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}px, no page overflow`);
+   console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}x${attrs.height}, no page overflow`);
    count++;
   }
  }
