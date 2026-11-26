@@ -9,7 +9,7 @@ const safeKey = account => encodeURIComponent(String(account || 'local-device').
 const draftKey = account => DRAFT_PREFIX + safeKey(account);
 const templateKey = account => TEMPLATE_PREFIX + safeKey(account);
 const plain = (value, limit) => String(value ?? '').slice(0, limit);
-const isDay = text => /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(String(text));
+const isDay = text => {if(!/^\d{4}-\d{2}-\d{2}$/.test(String(text)))return false;const d=new Date(text+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===text;};
 const normalizeTask = task => ({
   id:plain(task?.id || uid(),120), project:plain(task?.project,100),
   category:plain(task?.category || '其他',100), title:plain(task?.title,TITLE_MAX),
@@ -17,21 +17,45 @@ const normalizeTask = task => ({
   status:['done','doing','blocked'].includes(task?.status)?task.status:'doing',
   hours:Math.min(24,Math.max(0,Number(task?.hours)||0))
 });
-export function readQuickDraft(storage,account,maxAgeMs=7*86400000){
- try{
-  const raw=storage?.getItem(draftKey(account));if(!raw)return null;
-  const payload=JSON.parse(raw);
-  if(payload?.account!==String(account)||!Number.isFinite(payload.savedAt)||Date.now()-payload.savedAt>maxAgeMs||payload.savedAt>Date.now()+60000){storage?.removeItem(draftKey(account));return null;}
-  const d=payload.draft;
-  if(!d||!isDay(d.date)||typeof d.employeeId!=='string'||!Array.isArray(d.tasks)||!d.tasks.length||d.tasks.length>100)return null;
-  return {date:d.date,employeeId:plain(d.employeeId,180),note:plain(d.note,2000),tomorrow:plain(d.tomorrow,2000),tasks:d.tasks.map(normalizeTask),editing:!!d.editing,revision:Number(d.revision)||0};
- }catch{return null;}
+function quickDraftRows(storage,account){
+ const raw=storage?.getItem(draftKey(account));if(!raw)return [];
+ const p=JSON.parse(raw);
+ if(p?.account!==String(account))throw Error('草稿帳號不符');
+ if(p.version===2){if(!Array.isArray(p.rows)||p.rows.length>31)throw Error('草稿資料格式異常');return p.rows;}
+ if(p.draft)return [{savedAt:p.savedAt,draft:p.draft}];
+ throw Error('草稿資料格式異常');
+}
+function quickDraftValid(row,maxAgeMs){
+ const d=row?.draft,age=Date.now()-row?.savedAt;
+ return Number.isFinite(age)&&age>=-60000&&age<=maxAgeMs&&d&&isDay(d.date)&&typeof d.employeeId==='string'&&Array.isArray(d.tasks)&&d.tasks.length>0&&d.tasks.length<=100;
+}
+function quickDraftNormalize(d){
+ return {date:d.date,employeeId:plain(d.employeeId,180),note:plain(d.note,2000),tomorrow:plain(d.tomorrow,2000),tasks:d.tasks.map(normalizeTask),editing:!!d.editing,revision:Number(d.revision)||0};
+}
+export function countExpiredQuickDrafts(storage,account,maxAgeMs=7*86400000){try{return quickDraftRows(storage,account).filter(row=>!quickDraftValid(row,maxAgeMs)).length;}catch{return 0;}}
+export function pruneExpiredQuickDrafts(storage,account,maxAgeMs=7*86400000){try{const rows=quickDraftRows(storage,account),keep=rows.filter(row=>quickDraftValid(row,maxAgeMs));if(rows.length===keep.length)return 0;if(keep.length)storage.setItem(draftKey(account),JSON.stringify({account:String(account),version:2,rows:keep}));else storage.removeItem(draftKey(account));return rows.length-keep.length;}catch{return -1;}}
+export function listQuickDrafts(storage,account,maxAgeMs=7*86400000,employeeId=''){
+ try{return quickDraftRows(storage,account).filter(row=>quickDraftValid(row,maxAgeMs)&&(!employeeId||row.draft.employeeId===employeeId)).sort((a,b)=>b.savedAt-a.savedAt).map(row=>({date:row.draft.date,employeeId:row.draft.employeeId,savedAt:row.savedAt}));}catch{return [];}
+}
+export function readQuickDraft(storage,account,maxAgeMs=7*86400000,date='',employeeId=''){
+ try{const row=quickDraftRows(storage,account).filter(x=>quickDraftValid(x,maxAgeMs)&&(!date||x.draft.date===date)&&(!employeeId||x.draft.employeeId===employeeId)).sort((a,b)=>b.savedAt-a.savedAt)[0];return row?quickDraftNormalize(row.draft):null;}catch{return null;}
 }
 export function saveQuickDraft(storage,account,draft){
- if(!storage||!draft||!isDay(draft.date)||!Array.isArray(draft.tasks)||!draft.tasks.length||draft.tasks.length>100)return false;
- try{storage.setItem(draftKey(account),JSON.stringify({account:String(account),savedAt:Date.now(),draft:{date:draft.date,employeeId:plain(draft.employeeId,180),note:plain(draft.note,2000),tomorrow:plain(draft.tomorrow,2000),editing:!!draft.editing,revision:Number(draft.revision)||0,tasks:draft.tasks.map(normalizeTask)}}));return true;}catch{return false;}
+ if(!storage||!draft||!isDay(draft.date)||typeof draft.employeeId!=='string'||!Array.isArray(draft.tasks)||!draft.tasks.length||draft.tasks.length>100)return false;
+ try{
+  const rows=quickDraftRows(storage,account).filter(row=>!(row.draft?.date===draft.date&&row.draft?.employeeId===draft.employeeId));
+  if(rows.length>=31)return false; // Never silently evict other dates.
+  rows.push({savedAt:Date.now(),draft:quickDraftNormalize(draft)});
+  storage.setItem(draftKey(account),JSON.stringify({account:String(account),version:2,rows}));return true;
+ }catch{return false;}
 }
-export function clearQuickDraft(storage,account){try{storage?.removeItem(draftKey(account));}catch{/* storage disabled */}}
+export function clearQuickDraft(storage,account,date='',employeeId=''){
+ try{
+  if(!date&&!employeeId){storage?.removeItem(draftKey(account));return true;}
+  const rows=quickDraftRows(storage,account).filter(row=>!((!date||row.draft?.date===date)&&(!employeeId||row.draft?.employeeId===employeeId)));
+  if(rows.length)storage?.setItem(draftKey(account),JSON.stringify({account:String(account),version:2,rows}));else storage?.removeItem(draftKey(account));return true;
+ }catch{return false;}
+}
 export function readTemplates(storage,account){
  try{
   const rows=JSON.parse(storage?.getItem(templateKey(account))||'[]');if(!Array.isArray(rows))return [];

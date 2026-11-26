@@ -115,11 +115,12 @@ const probe=`<script>
        const heading=document.querySelector('.section-head.section-space');
        spacingCheck=heading&&parseFloat(getComputedStyle(heading).marginTop)>=26?'ok':'missing-gap';
      }
-     let dockCheck='skip',sheetCheck='skip',searchCheck='skip';
+     let dockCheck='skip',sheetCheck='skip',searchCheck='skip',collapseCheck='skip';
      if(window.innerWidth<=900&&location.hash.includes('/entry')){
        const dock=document.querySelector('#wp-mobile-dock'),before=document.querySelectorAll('.task-card').length;
        dock?.querySelector('[data-dock="add"]')?.click();
        dockCheck=dock&&!dock.hidden&&document.querySelectorAll('.task-card').length===before+1?'ok':'missing-dock';
+       const first=document.querySelector('[data-action="task-collapse"]');first?.click();const closed=first?.getAttribute('aria-expanded')==='false'&&document.querySelector('#task-0-fields')?.hidden;first?.click();collapseCheck=closed&&first?.getAttribute('aria-expanded')==='true'&&!document.querySelector('#task-0-fields')?.hidden?'ok':'wrong-collapse';
        const trigger=document.querySelector('select[data-field="category"] + .wp-sheet-trigger');trigger?.click();
        const sheet=document.querySelector('.wp-bottom-sheet[open]'),choice=sheet?.querySelector('[data-sheet-value]:not([aria-pressed="true"]):not(:disabled)');
        if(choice){const search=sheet.querySelector('.wp-sheet-search');if(search){search.value='zz_no_match_123';search.dispatchEvent(new Event('input',{bubbles:true}));const hidden=[...sheet.querySelectorAll('.wp-sheet-option')].every(x=>x.hidden);search.value=choice.textContent;search.dispatchEvent(new Event('input',{bubbles:true}));searchCheck=hidden&&!choice.hidden?'ok':'wrong-filter';}else searchCheck='missing-search';const value=choice.dataset.sheetValue;choice.click();sheetCheck=!document.querySelector('.wp-bottom-sheet')&&document.querySelector('select[data-field="category"]')?.value===value?'ok':'wrong-option';}else sheetCheck='missing-sheet';
@@ -150,7 +151,7 @@ const probe=`<script>
      output.dataset.failed=failed()?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
-     output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
+     output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.collapseCheck=collapseCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
      output.dataset.spacingCheck=spacingCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
@@ -198,7 +199,7 @@ try{
    if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||attrs['storage-banner']!=='1'||(mobile&&Number(attrs.height)!==height)||
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
-      (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'))||
+      (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'||attrs['collapse-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
