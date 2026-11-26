@@ -61,6 +61,16 @@ export function renameTemplatesProject(storage,account,oldName,newName){
   return rows;
  }
 }
+export function renameTemplatesCategory(storage,account,oldName,newName){
+ const values=readTemplates(storage,account);
+ const changed=values.map(row=>row.category===oldName?{
+  ...row,category:newName,title:row.title===oldName?newName:row.title
+ }:row);
+ try{if(values.some(row=>row.category===oldName))
+  storage?.setItem(templateKey(account),JSON.stringify(changed));
+ }catch{}
+ return changed;
+}
 // Only reuse the work definition; never copy yesterday's completion status, result or logged hours.
 export function newTaskFromTemplate(task){const row=normalizeTask(task);return {...row,id:uid(),result:'',status:'doing',hours:0};}
 export function recentPriorJournal(journals,date,employeeId){

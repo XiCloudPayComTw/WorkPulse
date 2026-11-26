@@ -157,6 +157,10 @@ document.addEventListener('change',event=>{
   if(attendanceState.dirty&&!confirm('出勤資料尚未儲存，確定要切換？')){refreshAttendanceDom();return;}
   const month=el.matches('[data-att-month]')?el.value:attendanceState.month;
   const employee=el.matches('[data-att-person]')?el.value:attendanceState.employeeId;
+  if(el.matches('[data-att-person]')){
+   const ok=document.dispatchEvent(new CustomEvent('workpulse:select-person',{detail:{id:employee},cancelable:true}));
+   if(!ok){refreshAttendanceDom();return;}
+  }
   changeAttendanceMonth(month,employee).catch(e=>{attendanceNotice=e.message;refreshAttendanceDom();});return;
  }
  if(el.matches('[data-att-date]')){

@@ -32,7 +32,7 @@ export function renderReportWorkspace({filters,phase,error,report,meta,cloud,sta
    ${filterSelect('員工','employeeId',personOpts,filters.employeeId)}
    ${filterSelect('部門','departmentId',deptOpts,filters.departmentId)}
    ${filterSelect('專案','project',projectNames.map(x=>[x,x]),filters.project)}
-   ${filterSelect('工作類型','category',CATEGORIES.map(x=>[x,x]),filters.category)}
+   ${filterSelect('工作類型','category',(meta.categories||CATEGORIES).map(x=>[x,x]),filters.category)}
    ${filterSelect('完成狀態','status',Object.entries(STATUSES).map(([x,v])=>[x,v]),filters.status)}
   </div>
   <div class="report-action-row"><div class="report-action-hint">${cloud?'日期或條件改變後，按「查詢報表」讀取授權資料。':'本機資料會依篩選條件即時重新計算。'}</div><button class="soft-button primary" data-action="report-run" ${phase==='loading'?'disabled aria-busy="true"':''}>${icon('search',16)} ${phase==='loading'?'查詢中…':'查詢報表'}</button></div>

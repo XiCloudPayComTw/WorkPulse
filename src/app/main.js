@@ -7,13 +7,13 @@ import {renameLocalEmployee,renameLocalProject} from '../features/admin/rename.j
 import { buildReport, reportCsv, reportSheets } from '../features/reports/reports.js';
 import { buildXlsx } from '../shared/xlsx.js';
 import { renderReportWorkspace } from '../features/reports/report-ui.js';
-import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemplate, removeTemplate, renameTemplatesProject, newTaskFromTemplate, recentPriorJournal } from '../features/journals/quick-entry.js';
+import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemplate, removeTemplate, renameTemplatesProject,renameTemplatesCategory, newTaskFromTemplate, recentPriorJournal } from '../features/journals/quick-entry.js';
 import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig} from '../features/attendance/attendance-state.js';
 import {renderAttendance} from '../features/attendance/attendance-ui.js';
 import {shouldLoadAttendance,activateAttendance} from './attendance-lifecycle.js';
 import {viewFromHash,visibleNavigation,renderNavigationButton} from './navigation.js';
 import {readSelectedPerson,writeSelectedPerson,shortPersonName,isMobileViewport} from './person.js';
-import {addWorkCategory,renameWorkCategory} from '../features/journals/categories.js';
+import {addWorkCategory,renameLocalWorkCategory} from '../features/journals/categories.js';
 import {rememberDescriptions,descriptionSuggestions} from '../features/journals/description-memory.js';
 import {validateReportPeriod,applyReportPeriod} from '../features/reports/periods.js';
 
@@ -275,7 +275,8 @@ function renderHistoryResults(){
 function reportMeta(){
  const source=isCloud?state.report.payload:null;
  return {employees:source?.employees || state.store.employees.map(e=>({id:e.id,name:e.name,departmentId:''})),
-  departments:source?.departments || [],projects:source?.projects || state.store.projects};
+  departments:source?.departments || [],projects:source?.projects || state.store.projects,
+   categories:state.store.categories||CATEGORIES};
 }
 function reportResult(){
  if(reportDateError())return null;
@@ -455,7 +456,8 @@ root.addEventListener('click', event=>{
    if(adminState.draft && adminState.draft.active===false && !confirm('停用後該資料將不再可用，但歷史紀錄會保留。確定儲存？'))return;
    saveAdmin().then(async r=>{
      const updated=await cloudCall('wpSharedBootstrap',state.month);
-     state.store={...updated.store,mode:'cloud'};
+     state.store={...updated.store,mode:'cloud'};state.selectedPersonId=readSelectedPerson(permanentStorage(),state.store.employees);
+     selectPersonId(state.selectedPersonId);
      state.cloud.user=updated.user;state.report.payload=null;state.report.applied=null;state.report.phase='idle';
      if(updated.user?.role!=='admin'){state.view='overview';location.hash='/overview';}
      else if(!canEditJournal(state.draft?.employeeId))state.draft=makeDraft(today,state.selectedPersonId);

@@ -19,3 +19,12 @@ export function renameWorkCategory(list,oldName,name){
  if(!current.includes(oldName))throw Error('找不到要編輯的工作類型');
  return normalizeCategories(current.map(v=>v===oldName?target:v));
 }
+
+export function renameLocalWorkCategory(store,previous,target){
+ const categories=renameWorkCategory(store.categories||CATEGORIES,previous,target);
+ return {...store,categories,journals:store.journals.map(journal=>({
+  ...journal,tasks:journal.tasks.map(task=>task.category===previous?{
+   ...task,category:target,title:task.title===previous?target:task.title
+  }:task)
+ }))};
+}
