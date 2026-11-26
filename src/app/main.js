@@ -412,6 +412,7 @@ async function saveCloudJournal(){
   state.store={...state.store,journals:[...state.store.journals.filter(j=>!(j.date===result.journal.date && j.employeeId===result.journal.employeeId)),result.journal]};
   state.draft=makeDraft(result.journal.date,result.journal.employeeId,result.journal);
   state.report.payload=null;state.report.applied=null;state.report.phase='idle';
+  rememberDescriptions(permanentStorage(),result.journal.employeeId,result.journal.tasks);
   state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());state.draftStatus='已正式儲存';
   notify(result.deduplicated?'已確認此筆工作日誌存在雲端':'工作日誌已成功儲存到 Google Sheets');
  }catch(e){
@@ -421,6 +422,28 @@ async function saveCloudJournal(){
 root.addEventListener('click', event=>{
  const button=event.target.closest('[data-action]');if(!button)return;
  const action=button.dataset.action;
+ if(action==='person-menu'){
+  const box=button.closest('.wp-person-picker'),menu=box?.querySelector('.wp-person-menu');
+  if(menu){menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));}
+  return;
+ }
+ if(action==='person-select'){changeSelectedPerson(button.dataset.id);return;}
+ if(action==='description-use'){
+  const index=Number(button.dataset.index);
+  const textarea=document.querySelector('textarea[data-task="'+index+'"][data-field="description"]');
+  const suggestions=descriptionSuggestions(permanentStorage(),state.selectedPersonId,
+    textarea?.value||'',state.store.journals);
+  const value=suggestions[Number(button.dataset.suggestion)];
+  if(textarea&&value){
+   textarea.value=value;
+   const task=state.draft.tasks[index];if(task)task.description=value;
+   markDraftDirty();
+   const popover=document.querySelector('[data-description-suggestions="'+index+'"]');
+   if(popover)popover.hidden=true;
+   textarea.focus();
+  }
+  return;
+ }
  if(action==='retry-cloud'){initCloud();return;}
  if(action==='admin-refresh'){if(adminState.saving)return;if(adminState.dirty&&!confirm('尚未儲存的團隊資料會遺失，確定重新整理？'))return;resetAdminEditor();refreshTeam();return;}
  if(action==='admin-tab'){if(adminState.saving)return;if(adminState.dirty&&!confirm('要放棄尚未儲存的變更嗎？'))return;setAdminTab(button.dataset.kind);render();return;}
@@ -534,7 +557,7 @@ root.addEventListener('click', event=>{
    try{
     const base=state.store.mode==='demo'?{...state.store,journals:[],mode:'local'}:state.store;
     const next=saveJournal(base,state.draft);
-    if(saveStore(next)){state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());state.draftStatus='已正式儲存';render();notify('工作日誌已儲存至目前瀏覽器');}
+    if(saveStore(next)){rememberDescriptions(permanentStorage(),state.draft.employeeId,state.draft.tasks);state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());state.draftStatus='已正式儲存';render();notify('工作日誌已儲存至目前瀏覽器');}
     updateDraftSummary();
    }catch(e){notify(e.message||'無法儲存日誌',true);}return;
  }
@@ -573,7 +596,14 @@ root.addEventListener('click', event=>{
 root.addEventListener('input',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
- if(el.matches('[data-task]')){const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;t[el.dataset.field]=el.dataset.field==='hours'?Number(el.value):el.value;markDraftDirty();updateDraftSummary();return;}
+ if(el.matches('[data-task]')){
+  const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;
+  if(el.dataset.field==='category'&&(!t.title||t.title===t.category))t.title=el.value;
+  t[el.dataset.field]=el.dataset.field==='hours'?Number(el.value):el.value;
+  markDraftDirty();updateDraftSummary();
+  if(el.dataset.field==='description')updateDescriptionSuggestions(el);
+  return;
+ }
  if(el.matches('[data-draft]')){state.draft[el.dataset.draft]=el.value;markDraftDirty();return;}
  if(el.matches('[data-filter="query"]')){state.filters.query=el.value;const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults();const count=document.querySelector('#history-count');if(count)count.textContent=`${filteredGroups().length} 個工作日`;return;}
 });
