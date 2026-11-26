@@ -379,3 +379,14 @@
 
 - PR #28 修正（實機 iOS 回報）：日期欄位超出卡片。手機 `.form-group` 單欄 minmax(0,1fr)，原生 date/month/time/datetime-local 欄位明確 border-box、inline-size、min/max width、移除 WebKit 原生外觀及內部 value/edit 置中最小尺寸，保留原生選擇器與 16px 字體；Chrome 全路由檢查可見日期／月份／時間欄位矩形是否超出 form-group／卡片，不只量整頁 scrollWidth。實際 iOS Safari 仍需確認。
 - PR #28 原 CI 163/163 通過，但原生 PWA probe `FAIL offline: wait timed out`。靜態 worker 導覽快取 key 明確去除 hash fragment，測試改為來源 503 後建立新的 iframe 文件（非沿用舊已載入 app 或 hash-only navigation），保留指定 entry 路由、controller、表單及本機提示的驗證；若失敗回傳 URL、標題、body 片段供診斷。原生 IndexedDB 和 60 項響應式測試保留，未確認新 CI 通過前勿 Merge。
+
+
+## v0.18.0 — 歷史與統計效能、行動裝置穩定性
+
+- 基於 PR #28 修正版已合併且 CI 通過的 main e4d7effd4cfed66144354715dfa9f6e595f6b1e7，分支 feat/workpulse-v0.18.0-performance；不自動 Merge。iOS 日期欄位修正與原生 PWA/IndexedDB 測試保留。
+- 歷史查詢單一結果 memo（依 journals/employees 陣列參照與月份、人員、狀態、關鍵字；既有寫入以替換陣列為契約），一次分組與統計；只保留最近一份，不建立永久搜尋索引。日期展開／收合僅更新該卡片 DOM，保留兄弟節點及焦點；關閉時移除詳情。每日期每頁最多 5 筆人員日誌（每筆原上限 100 項），保留全部日期標頭、總數與工時、上一頁／下一頁；完整重新渲染時詳情頁回第一頁，原篩選維持。不是無限滾動，也不改雲端查詢限制。
+- 月統計改單次累加各日、分類、完成率；常用描述依原優先順序逐項搜尋、達上限即停止，不建立全量陣列。手機總覽直接輸出功能首頁、不生成隱藏桌面統計 DOM；切換斷點重新渲染總覽。沒有宣稱實測加速百分比。
+- 新增 1500 筆日誌／10000 項工作合成資料測試（等同跨月報表原限制規模，不是實際公司資料或 GAS 效能基準）、篩選／快取失效、分頁、常用內容隔離，以及 Chromium 日期展開不替換兄弟節點的回歸測試。保留 60 項響應式、原生 PWA 與 IndexedDB。真實低階手機、Safari、長期記憶體及正式公司 GAS 負載尚待實測。
+- Google Drive／Sheets 唯一正式雲端架構，Firebase 取消；未操作正式公司資料、未新增備份或改寫權限。下一批 v0.19.0 UI/UX 最終精修，v1.0.0 公司正式部署及驗收。
+
+- Chrome 歷史測試使用當月固定兩日期、其中七人同日的合成資料，核對跨頁 5/2 筆、原日期卡片節點保持；避免月初 demo 只有一天導致測試不穩。此資料僅在測試瀏覽器內使用。

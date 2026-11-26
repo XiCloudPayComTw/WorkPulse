@@ -72,15 +72,20 @@ export function saveJournal(state, entry) {
 }
 export function journalFor(state,date,employeeId) { return state.journals.find(j=>j.date===date && j.employeeId===employeeId); }
 export function monthStats(state,month=currentMonth()) {
-  const journals = state.journals.filter(j=>j.date.startsWith(month));
-  const tasks = journals.flatMap(j=>j.tasks);
-  const hours = tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);
-  const completed = tasks.filter(t=>t.status==='done').length;
-  const pending = tasks.filter(t=>t.status!=='done').length;
-  const days = new Set(journals.map(j=>j.date)).size;
-  const byCategory = [...new Set(tasks.map(t=>t.category))].map(name => ({name,hours:tasks.filter(t=>t.category===name).reduce((a,t)=>a+(Number(t.hours)||0),0),count:tasks.filter(t=>t.category===name).length})).filter(i=>i.count);
-  const byDay = [...new Set(journals.map(j=>j.date))].sort().map(date=>({date,count:journals.filter(j=>j.date===date).reduce((sum,j)=>sum+j.tasks.length,0),hours:journals.filter(j=>j.date===date).flatMap(j=>j.tasks).reduce((a,t)=>a+(Number(t.hours)||0),0)}));
-  return {journals,tasks,count:tasks.length,hours,completed,pending,days,rate:tasks.length?Math.round(completed/tasks.length*100):0,byCategory,byDay};
+  const journals=[],tasks=[],categories=new Map(),daysMap=new Map();
+  let hours=0,completed=0;
+  for(const j of state.journals){
+    if(!j.date.startsWith(month))continue;
+    journals.push(j);
+    let day=daysMap.get(j.date);if(!day){day={date:j.date,count:0,hours:0};daysMap.set(j.date,day);}
+    for(const t of j.tasks){
+      tasks.push(t);const value=Number(t.hours)||0;hours+=value;completed+=Number(t.status==='done');
+      day.count++;day.hours+=value;
+      let category=categories.get(t.category);if(!category){category={name:t.category,hours:0,count:0};categories.set(t.category,category);}
+      category.hours+=value;category.count++;
+    }
+  }
+  return {journals,tasks,count:tasks.length,hours,completed,pending:tasks.length-completed,days:daysMap.size,rate:tasks.length?Math.round(completed/tasks.length*100):0,byCategory:[...categories.values()],byDay:[...daysMap.values()].sort((a,b)=>a.date.localeCompare(b.date))};
 }
 export function csvExport(state) {
   const header = ['日期','員工','專案','工作類型','工作名稱','工作內容','成果','狀態','投入時數','當日備註','明日計畫'];

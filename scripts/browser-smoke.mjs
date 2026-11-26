@@ -68,6 +68,8 @@ async function nativeVaultSmoke(){
 const html=await readFile(join(root,'index.html'),'utf8');
 const bootstrap=`<script>
  window.__wpSmokeErrors=[];
+ // Deterministic history fixture even on the first day of a calendar month.
+ if(location.hash==='#/history'){const now=new Date(),month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');const people=[{id:'me',name:'展示使用者'},...Array.from({length:6},(_,i)=>({id:'stress'+i,name:'測試人員'+i}))];const journals=[...people.map((p,i)=>({id:'history-'+i,date:month+'-01',employeeId:p.id,tasks:[{id:'t'+i,category:'其他',description:'測試',status:'done',hours:1}]})),{id:'history-next',date:month+'-02',employeeId:'me',tasks:[{id:'next',category:'其他',description:'測試',status:'doing',hours:2}]}];localStorage.setItem('workpulse:v1',JSON.stringify({version:1,mode:'local',employees:people,projects:[],categories:['其他'],journals}));localStorage.setItem('workpulse:selected-person:v1','me');}
  window.addEventListener('error',e=>window.__wpSmokeErrors.push(e.message));
  window.addEventListener('unhandledrejection',e=>window.__wpSmokeErrors.push(String(e.reason)));
  </script>`;
@@ -109,7 +111,8 @@ const probe=`<script>
          personChoice=(stored===id && inForm===id && after!==before)?'ok':'not-synced';
        }
      }
-     let calendarCheck='skip',spacingCheck='skip';
+     let calendarCheck='skip',spacingCheck='skip',historyDomCheck='skip';
+     if(location.hash.includes('/history')){const people=document.querySelector('select[data-filter="employee"]');if(people){people.value='all';people.dispatchEvent(new Event('change',{bubbles:true}));}const first=document.querySelector('[data-action="toggle-day"]'),sibling=document.querySelectorAll('.history-record')[1];if(first&&sibling){const before=first.getAttribute('aria-expanded');first.click();const after=first.getAttribute('aria-expanded'),same=document.querySelectorAll('.history-record')[1]===sibling;first.click();const second=sibling.querySelector('[data-action="toggle-day"]');if(second.getAttribute('aria-expanded')==='false')second.click();const details=sibling.querySelectorAll('.history-detail'),next=sibling.querySelector('[data-action="history-detail-page"][data-page="1"]');next?.click();const pageOk=details.length===5&&!!next&&sibling.querySelectorAll('.history-detail').length===2;historyDomCheck=before!==after&&same&&first.isConnected&&first.getAttribute('aria-expanded')===before&&pageOk?'ok':'replaced-or-page';}else historyDomCheck='missing';}
      if(location.hash.includes('/attendance')){
        const cell=document.querySelector('.att-cal-day[data-date]');
        if(cell){const date=cell.dataset.date;cell.click();calendarCheck=document.querySelector('[data-att-date]')?.value===date?'ok':'wrong-date';}else calendarCheck='missing';
@@ -155,7 +158,7 @@ const probe=`<script>
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
      output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.collapseCheck=collapseCheck;output.dataset.sheetCheck=sheetCheck;output.dataset.searchCheck=searchCheck;output.dataset.storageBanner=document.querySelector('.wp-storage-banner')?.textContent.includes('本機展示版')?'1':'0';output.dataset.height=String(window.innerHeight);
-     output.dataset.spacingCheck=spacingCheck;
+     output.dataset.spacingCheck=spacingCheck;output.dataset.historyDomCheck=historyDomCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
@@ -207,6 +210,7 @@ try{
       (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'||attrs['search-check']!=='ok'||attrs['collapse-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
+      (route==='history'&&attrs['history-dom-check']!=='ok')||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}x${attrs.height}, no page overflow`);

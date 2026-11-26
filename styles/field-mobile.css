@@ -157,3 +157,6 @@ input,textarea,select,[contenteditable="true"]{user-select:text;-webkit-user-sel
  .main input.input::-webkit-date-and-time-value{min-width:0;max-width:100%;margin:0;text-align:left}
  .main input.input::-webkit-datetime-edit{min-width:0;max-width:100%;padding:0}
 }
+
+/* v0.18.0: bounded history detail pages. */
+.wp-history-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-top:1px solid var(--line);flex-wrap:wrap}.wp-history-pagination span{font-size:13px;color:#536f83;text-align:center;flex:1;min-width:0}.wp-history-pagination button{min-height:44px;white-space:normal}@media(max-width:430px){.wp-history-pagination{display:grid;grid-template-columns:1fr 1fr;gap:8px}.wp-history-pagination span{grid-column:1/-1;grid-row:1}.wp-history-pagination button{width:100%}}
