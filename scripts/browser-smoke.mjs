@@ -27,16 +27,46 @@ const probe=`<script>
    setTimeout(()=>{
      const title=document.querySelector('h1.page-title')?.textContent.trim()||'';
      const attendance=Boolean(document.querySelector('.att-page .att-fields'));
+     const fieldHome=document.querySelector('.wp-field-home');
+     const mobileLauncher=Boolean(fieldHome&&getComputedStyle(fieldHome).display!=='none');
+     const mobileTabs=[...document.querySelectorAll('.mobile-nav .nav-link')].map(x=>x.textContent.trim());
+     const noAdminTabs=!mobileTabs.some(x=>x.includes('統計分析')||x.includes('系統設定'));
      const loading=Boolean(document.querySelector('.att-page')?.textContent.includes('正在讀取出勤資料'));
      const overflow=document.documentElement.scrollWidth>window.innerWidth+2;
      const failed=window.__wpSmokeErrors.length>0;
+     let personChoice='skip';
+     if(location.hash.includes('/overview')){
+       const menuButton=document.querySelector('[data-action="person-menu"]');
+       const before=menuButton?.textContent.trim();
+       menuButton?.click();
+       const option=[...document.querySelectorAll('[data-action="person-select"]')][1];
+       if(!option)personChoice='missing-option';
+       else{
+         const id=option.dataset.id;
+         option.click();
+         const stored=localStorage.getItem('workpulse:selected-person:v1');
+         const after=document.querySelector('[data-action="person-menu"]')?.textContent.trim();
+         const nav=document.querySelector('[data-action="navigate"][data-view="entry"]');
+         nav?.click();
+         const inForm=document.querySelector('#entry-employee')?.value;
+         personChoice=(stored===id && inForm===id && after!==before)?'ok':'not-synced';
+       }
+     }
+     const copyCheck=new Event('copy',{bubbles:true,cancelable:true});
+     const titleElement=document.querySelector('h1.page-title');
+     titleElement?.dispatchEvent(copyCheck);
+     const copyBlocked=Boolean(titleElement&&copyCheck.defaultPrevented);
      const output=document.createElement('output');
      output.id='workpulse-smoke-result';
      output.dataset.title=title;
      output.dataset.attendance=attendance?'1':'0';
+     output.dataset.mobileLauncher=mobileLauncher?'1':'0';
+     output.dataset.noAdminTabs=noAdminTabs?'1':'0';
      output.dataset.loading=loading?'1':'0';
      output.dataset.overflow=overflow?'1':'0';
      output.dataset.failed=failed?'1':'0';
+     output.dataset.personChoice=personChoice;
+     output.dataset.copyBlocked=copyBlocked?'1':'0';
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
@@ -73,7 +103,12 @@ try{
    const match=output.match(/<output id="workpulse-smoke-result"([^>]*)><\/output>/);
    if(!match)throw new Error(`${route}@${width}: 頁面未完成初始化或瀏覽器測試探針未載入`);
    const attrs=Object.fromEntries([...match[1].matchAll(/data-([\w-]+)="([^"]*)"/g)].map(([,k,v])=>[k,v]));
-   if(attrs.title!==title||attrs.overflow==='1'||attrs.failed==='1'||
+   const mobile=width===390;
+   const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
+   if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||
+      attrs['copy-blocked']!=='1'||
+      (route==='overview'&&attrs['person-choice']!=='ok')||
+      (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0')))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}px, no page overflow`);

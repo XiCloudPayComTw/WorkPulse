@@ -129,3 +129,12 @@ Chrome 執行環境依賴 Ubuntu Runner 預裝的 `google-chrome`；開發者本
 - `styles/stability.css`：以「展示版」、「共用」、「管理員」文字標籤替代先前單字「示」。
 - 正式雲端的**舊專案名稱不會批次改寫**；這是保留歷史紀錄的設計，與本機模式會同步改名不同。
 
+
+## v0.11.0 增量模組
+
+- `src/app/person.js`：當前人員選擇偏好（只存 stable employee ID）。
+- `src/app/loading.js`：客製化雲端載入的浮層計數器，支援連續呼叫與快速呼叫防閃爍。
+- `src/features/journals/categories.js`：類型名單驗證／新增／更名；`src/features/journals/description-memory.js`：依人員隔離的輸入建議本機儲存。
+- `apps-script/shared/Core.gs`：公用唯讀工作類型設定查詢；`apps-script/admin/OwnerCategories.gs`：私人管理端動態類型新增／編輯。Google Sheet Meta 記錄 revision 與 JSON 列表，沒有每月資料表結構變更。
+- `styles/field-mobile.css`：外勤功能首頁、人物下拉、果凍載入、行動版薪資區塊隱藏及文字選取限制。
+- `tests/field-mobile.test.mjs`：人員偏好保存、個人輸入建議、類型管理；`tests/monthly.test.mjs`：動態類型的匿名讀取和管理員專屬寫入。

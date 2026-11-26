@@ -1,12 +1,13 @@
+import {startFieldLoading,stopFieldLoading} from '../app/loading.js';
 /** Apps Script HTMLService provides google.script.run only inside its own web-app origin. */
 const METHODS = new Set([
  'wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
- 'wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerDeleteJournal',
+ 'wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
  'wpOwnerSaveAttendanceConfig','wpAttendanceRange'
 ]);
 const MUTATIONS = new Set([
- 'wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerDeleteJournal',
+ 'wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceSave','wpOwnerSaveAttendanceConfig'
 ]);
 
@@ -26,6 +27,7 @@ export function cloudCall(method,argument,{timeoutMs}={}){
  const duration=timeoutMs??(MUTATIONS.has(method)?90000:60000);
  if(!Number.isInteger(duration)||duration<1||duration>180000)
   return Promise.reject(new Error('雲端請求逾時設定無效'));
+ startFieldLoading(MUTATIONS.has(method)?'正在儲存資料…':'正在讀取資料…');
  return new Promise((resolve,reject)=>{
   let completed=false;
   let timer;
@@ -33,6 +35,7 @@ export function cloudCall(method,argument,{timeoutMs}={}){
    if(completed)return;
    completed=true;
    clearTimeout(timer);
+   stopFieldLoading();
    handler(value);
   };
   timer=setTimeout(()=>settle(reject,new Error(
