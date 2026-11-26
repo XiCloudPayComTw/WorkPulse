@@ -121,16 +121,14 @@ function renderPersonMenu(){
 }
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班費與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
- const modeName=isCloud?(state.cloud.user?.role==='admin'?'管理員':'共用'):'展示版';
- const modeTip=isCloud?(state.cloud.user?.role==='admin'?'已驗證的管理員入口':'共用填寫，選擇姓名不代表已驗證個人身分'):'本機展示模式，資料只存於目前瀏覽器';
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.10.1</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.11.0</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
-   <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button><span class="mode-chip" title="${esc(modeTip)}" aria-label="${esc(modeTip)}">${esc(modeName)}</span></div></header>
-   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.10.1</footer></main>
-   <nav class="mobile-nav" style="--nav-count:${visibleNav().length}" aria-label="手機導覽">${visibleNav().map(n=>navButton(n,true)).join('')}</nav>
+   <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button>${renderPersonMenu()}</div></header>
+   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.11.0</footer></main>
+   <nav class="mobile-nav" style="--nav-count:${mobileNav().length}" aria-label="手機導覽">${mobileNav().map(n=>navButton(n,true)).join('')}</nav>
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
   </div>`;
@@ -312,20 +310,20 @@ function render(){renderShell();}
 function activateAttendancePage(){
  if(!shouldLoadAttendance({view:state.view,isCloud,cloudPhase:state.cloud.phase}))return;
  void activateAttendance({
-   load:()=>loadAttendance(state.store.employees,isOwnerPortal),
+   load:()=>loadAttendance(state.store.employees,isOwnerPortal,attendanceState.month,state.selectedPersonId),
    render,
    isActive:()=>shouldLoadAttendance({view:state.view,isCloud,cloudPhase:state.cloud.phase}),
    onError:error=>{attendanceState.phase='error';attendanceState.error=error?.message||'出勤表讀取失敗';}
  });
 }
-function changeView(view){if(!visibleNav().some(n=>n.id===view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
+function changeView(view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;const promise=loadAdmin();render();await promise;render();}
 function notify(text,error=false){state.toast={text,error};showToast(text,error);}
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;flushQuickDraft();return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
 function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
-function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=isCloud?(state.draft?.employeeId||state.store.employees[0]?.id):state.store.employees[0]?.id;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
+function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=state.selectedPersonId;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
 
@@ -346,7 +344,9 @@ async function initCloud(){
     payload.user={...payload.user,role:'admin',name:'管理員'};
   }
   state.cloud.user=payload.user;state.cloud.phase='ready';
-  state.draft=makeDraft(today,payload.store.employees[0]?.id);
+  state.selectedPersonId=readSelectedPerson(permanentStorage(),state.store.employees);
+  selectPersonId(state.selectedPersonId);
+  state.draft=makeDraft(today,state.selectedPersonId);
   state.dirty=false;restoreQuickDraft();if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
   if(state.view==='team'&&payload.user.role==='admin')refreshTeam();
   if(state.view==='insights'&&state.report.phase==='idle')loadCloudReport();
@@ -361,7 +361,7 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
   const result=await cloudCall('wpSharedLoadMonth',month);
   if(token!==state.cloud.monthToken)return;
   state.store={...state.store,journals:result.journals};state.month=month;
-  if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.draft?.employeeId||state.store.employees[0]?.id);state.dirty=false;}
+  if(focusDate){state.draft=makeDraft(focusDate,focusEmployee||state.selectedPersonId);state.dirty=false;}
  }catch(e){if(token===state.cloud.monthToken)notify('雲端讀取失敗：'+(e.message||'未知錯誤'),true);}
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
 }
@@ -405,7 +405,7 @@ root.addEventListener('click', event=>{
      state.store={...updated.store,mode:'cloud'};
      state.cloud.user=updated.user;state.report.payload=null;state.report.applied=null;state.report.phase='idle';
      if(updated.user?.role!=='admin'){state.view='overview';location.hash='/overview';}
-     else if(!canEditJournal(state.draft?.employeeId))state.draft=makeDraft(today,updated.store.employees[0]?.id);
+     else if(!canEditJournal(state.draft?.employeeId))state.draft=makeDraft(today,state.selectedPersonId);
      render();notify(r.deduplicated?'已確認資料儲存結果':'團隊資料已更新');
    }).catch(e=>{render();notify('變更未儲存：'+(e.message||'未知錯誤'),true);});
    render();return;
@@ -586,7 +586,7 @@ root.addEventListener('change',async event=>{
    if(saveStore(payload)){state.draft=makeDraft();state.dirty=false;state.filters={query:'',employee:'all',status:'all'};render();notify('備份資料匯入成功');}
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
-window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
+window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
 window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();
