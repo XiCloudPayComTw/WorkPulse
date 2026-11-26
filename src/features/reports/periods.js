@@ -5,7 +5,7 @@ export function validReportDate(date){
  const value=new Date(date+'T00:00:00Z');
  return !Number.isNaN(value.getTime()) && value.toISOString().slice(0,10)===date;
 }
-export function reportDateError({startDate,endDate}){
+export function validateReportPeriod({startDate,endDate}){
  if(!validReportDate(startDate)||!validReportDate(endDate))return '請填寫正確的起訖日期';
  const span=(Date.parse(endDate+'T00:00:00Z')-Date.parse(startDate+'T00:00:00Z'))/86400000;
  if(span<0||span>365)return '查詢日期須由早到晚，且最多 366 天';
