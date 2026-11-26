@@ -59,7 +59,7 @@ export async function fieldSave(method,payload){
  wpFieldBusy.add(id);
  try{
   wpFieldStatus(id,fieldOnline()?'uncertain':'offline');
-  if(!await flushOfflineVault())throw Error('持久暫存未確認，尚未送出；請保存原始請求並核對離線設定');
+  if((offlineVaultStatus().enabled&&wpFieldMemory!==null)||!await flushOfflineVault())throw Error('持久暫存未確認，尚未送出；請保存原始請求並核對離線設定');
   if(!fieldOnline())throw Error(fieldRecoveryDurable()?'目前離線，已暫存待同步；恢復網路後請手動重送':'目前離線且無法持久暫存，請保持頁面開啟');
   const result=await cloudCall(method,entry.payload);
   const row=method==='wpSharedSaveJournal'?result?.journal:result?.row;

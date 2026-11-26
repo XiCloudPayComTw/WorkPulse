@@ -17,6 +17,7 @@ const port=Number(process.env.WORKPULSE_SMOKE_PORT||5287);
 const fileName=`workpulse-browser-smoke-${process.pid}.html`;
 const testFile=join(root,fileName);
 const frameName=`workpulse-viewport-${process.pid}.html`,frameFile=join(root,frameName);
+const vaultName=`workpulse-vault-${process.pid}.html`,vaultFile=join(root,vaultName);
 const html=await readFile(join(root,'index.html'),'utf8');
 const bootstrap=`<script>
  window.__wpSmokeErrors=[];
@@ -126,6 +127,16 @@ try{
   await delay(100);
  }
  if(!available)throw new Error('WorkPulse 本機伺服器無法啟動');
+ await writeFile(vaultFile,'<!doctype html><html><body><output id="vault-result">waiting</output><script type="module">'+
+  "import {createOfflineVault} from '/src/services/offline-vault.js';"+
+  "const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}};"+
+  "const prefs=memory(),make=()=>{const s=memory();return createOfflineVault({session:()=>s,preferences:()=>prefs,signal(){}})};"+
+  "const key='workpulse:field-recovery:v1',scope='native-smoke';"+
+  "try{const a=make();await a.configure(scope);if(!await a.enable())throw Error(a.status().failure||'enable failed');a.storage().setItem(key,'native test');if(!await a.flush())throw Error('flush failed');const b=make();await b.configure(scope);if(b.status().phase!=='locked')throw Error('second vault not locked');await a.configure('');const c=make();await c.configure(scope);if(c.storage().getItem(key)!=='native test')throw Error('native restore failed');if(!await c.disable())throw Error('clear failed');await c.configure('');const d=make();await d.configure(scope);if(d.storage().getItem(key)!==null)throw Error('data not cleared');document.querySelector('#vault-result').textContent='PASS';}catch(e){document.querySelector('#vault-result').textContent='FAIL '+e.message;}"+
+  '</script></body></html>');
+ const vaultOutput=execFileSync(browser,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--virtual-time-budget=15000','--dump-dom','http://127.0.0.1:'+port+'/'+vaultName],{cwd:root,encoding:'utf8',timeout:30000,maxBuffer:2000000,stdio:['ignore','pipe','pipe']});
+ if(!vaultOutput.includes('<output id="vault-result">PASS</output>'))throw Error('Native IndexedDB / Web Locks check failed: '+(vaultOutput.match(/<output id="vault-result">([^<]*)/)?.[1]||'missing result'));
+ console.log('Native IndexedDB / Web Locks check passed');
  const routes=[
   ['overview','工作總覽'],['attendance','出勤表'],['entry','填寫工作日誌'],
   ['history','歷史工作紀錄'],['insights','統計分析'],['settings','系統設定']];
@@ -164,4 +175,5 @@ try{
  server.kill('SIGTERM');
  await rm(testFile,{force:true});
  await rm(frameFile,{force:true});
+ await rm(vaultFile,{force:true});
 }

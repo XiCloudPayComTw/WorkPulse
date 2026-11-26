@@ -45,7 +45,7 @@ const draftAccount = () => isCloud ? `selected:${state.draft?.employeeId||'none'
 let draftTimer = null;
 function restoreQuickDraft(exactDate=''){
   const stored=readQuickDraft(draftStorage(),draftAccount(),isCloud&&!offlineVaultStatus().enabled?86400000:7*86400000);
-  if(stored&&(!exactDate||stored.date===exactDate)&&(!isCloud||canEditJournal(stored.employeeId))){
+  if(stored&&(!exactDate||stored.date===exactDate)&&(!isCloud||canEditJournal(stored.employeeId)&&stored.date.startsWith(state.month))){
     state.draft={...makeDraft(stored.date,stored.employeeId),...stored,tasks:stored.tasks.map(makeItem)};
     state.dirty=true;state.draftRestored=true;state.draftStatus='已還原未提交草稿';
   } else {state.draftRestored=false;state.draftStatus='草稿自動暫存已啟用';}
@@ -484,6 +484,7 @@ root.addEventListener('click', event=>{
   }
   if(action==='vault-enable'){
    if(!confirm('僅限公司授權的專用裝置。啟用後未提交的工作內容會留在此瀏覽器，即使關閉亦可能保留；資料未加密，不可在共用裝置啟用。確定繼續？'))return;
+   if(!fieldRecoveryDurable()&&offlineVaultStatus().phase!=='error'){notify('目前有未確認的暫存資料，請先保存原始請求再啟用',true);return;}
    flushQuickDraft();void offlineVault.enable().then(ok=>{if(ok){if(!state.dirty)restoreQuickDraft();if(attendanceState.phase==='ready'&&!attendanceState.dirty&&attendanceState.draft)attendanceSelectDate(attendanceState.date);notify('持久暫存已啟用，仍須正式儲存至 Google Sheets');}else notify('無法啟用持久暫存，請核對離線狀態',true);render();});return;
   }
   if(!confirm('清除目前帳號與部署的 IndexedDB 副本，保留此分頁暫存。若有未核對的歷史持久副本將無法復原；請先保存重要資料。確定清除？'))return;
