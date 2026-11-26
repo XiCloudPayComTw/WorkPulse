@@ -11,7 +11,7 @@ import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,sub
 import {renderAttendance} from '../features/attendance/attendance-ui.js';
 import {shouldLoadAttendance,activateAttendance} from './attendance-lifecycle.js';
 import {viewFromHash,visibleNavigation,renderNavigationButton} from './navigation.js';
-import {reportDateError as checkReportDates,applyReportPeriod} from '../features/reports/periods.js';
+import {validateReportPeriod,applyReportPeriod} from '../features/reports/periods.js';
 
 const root = document.querySelector('#app');
 const today = localISODate();
@@ -209,7 +209,7 @@ function renderInsights(){
  return `${syncBanner()}${renderReportWorkspace({filters:state.report.filters,phase:state.report.phase,error:state.report.error,
   report:reportResult(),meta:reportMeta(),cloud:isCloud,stale})}`;
 }
-function reportDateError(){return checkReportDates(state.report.filters);}
+function reportDateError(){return validateReportPeriod(state.report.filters);}
 async function loadCloudReport(){
  if(!isCloud||state.cloud.phase!=='ready'||state.report.phase==='loading')return;
  const error=reportDateError();if(error){state.report.error=error;state.report.phase='error';render();return;}
