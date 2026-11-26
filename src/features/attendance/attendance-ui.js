@@ -64,14 +64,14 @@ export function renderAttendance(people,isAdmin=false){
  const calendar=renderAttendanceCalendar(days);
  const scheduleEditor=isAdmin&&a.adminConfig?renderAttendanceSchedule(a):'';
  const table='<section class="soft-card card-pad-lg att-panel"><div class="card-head"><div><h3 class="card-title">本月出勤明細</h3>'+
- '<p class="card-sub">點選日期可編輯既有紀錄。表格可橫向捲動，不會撐開網站版型。</p></div><span class="tag">'+a.rows.length+' 筆</span></div>'+
+ '<p class="card-sub">點選日期可編輯既有紀錄。桌面使用表格，手機使用逐日卡片。</p></div><span class="tag">'+a.rows.length+' 筆</span></div>'+
  (a.rows.length?'<div class="att-scroll"><table class="att-table"><thead><tr><th>日期</th><th>星期</th><th>出勤日別</th><th>上班</th><th>下班</th><th>當日上班時數</th><th>當日加班時數</th><th>請假</th><th>備註</th><th>操作</th></tr></thead><tbody>'+
  a.rows.map(r=>'<tr><td>'+esc(r.date)+'</td><td>週'+weekdayLabel(r.date)+'</td><td>'+esc(DAY_TYPES[r.dayType]||r.dayType)+'</td>'+
  '<td>'+esc(r.startTime||'—')+'</td><td>'+esc(r.endTime||'—')+'</td><td>'+hoursLabel(r.workedMinutes)+'</td><td>'+hoursLabel(r.overtimeMinutes)+'</td>'+
  '<td>'+(r.leaveMinutes?esc(LEAVE_TYPES[r.leaveType]||r.leaveType)+' '+hoursLabel(r.leaveMinutes):'—')+'</td>'+
  '<td><span class="att-note" title="'+esc(r.notes||'')+'">'+esc(r.notes||'—')+'</span></td>'+
  '<td><button class="soft-button mini" data-action="attendance-edit" data-date="'+esc(r.date)+'">編輯</button></td></tr>').join('')+
- '</tbody></table></div>':'<p class="small muted">尚無本月出勤紀錄。</p>')+'</section>';
+ '</tbody></table></div>'+renderMobileAttendanceRows(a.rows):'<p class="small muted">尚無本月出勤紀錄。</p>')+'</section>';
  const law='<section class="soft-card att-law-panel att-panel"><h3 class="card-title">加班費計算公式（勞基法）</h3>'+
  '<div class="att-law"><p><strong>月薪制基準時薪</strong>月薪工資總額 ÷ 240</p>'+
  '<p><strong>平日加班</strong>前 2 小時 × 4/3；第 3–4 小時 × 5/3</p>'+
@@ -85,6 +85,13 @@ export function renderAttendance(people,isAdmin=false){
 }
 
 /** Attendance interactions are delegated here to avoid coupling the journal editor. */
+function renderMobileAttendanceRows(rows){
+ return '<div class="att-mobile-records" aria-label="逐日出勤明細">'+rows.map(r=>
+ '<article class="att-mobile-record"><div class="row-between"><strong>'+esc(r.date)+' · 週'+weekdayLabel(r.date)+'</strong><span class="tag">'+esc(DAY_TYPES[r.dayType]||r.dayType)+'</span></div>'+
+ '<dl class="att-mobile-values">'+[['上班',r.startTime||'—'],['下班',r.endTime||'—'],['實際工時',hoursLabel(r.workedMinutes)],['加班時數',hoursLabel(r.overtimeMinutes)],['請假',r.leaveMinutes?(LEAVE_TYPES[r.leaveType]||r.leaveType)+' '+hoursLabel(r.leaveMinutes):'—'],['休息分鐘',String(r.breakMinutes??0)]].map(v=>'<div><dt>'+esc(v[0])+'</dt><dd>'+esc(v[1])+'</dd></div>').join('')+'</dl>'+
+ (r.notes?'<p class="att-mobile-note"><strong>備註：</strong>'+esc(r.notes)+'</p>':'')+
+ '<button type="button" class="soft-button sm" data-action="attendance-edit" data-date="'+esc(r.date)+'">編輯這一天</button></article>').join('')+'</div>';
+}
 function renderAttendanceCalendar(days){
  const a=attendanceState,offset=days.length?new Date(days[0].date+'T00:00:00Z').getUTCDay():0;
  const labels={recorded:'有紀錄',leave:'請假',review:'待核對',missing:'缺紀錄',future:'未到日期',today:'今日',off:'休假／休息'};

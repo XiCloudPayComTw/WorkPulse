@@ -71,7 +71,7 @@ test('attendance places Excel export above the compact labor-law section, withou
   globalThis.window={addEventListener(){}};
   const {renderAttendance}=await import('../src/features/attendance/attendance-ui.js');
   attendanceState.employeeId='E-1';attendanceState.month='2026-11';
-  attendanceState.date='2026-11-26';attendanceState.rows=[];
+  attendanceState.date='2026-11-26';attendanceState.rows=[{date:'2026-11-26',employeeId:'E-1',dayType:'workday',startTime:'08:00',endTime:'17:00',workedMinutes:480,overtimeMinutes:0,breakMinutes:60,notes:'現場核對',revision:1}];
   attendanceState.phase='ready';attendanceState.expectedDays=null;
   attendanceState.draft={date:'2026-11-26',employeeId:'E-1',dayType:'workday',startTime:'',
    endTime:'',breakMinutes:0,leaveType:'none',leaveMinutes:0,notes:'',revision:0};
@@ -81,6 +81,7 @@ test('attendance places Excel export above the compact labor-law section, withou
   assert.ok(table>0&&exportPanel>table&&law>exportPanel);
   assert.doesNotMatch(html,/data-att-salary|data-att-monthly-pay|data-att-preview-pay|data-att-row-pay|薪資基準 · 即時計算/);
   assert.match(html,/att-law-panel/);
+  assert.match(html,/att-mobile-records/);assert.match(html,/att-mobile-values/);assert.match(html,/現場核對/);
   assert.match(html,/data-action="payroll-start"/);
  }finally{
   if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;

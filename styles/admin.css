@@ -17,3 +17,5 @@
 .local-rename-editor .input{width:min(260px,55vw);min-width:125px;flex:1 1 125px;font-size:15px}
 .local-rename-editor .soft-button{min-height:33px;padding:5px 9px;font-size:13px}
 @media(max-width:480px){.local-rename-editor{width:100%}.local-rename-editor .input{width:100%}}
+
+.maintenance-list{display:grid;gap:7px;max-height:340px;overflow:auto;margin-top:12px}.maintenance-list>div{display:grid;gap:3px;background:#e5ecf2;padding:12px;border-radius:12px;overflow-wrap:anywhere}.maintenance-list span{font-size:13px;color:#526d7c}
