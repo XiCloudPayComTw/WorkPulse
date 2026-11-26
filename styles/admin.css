@@ -19,3 +19,5 @@
 @media(max-width:480px){.local-rename-editor{width:100%}.local-rename-editor .input{width:100%}}
 
 .maintenance-list{display:grid;gap:7px;max-height:340px;overflow:auto;margin-top:12px}.maintenance-list>div{display:grid;gap:3px;background:#e5ecf2;padding:12px;border-radius:12px;overflow-wrap:anywhere}.maintenance-list span{font-size:13px;color:#526d7c}
+
+.wp-migration-review{display:grid;gap:14px;min-width:0}.wp-migration-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-height:340px;overflow:auto}.wp-migration-map label{min-width:0;overflow-wrap:anywhere}.wp-migration-review input[type=file]{max-width:100%;min-width:0}.wp-migration-review button{min-height:44px}@media(max-width:900px){.wp-migration-map{grid-template-columns:1fr}}

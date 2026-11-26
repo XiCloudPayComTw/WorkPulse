@@ -303,3 +303,32 @@ function workPulseVerifyMonthFiles(){
  return {readOnly:true,productionVerified:false,checkedAt:new Date().toISOString(),totalIndexed:all.length,checked:results.length,
   ok:results.every(function(x){return x.ok;}),nextFromMonth:older[0]||'',results:results};
 }
+
+
+/** Primary-owner-only migration dry run; accepts record keys, never journal content. */
+function wpOwnerMigrationPreflight(input){
+ wpPrimaryOwnerAssert_();
+ if(!input||typeof input!=='object'||Array.isArray(input)||!Array.isArray(input.keys)||input.keys.length<1||input.keys.length>500)
+  throw Error('預檢每次須提供 1 至 500 筆識別資料');
+ var month=wpMonth_(input.month),control=wsBook_(),people=new Set(wsPeople_(control,false).map(function(p){return p.id;}));
+ var seen=new Set(),keys=input.keys.map(function(k){
+  if(!k||Object.keys(k).some(function(n){return ['kind','date','employeeId'].indexOf(n)<0;})||
+   ['journal','attendance'].indexOf(k.kind)<0||typeof k.employeeId!=='string'||!people.has(k.employeeId))
+   throw Error('預檢只接受有效人員、日期及紀錄類型');
+  var date=wpDate_(k.date);if(date.slice(0,7)!==month)throw Error('預檢須為同月份');
+  var key=k.kind+'|'+k.employeeId+'|'+date;if(seen.has(key))throw Error('同人同日重複預檢項目');seen.add(key);
+  return {kind:k.kind,date:date,employeeId:k.employeeId,key:key};
+ });
+ var book=wpMonthFile_(control,month,false),active=new Set(),deletedKeys=new Set();
+ if(book){
+  var deleted=wsDeleted_(book);
+  wpRows_(wpSheet_(book,'Journals')).forEach(function(j){
+   var key='journal|'+String(j.employeeId)+'|'+String(j.date);
+   if(deleted[String(j.journalId)])deletedKeys.add(key);else active.add(key);
+  });
+  wpRows_(wpSheet_(book,'Attendance')).forEach(function(j){active.add('attendance|'+String(j.employeeId)+'|'+String(j.date));});
+ }
+ return {readOnly:true,month:month,checkedAt:new Date().toISOString(),results:keys.map(function(k){
+  return {kind:k.kind,date:k.date,employeeId:k.employeeId,status:active.has(k.key)?'exists':deletedKeys.has(k.key)?'deleted-history':'not-found'};
+ })};
+}
