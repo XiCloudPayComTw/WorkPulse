@@ -658,3 +658,15 @@ test('unified read and write RPCs refuse anonymous and external callers even bef
  for(const email of ['','external@elsewhere.com']){h.as(email);for(const method of methods)assert.throws(()=>h.scope[method]({}),/公司網域/,method);}
  h.as('admin@example.com');h.effective('external@elsewhere.com');for(const method of methods)assert.throws(()=>h.scope[method]({}),/持有者身分/,method);
 });
+
+test('unified legacy delegated operator is never promoted even when configured',()=>{
+ const h=harness();h.setup();const person=h.employee();
+ h.scope.WP_PORTAL_KIND='unified';h.props.WORKPULSE_ACCESS_MODE='domain';h.props.WORKPULSE_OPERATOR_EMAIL='operator@example.com';
+ h.as('operator@example.com');assert.equal(h.scope.wpSharedBootstrap('2026-11').user.role,'guest');
+ assert.throws(()=>h.scope.wpOwnerBootstrap(),/持有帳號/);
+ h.effective('operator@example.com');assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/持有者身分/);
+ h.effective('admin@example.com');h.as('staff@example.com');
+ const payload={date:'2026-11-23',employeeId:person.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',expectedRevision:0,requestId:'unified-attendance-01'};
+ assert.equal(h.scope.wpAttendanceSave(payload).ok,true);
+ h.as('admin@example.com');assert.equal(h.scope.wpAttendanceSave({...payload,date:'2026-11-24',requestId:'unified-attendance-02'}).ok,true);
+});
