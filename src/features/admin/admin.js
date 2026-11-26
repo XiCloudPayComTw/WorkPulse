@@ -1,10 +1,10 @@
 import { cloudCall } from '../../services/cloud.js';
-import { esc, uid } from '../../shared/utils.js';
+import { esc, uid, download } from '../../shared/utils.js';
 import { icon } from '../../shared/icons.js';
 import {addWorkCategory,renameWorkCategory} from '../journals/categories.js';
 
 export const adminState={phase:'idle',data:null,tab:'employees',draft:null,dirty:false,saving:false,error:'',requestId:null};
-export const maintenanceState={month:'',data:null,error:'',backup:null,backupRequest:null,backupTarget:'',busy:false};
+export const maintenanceState={month:'',data:null,error:'',backup:null,backupRequest:null,backupTarget:'',busy:false,recovery:null};
 export async function loadAdmin(){
  if(adminState.phase==='loading')return;
  adminState.phase='loading';adminState.error='';
@@ -116,16 +116,17 @@ export function renderMaintenance(){
  '<div class="form-fields"><label class="form-group"><span class="field-label">查詢月份</span><input class="input" type="month" data-maintenance-month value="'+esc(a.month)+'" '+(a.busy?'disabled':'')+'></label>'+
  '<div class="form-group"><span class="field-label">操作</span><button class="soft-button" data-action="maintenance-load" '+(a.busy?'disabled':'')+'>查詢操作紀錄</button></div></div>'+
  (a.error?'<p role="alert" class="small">'+esc(a.error)+'</p>':'')+
- (d?'<p class="small muted">'+esc(d.month)+' · 稽核 '+d.auditCount+' 筆 · 已刪除 '+d.deletedCount+' 筆（各顯示最近至多 100 筆）</p>'+
+ (d?'<p class="small muted">每日備份：'+(d.schedule?.configured?'已登記排程（須核對實際執行）':'尚未啟用')+'</p>'+(d.schedule?.lastRun?'<div class="maintenance-list"><div><strong>最近執行 '+esc(d.schedule.lastRun.day)+' · '+(d.schedule.lastRun.ok?'通過':'部分失敗')+'</strong><span>'+esc((d.schedule.lastRun.results||[]).map(x=>x.target+'：'+(x.ok?'完成':x.error||'失敗')).join('；'))+'</span></div></div>':'')+'<p class="small muted">'+esc(d.month)+' · 稽核 '+d.auditCount+' 筆 · 已刪除 '+d.deletedCount+' 筆（各顯示最近至多 100 筆）</p>'+
  '<div class="maintenance-list">'+d.audit.map(x=>'<div><strong>'+esc(x.action)+'</strong><span>'+esc(x.occurredAt)+' · '+esc(x.actor)+' · '+esc(x.recordId)+'</span></div>').join('')+'</div>'+
- '<h3 class="card-title section-space">已刪除日誌（唯讀）</h3><div class="maintenance-list">'+d.deleted.map(x=>'<div><strong>'+esc(x.date)+' · '+esc(x.employeeName)+'</strong><span>版本 '+x.revision+' · '+esc(x.id)+'</span></div>').join('')+'</div>':'')+
+ '<h3 class="card-title section-space">已刪除日誌（唯讀）</h3><div class="maintenance-list">'+d.deleted.map(x=>'<div><strong>'+esc(x.date)+' · '+esc(x.employeeName)+'</strong><span>版本 '+x.revision+' · '+esc(x.id)+'</span><button type="button" class="soft-button sm" data-action="maintenance-recovery" data-id="'+esc(x.id)+'" '+(a.busy?'disabled':'')+'>核對復原資料</button></div>').join('')+'</div>':'')+
+ (a.recovery?'<div class="notice" role="status"><div><strong>復原資料已讀取 · '+esc(a.recovery.journal.date)+'</strong><p>'+esc(a.recovery.activeCollision?'同人同日已有正式紀錄，禁止覆蓋，請人工合併。':'目前未發現同日正式紀錄，仍須重新核對後人工補登。')+'</p><p>'+a.recovery.journal.tasks.length+' 項工作 · 此資料僅供核對，不會寫回。</p><button type="button" class="soft-button sm" data-action="maintenance-recovery-download" '+(a.busy?'disabled':'')+'>下載復原 JSON</button></div></div>':'')+
  '<div class="divider"></div><h3 class="card-title">建立獨立備份</h3><p class="small muted">須預先配置持有者專用備份資料夾；建議於暫停填寫時執行。每次僅複製一份檔案，並非整庫原子快照。</p>'+
  '<div class="row" style="flex-wrap:wrap"><button class="soft-button" data-action="maintenance-backup" data-target="control" '+(a.busy?'disabled':'')+'>備份控制表</button><button class="soft-button" data-action="maintenance-backup" data-target="month" '+(a.busy?'disabled':'')+'>備份所選月份</button></div>'+
  (a.backup?'<p class="small muted" role="status">副本：'+esc(a.backup.name)+' · '+a.backup.sheets.length+' 個工作表。請在私人 Drive 確認。</p>':'')+'</section>';
 }
 export async function loadMaintenance(month){
  const a=maintenanceState;if(a.busy)return;
- a.month=month;a.busy=true;a.data=null;a.error='';
+ a.month=month;a.busy=true;a.data=null;a.recovery=null;a.error='';
  try{const result=await cloudCall('wpOwnerMaintenance',{month});if(result?.month!==month||!Array.isArray(result.audit)||!Array.isArray(result.deleted))throw Error('稽核回應格式錯誤');a.data=result;}
  catch(e){a.error=e.message;}finally{a.busy=false;}
 }
@@ -135,4 +136,19 @@ export async function backupMaintenance(target){
  a.busy=true;a.error='';a.backup=null;
  try{const result=await cloudCall('wpOwnerBackupWorkbook',{target,requestId:a.backupRequest},{timeoutMs:180000});if(!result?.ok||!Array.isArray(result.sheets))throw Error('未確認備份結果');a.backup=result;a.backupRequest=null;a.backupTarget='';}
  catch(e){a.error=e.message+'；如結果未確認，請先檢查私人 Drive，再使用同一目標重試。';}finally{a.busy=false;}
+}
+
+export async function previewMaintenanceRecovery(id){
+ const a=maintenanceState;if(a.busy)return;
+ const row=a.data?.deleted.find(x=>x.id===id);if(!row)return;
+ a.busy=true;a.recovery=null;a.error='';
+ try{
+  const result=await cloudCall('wpOwnerRecoveryPreview',{journalId:id,date:row.date,expectedRevision:row.revision});
+  if(result?.readOnly!==true||result.journal?.id!==id||!Array.isArray(result.journal.tasks))throw Error('復原資料格式錯誤');
+  a.recovery=result;
+ }catch(e){a.error=e.message;}finally{a.busy=false;}
+}
+export function downloadMaintenanceRecovery(){
+ const data=maintenanceState.recovery;if(!data||maintenanceState.busy)return;
+ download('WorkPulse-Recovery-'+data.journal.date+'-'+data.journal.id+'.json',JSON.stringify(data,null,2),'application/json');
 }

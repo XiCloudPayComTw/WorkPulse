@@ -93,7 +93,9 @@ function wpOwnerMaintenance(input){
  var rows=auditRows(control,'control').concat(book?auditRows(book,month):[]);
  rows.sort(function(a,b){return b.occurredAt.localeCompare(a.occurredAt);});
  deleted.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
- return {month:month,exists:!!book,auditCount:rows.length,audit:rows.slice(0,100),deletedCount:deleted.length,
+ var props=PropertiesService.getScriptProperties(),lastRun=null;
+ try{lastRun=JSON.parse(props.getProperty('WORKPULSE_BACKUP_LAST_RUN')||'null');}catch(e){}
+ return {month:month,exists:!!book,schedule:{configured:!!props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID'),lastRun:lastRun},auditCount:rows.length,audit:rows.slice(0,100),deletedCount:deleted.length,
   deleted:deleted.slice(0,100).map(function(j){return {id:String(j.journalId),date:String(j.date),employeeName:people[String(j.employeeId)]||String(j.employeeId),revision:Number(j.revision)||0};})};
 }
 /** Owner-only independent copy; not an atomic multi-file snapshot. */
@@ -106,7 +108,16 @@ function wpBackupAssertPrivate_(item,email){
 }
 function wpBackupShape_(book){return book.getSheets().map(function(s){return {name:s.getName(),rows:s.getLastRow()};});}
 function wpOwnerBackupWorkbook(input){
- var cfg=wpPrimaryOwnerAssert_();
+ wpPrimaryOwnerAssert_();return wpBackupWorkbook_(input,false);
+}
+function wpBackupActor_(scheduled){
+ if(!scheduled)return wpPrimaryOwnerAssert_();
+ var cfg=wpConfig_();
+ if(String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase()!==cfg.adminEmail)throw Error('排程必須由資料持有帳號執行');
+ return cfg;
+}
+function wpBackupWorkbook_(input,scheduled){
+ var cfg=wpBackupActor_(scheduled);
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('備份格式無效');
  var target=input.target==='control'?'control':wpMonth_(input.target),request=String(input.requestId||'');
  if(!/^[a-zA-Z0-9_-]{12,120}$/.test(request))throw Error('備份識別碼無效');
@@ -119,13 +130,88 @@ function wpOwnerBackupWorkbook(input){
  if(String(file.getOwner()?.getEmail()||'').toLowerCase()!==cfg.adminEmail)throw Error('來源檔案非指定持有者');
  var lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
-  wpPrimaryOwnerAssert_();wpBackupAssertPrivate_(folder,cfg.adminEmail);
+  wpBackupActor_(scheduled);wpBackupAssertPrivate_(folder,cfg.adminEmail);
+  var before=wpBackupContent_(source);
   var title='WorkPulse_Backup_'+target+'_'+request,matching=folder.getFilesByName(title),copy,duplicate=false;
   if(matching.hasNext()){copy=matching.next();duplicate=true;if(matching.hasNext())throw Error('備份名稱重複，請人工核對');}
   else{SpreadsheetApp.flush();copy=file.makeCopy(title,folder);}
   wpBackupAssertPrivate_(copy,cfg.adminEmail);
-  var shape=wpBackupShape_(SpreadsheetApp.openById(copy.getId()));
-  if(!shape.length||JSON.stringify(shape)!==JSON.stringify(wpBackupShape_(source)))throw Error('來源與副本工作表／列數不同，請人工核對，不可視為已驗證備份');
+  var copied=SpreadsheetApp.openById(copy.getId()),shape=wpBackupShape_(copied);
+  if(!shape.length||before!==wpBackupContent_(copied)||before!==wpBackupContent_(source))throw Error('來源與副本內容不同或來源已變動，請人工核對，不可視為已驗證備份');
   return {ok:true,deduplicated:duplicate,target:target,backupId:copy.getId(),name:title,sheets:shape};
  }finally{lock.releaseLock();}
+}
+
+
+/** Compare stored cell values, including headers. Bound work to avoid script timeouts.
+ * This checks content, not formatting, permissions, formulas or atomicity.
+ */
+function wpBackupContent_(book){
+ var cells=0,parts=[];
+ book.getSheets().forEach(function(s){
+  var headers=WP_HEADERS[s.getName()];
+  if(!headers)throw Error('備份含未知工作表，請人工核對');
+  var n=s.getLastRow();cells+=n*headers.length;
+  if(cells>250000)throw Error('備份資料量超過自動核對上限，請人工備份');
+  parts.push([s.getName(),n,n?s.getRange(1,1,n,headers.length).getValues():[]]);
+ });
+ parts.sort(function(a,b){return a[0].localeCompare(b[0]);});
+ return JSON.stringify(parts);
+}
+/** Deleted journal recovery snapshot, never reactivates or writes a live record. */
+function wpOwnerRecoveryPreview(input){
+ wpOwnerAssert_();
+ if(!input||typeof input!=='object'||Array.isArray(input))throw Error('復原查詢格式無效');
+ var date=wpDate_(input.date),id=String(input.journalId||''),revision=Number(input.expectedRevision);
+ if(!/^[a-zA-Z0-9_-]{1,120}$/.test(id)||!Number.isSafeInteger(revision)||revision<1)throw Error('復原識別碼或版本無效');
+ var control=wsBook_(),book=wpMonthFile_(control,date.slice(0,7),false);
+ if(!book)throw Error('找不到月份文件');
+ var removed=wsDeleted_(book),rows=wpRows_(wpSheet_(book,'Journals'));
+ var original=rows.find(function(j){return String(j.journalId)===id&&String(j.date)===date;});
+ if(!original||!removed[id]||Number(original.revision)!==revision)throw Error('CONFLICT:已刪除紀錄狀態或版本已改變，請重新查詢');
+ var collision=rows.some(function(j){return String(j.date)===date&&String(j.employeeId)===String(original.employeeId)&&!removed[String(j.journalId)];});
+ return {format:'workpulse-recovery-v1',readOnly:true,generatedAt:new Date().toISOString(),activeCollision:collision,
+  journal:wsRecord_(original,wpRows_(wpSheet_(book,'Tasks')))};
+}
+/** Only install from the private project's editor, signed in as primary owner. */
+function workPulseInstallDailyBackup(){
+ var cfg=wpPrimaryOwnerAssert_(),props=PropertiesService.getScriptProperties();
+ var id=String(props.getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim();
+ if(!id||id===cfg.folderId)throw Error('請先設定獨立私人備份資料夾');
+ wpBackupAssertPrivate_(DriveApp.getFolderById(id),cfg.adminEmail);
+ var existing=ScriptApp.getProjectTriggers().filter(function(t){return t.getHandlerFunction()==='wpDailyBackup_';});
+ if(existing.length>1)throw Error('備份排程重複，請在 Apps Script 觸發條件人工移除');
+ var trigger=existing[0]||ScriptApp.newTrigger('wpDailyBackup_').timeBased().atHour(3).everyDays(1).inTimezone('Asia/Taipei').create();
+ props.setProperty('WORKPULSE_BACKUP_TRIGGER_UID',trigger.getUniqueId());
+ return {ok:true,installed:true,hourWindow:'03:00–04:00 Asia/Taipei'};
+}
+function workPulseRemoveDailyBackup(){
+ wpPrimaryOwnerAssert_();
+ ScriptApp.getProjectTriggers().filter(function(t){return t.getHandlerFunction()==='wpDailyBackup_';}).forEach(function(t){ScriptApp.deleteTrigger(t);});
+ PropertiesService.getScriptProperties().setProperty('WORKPULSE_BACKUP_TRIGGER_UID','');
+ return {ok:true,installed:false};
+}
+function wpBackupDay_(now){
+ // Asia/Taipei is UTC+8 without DST.
+ return new Date(now.getTime()+8*3600000).toISOString().slice(0,10);
+}
+function wpDailyBackup_(event){
+ var cfg=wpBackupActor_(true),props=PropertiesService.getScriptProperties();
+ var expected=String(props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID')||'');
+ if(!expected||String(event&&event.triggerUid||'')!==expected)throw Error('未驗證備份排程');
+ var day=wpBackupDay_(new Date()),current=day.slice(0,7),priorDate=new Date(current+'-01T00:00:00Z');
+ priorDate.setUTCMonth(priorDate.getUTCMonth()-1);
+ var prior=priorDate.toISOString().slice(0,7),index=wpMonthIndex_(wsBook_()),targets=['control'];
+ [current,prior].forEach(function(m){if(index[m])targets.push(m);});
+ // Older months rotate one per day, since historical journals may still be edited.
+ var older=Object.keys(index).filter(function(m){return m!==current&&m!==prior;}).sort();
+ if(older.length)targets.push(older[Math.floor(Date.parse(day+'T00:00:00Z')/86400000)%older.length]);
+ var results=[],failed=false;
+ targets.forEach(function(target){
+  try{wpBackupWorkbook_({target:target,requestId:'daily-'+day+'-'+target},true);results.push({target:target,ok:true});}
+  catch(e){failed=true;results.push({target:target,ok:false,error:String(e.message||e).slice(0,200)});}
+ });
+ props.setProperty('WORKPULSE_BACKUP_LAST_RUN',JSON.stringify({day:day,completedAt:new Date().toISOString(),ok:!failed,results:results}));
+ if(failed)throw Error('部分備份未通過驗證，請查看私人維護控制台及 Apps Script 執行紀錄');
+ return {ok:true,results:results};
 }

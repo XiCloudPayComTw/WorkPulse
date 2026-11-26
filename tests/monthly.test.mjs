@@ -436,3 +436,39 @@ test('backup copies one workbook without modifying live index, retries same ID, 
  assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'backup-control-001'}),/持有者專用/);
  assert.equal(h.files.size,3);
 });
+
+test('recovery preview is private, preserves deleted content, flags live collision, never writes',()=>{
+ const h=harness();h.setup();const p=h.employee();h.as('');
+ const original=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ h.as('admin@example.com');h.scope.wpOwnerDeleteJournal({journalId:original.id,date:original.date,expectedRevision:1,requestId:'recovery-delete-001'});
+ h.as('');assert.throws(()=>h.scope.wpOwnerRecoveryPreview({journalId:original.id,date:original.date,expectedRevision:1}),/管理帳號/);
+ const live=h.scope.wpSharedSaveJournal(h.entry(p,'2026-11',0,'recovery-new-001')).journal;
+ h.as('admin@example.com');const result=h.scope.wpOwnerRecoveryPreview({journalId:original.id,date:original.date,expectedRevision:1});
+ assert.equal(result.readOnly,true);assert.equal(result.activeCollision,true);assert.equal(result.journal.tasks[0].description,'內容');
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals[0].id,live.id);
+ assert.throws(()=>h.scope.wpOwnerRecoveryPreview({journalId:original.id,date:original.date,expectedRevision:2}),/CONFLICT/);
+});
+test('backup verification detects changed cell values even with equal row counts',()=>{
+ const h=harness();h.setup();const folder=h.scope.DriveApp.createFolder('Private backups');
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=folder.getId();
+ const request={target:'control',requestId:'backup-content-001'},result=h.scope.wpOwnerBackupWorkbook(request);
+ h.books.get(result.backupId).getSheetByName('Meta').rows[1][1]='tampered';
+ assert.throws(()=>h.scope.wpOwnerBackupWorkbook(request),/內容不同/);
+});
+test('daily backup requires registered trigger and effective owner, records successful run',()=>{
+ const h=harness();h.setup();const folder=h.scope.DriveApp.createFolder('Private backups');
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=folder.getId();h.props.WORKPULSE_BACKUP_TRIGGER_UID='trigger-123';
+ h.as('');assert.throws(()=>h.scope.wpDailyBackup_({triggerUid:'wrong'}),/未驗證/);
+ h.effective('other@example.com');assert.throws(()=>h.scope.wpDailyBackup_({triggerUid:'trigger-123'}),/持有帳號/);
+ h.effective('admin@example.com');const result=h.scope.wpDailyBackup_({triggerUid:'trigger-123'});
+ assert.equal(result.ok,true);assert.equal(h.files.size,2);
+ assert.equal(JSON.parse(h.props.WORKPULSE_BACKUP_LAST_RUN).ok,true);
+ h.scope.wpDailyBackup_({triggerUid:'trigger-123'});assert.equal(h.files.size,2);
+});
+
+test('task index groups by journal and preserves revision filtering',()=>{
+ const h=harness(),j={journalId:'a',date:'2026-11-01',employeeId:'e',revision:2};
+ const tasks=[{journalId:'a',revision:1,title:'old'},{journalId:'a',revision:2,title:'new',position:1},{journalId:'b',revision:2,title:'other'}];
+ const index=h.scope.wsTaskIndex_(tasks);assert.equal(index.get('a').length,2);
+ const result=h.scope.wsRecord_(j,index.get('a'));assert.equal(result.tasks.length,1);assert.equal(result.tasks[0].title,'new');
+});

@@ -20,3 +20,13 @@
 - 響應式：900px 以下出勤明細採逐日卡片，桌面保留完整表格；底部導航均分、44px 以上主要觸控區、16px 表單、safe-area 與浮動提示位置調整；原本手機隱藏會計與法規區的決策維持。Chrome 加驗導航無溢出、觸控高度與輸入字級；iOS/Android 鍵盤、旋轉與觸控仍需實機驗證。
 
 - 備份新增模擬 Drive 複製成功、同 requestId 重試、拒絕額外分享者及正式索引不變測試。GAS viewport 同步 viewport-fit=cover。備份權限驗證不能代替實際 Drive 管理員檢查（含父層分享）。稽核 selected: 人員僅代表選取的姓名，不能當成登入身分證明。
+
+
+## v0.14.1 — 定期備份、內容核對與復原準備
+
+- 基於 PR #20 已合併、Pages CI 通過的 main fff629f5f163f96bc854a6e2029b99fcaca9f6ba，分支 feat/workpulse-v0.14.1-backup-recovery，不自動 Merge。
+- 每日備份排程：僅由資料持有者登入私人 Apps Script 編輯器執行 workPulseInstallDailyBackup，先配置私人 WORKPULSE_BACKUP_FOLDER_ID；03:00–04:00 台北時間為預設觸發區間（Google 調度非精準分鐘）。控制表、已存在的當月、上月及每日輪替一個較舊月份；未自動刪除備份。每日日期與目標作命名去重；同日重試若來源已變動，拒絕宣稱驗證成功。管理員可看到最近一次結果；移除用 workPulseRemoveDailyBackup。私人封包額外 script.scriptapp scope，公開封包不增加。
+- 備份核對已由列數提升為已知 schema 欄位的儲存格值前後比對（最多 250000 格），非公式／格式／ACL 完整驗證、非跨檔原子快照；來源變動拒絕確認，不自動刪副本。觸發器需符合已登記 UID 及持有者 effective account。未安裝真實觸發器、未操作公司 Drive。
+- 管理員可查閱已刪除日誌快照、檢查同人同日正式紀錄衝突、下載 JSON 人工核對；不變更正式資料，不自動解除刪除標記。跨專案寫入互斥未完成，直接復原與完整還原演練移至 v0.15.0 的正式環境驗收前置；普通使用者以姓名選取並非登入驗證。
+- 月份與跨月報表以 journalId 建立 task index，避免每份日誌掃描全部工作明細；保留 revision 過濾及原有查詢上限，無真實大型資料量基準測試。
+- 使用者確認將所有行動版提升納入正式路線，見 [ROADMAP.md](ROADMAP.md)。工作日誌及出勤正式保存仍使用公司 Drive 原生分月 Sheets；GitHub Pages 本機版不會自動上傳。薪資只在下載 Excel 處理。

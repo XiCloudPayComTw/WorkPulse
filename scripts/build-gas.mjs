@@ -28,7 +28,7 @@ const attendance=await readFile('apps-script/attendance/Attendance.gs','utf8');
 const attendanceSave=await readFile('apps-script/attendance/AttendanceSave.gs','utf8');
 const attendanceRange=await readFile('apps-script/attendance/AttendanceRange.gs','utf8');
 const attendanceOwner=await readFile('apps-script/admin/OwnerAttendance.gs','utf8');
-if(/function\s+wpOwner(?:Bootstrap|Maintenance|BackupWorkbook|SaveEmployee|DeleteJournal|AttendanceConfig|SaveAttendanceConfig)\s*\(/.test(core+'\n'+monthly+'\n'+simple+'\n'+attendance+'\n'+attendanceSave))
+if(/function\s+wpOwner(?:Bootstrap|Maintenance|RecoveryPreview|BackupWorkbook|SaveEmployee|DeleteJournal|AttendanceConfig|SaveAttendanceConfig)\s*\(/.test(core+'\n'+monthly+'\n'+simple+'\n'+attendance+'\n'+attendanceSave))
  throw Error('Owner API accidentally included in public backend');
 // Always remove old build outputs, preventing stale privileged files in a public bundle.
 await rm('dist-gas',{recursive:true,force:true});
@@ -51,7 +51,7 @@ for(const [portal,isOwner] of [['public',false],['admin',true]]){
    writeFile(directory+'/Attendance.gs',attendance),
    writeFile(directory+'/AttendanceSave.gs',attendanceSave),
    writeFile(directory+'/AttendanceRange.gs',attendanceRange),
-   writeFile(directory+'/appsscript.json',manifest)
+   writeFile(directory+'/appsscript.json',isOwner?JSON.stringify({...JSON.parse(manifest),oauthScopes:[...JSON.parse(manifest).oauthScopes,'https://www.googleapis.com/auth/script.scriptapp']},null,2)+'\n':manifest)
  ]);
  if(isOwner){await writeFile(directory+'/OwnerCategories.gs',ownerCategories);
   await writeFile(directory+'/OwnerProjects.gs',ownerProjects);
