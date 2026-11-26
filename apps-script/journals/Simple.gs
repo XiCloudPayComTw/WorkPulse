@@ -41,7 +41,7 @@ function wpSharedBootstrap(month){
   return {month:m,store:{version:1,mode:'cloud',
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
-      .map(function(p){return wpPlainText_(p.name);}),journals:wsMonth_(book,m)},
+      .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m)},
     user:{id:'guest',name:'共用填寫',role:'guest',email:'',
       canWriteIds:people.map(function(p){return p.id;})}};
 }
@@ -80,14 +80,30 @@ function wsValidated_(input,book){
    }).map(function(task){return wpPlainText_(task.project);});
    return olderProjects;
   }
+  var activeCategories=wsCategories_(book);
+  function preservedCategories_(){
+   var older=[];
+   var prior=wpMonthFile_(book,date.slice(0,7),false);
+   if(!prior)return older;
+   var removed=wsDeleted_(prior);
+   var record=wpRows_(wpSheet_(prior,'Journals')).find(function(row){
+    return String(row.date)===date&&String(row.employeeId)===employeeId&&!removed[String(row.journalId)];
+   });
+   if(!record)return older;
+   return wpRows_(wpSheet_(prior,'Tasks')).filter(function(task){
+    return String(task.journalId)===String(record.journalId)&&Number(task.revision)===Number(record.revision);
+   }).map(function(task){return String(task.category);});
+  }
   var tasks=input.tasks.map(function(t){
     if(!t||typeof t!=='object')throw Error('工作項目格式無效');
-    var title=wpText_(t.title,160),project=wpText_(t.project,100),category=String(t.category||'');
+    var project=wpText_(t.project,100),category=wpText_(t.category,100);
+    var title=wpText_(t.title||category,160);
     var status=String(t.status||''),hours=Number(t.hours);
-    if(!title)throw Error('工作名稱不可空白');
+    if(!title||!category)throw Error('請選擇工作類型');
     if(project&&projects.indexOf(project)<0&&preservedProjects_().indexOf(project)<0)
       throw Error('專案尚未建立或已更名，請重新選擇');
-    if(WP_CATEGORIES.indexOf(category)<0||WP_STATUS.indexOf(status)<0||!isFinite(hours)||hours<0||hours>24)
+    if(activeCategories.indexOf(category)<0&&preservedCategories_().indexOf(category)<0||
+       WP_STATUS.indexOf(status)<0||!isFinite(hours)||hours<0||hours>24)
       throw Error('分類、狀態或投入工時無效');
     return {id:Utilities.getUuid(),title:title,project:project,category:category,status:status,hours:hours,
       description:wpText_(t.description,2000),result:wpText_(t.result,1000)};
@@ -139,7 +155,7 @@ function wpSharedQueryReport(criteria){
       category=String(criteria.category||'all'),status=String(criteria.status||'all');
   var people=wsPeople_(book,true),ids={};people.forEach(function(p){ids[p.id]=true;});
   if(employeeId!=='all'&&!ids[employeeId])throw Error('找不到選取的使用者');
-  if(project.length>100||WP_CATEGORIES.indexOf(category)<0&&category!=='all'
+  if(project.length>100||category.length>100
     ||WP_STATUS.indexOf(status)<0&&status!=='all')throw Error('報表篩選格式錯誤');
   var journals=[];
   wpMonthRange_(start,end).forEach(function(month){
