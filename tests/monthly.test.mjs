@@ -651,3 +651,10 @@ test('unified manual backup configuration does not require installing trigger; i
  assert.equal(h.scope.workPulseDeploymentCheck().configurationPassed,false);
  h.props.WORKPULSE_OPERATOR_EMAIL='operator@example.com';assert.equal(h.scope.workPulseInitializationCheck().canInitialize,false);
 });
+
+test('unified read and write RPCs refuse anonymous and external callers even before touching payloads',()=>{
+ const h=harness();h.setup();h.scope.WP_PORTAL_KIND='unified';h.props.WORKPULSE_ACCESS_MODE='domain';
+ const methods=['doGet','wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange'];
+ for(const email of ['','external@elsewhere.com']){h.as(email);for(const method of methods)assert.throws(()=>h.scope[method]({}),/公司網域/,method);}
+ h.as('admin@example.com');h.effective('external@elsewhere.com');for(const method of methods)assert.throws(()=>h.scope[method]({}),/持有者身分/,method);
+});
