@@ -619,3 +619,54 @@ test('integrity accepts attendance and a recreated same-date journal after logic
  h.scope.wpAttendanceSave({date:j.date,employeeId:p.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',expectedRevision:0,requestId:'accept-att-0001'});
  const report=h.scope.wpOwnerMonthIntegrity({month:'2026-11'});assert.equal(report.status,'passed');assert.equal(report.counts.deletedJournals,1);assert.equal(report.counts.attendance,1);
 });
+
+
+test('unified portal fails closed, only verified primary owner can call any privileged RPC',()=>{
+ const h=harness();h.setup();const p=h.employee();h.scope.WP_PORTAL_KIND='unified';
+ const ownerMethods=['wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','workPulseInitialize','workPulseMigrateLegacy','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerRecoveryPreview','workPulseInstallDailyBackup','workPulseRemoveDailyBackup','workPulsePauseFieldWrites','workPulseResumeFieldWrites','workPulseDeploymentCheck','workPulseVerifyMonthFiles','wpOwnerMigrationPreflight','workPulseInitializationCheck','wpOwnerMonthIntegrity','workPulseCompareRestoredMonth','wpOwnerSaveCategories','wpOwnerSaveProject','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','workPulseUpgradeAttendance','wpOwnerSaveAttendanceSchedule'];
+ assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/禁止匿名/);
+ assert.throws(()=>h.scope.doGet(),/禁止匿名/);
+ h.props.WORKPULSE_ACCESS_MODE='domain';
+ const before=JSON.stringify([...h.books.values()].map(b=>b.sheets.map(s=>s.rows))),props=JSON.stringify(h.props);
+ for(const email of ['','outsider@elsewhere.com','staff@example.com','operator@example.com']){
+  h.as(email);
+  for(const method of ownerMethods)assert.throws(()=>h.scope[method]({}),/持有帳號/,method+' '+email);
+ }
+ assert.equal(JSON.stringify([...h.books.values()].map(b=>b.sheets.map(s=>s.rows))),before);
+ assert.equal(JSON.stringify(h.props),props);
+ h.as('');assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/公司網域/);
+ h.as('outsider@elsewhere.com');assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/公司網域/);
+ h.as('staff@example.com');assert.equal(h.scope.wpSharedBootstrap('2026-11').user.role,'guest');
+ assert.equal(h.scope.wpSharedSaveJournal(h.entry(p)).ok,true);
+ h.as('admin@example.com');assert.equal(h.scope.wpSharedBootstrap('2026-11').user.role,'admin');
+ assert.equal(h.scope.wpOwnerBootstrap().employees.length,1);
+ assert.equal(h.scope.wpSharedSaveJournal(h.entry(p,'2026-12',0,'unified-owner-0001')).ok,true);
+ h.effective('staff@example.com');assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/持有者身分/);
+});
+test('unified manual backup configuration does not require installing trigger; invalid existing folder still fails',()=>{
+ const h=harness();h.setup();h.scope.WP_PORTAL_KIND='unified';h.props.WORKPULSE_ACCESS_MODE='domain';
+ const result=h.scope.workPulseDeploymentCheck();
+ assert.equal(result.configurationPassed,true);assert.equal(result.productionVerified,false);assert.equal(result.backupMode,'manual');
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=h.props.WORKPULSE_FOLDER_ID;
+ assert.equal(h.scope.workPulseDeploymentCheck().configurationPassed,false);
+ h.props.WORKPULSE_OPERATOR_EMAIL='operator@example.com';assert.equal(h.scope.workPulseInitializationCheck().canInitialize,false);
+});
+
+test('unified read and write RPCs refuse anonymous and external callers even before touching payloads',()=>{
+ const h=harness();h.setup();h.scope.WP_PORTAL_KIND='unified';h.props.WORKPULSE_ACCESS_MODE='domain';
+ const methods=['doGet','wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange'];
+ for(const email of ['','external@elsewhere.com']){h.as(email);for(const method of methods)assert.throws(()=>h.scope[method]({}),/公司網域/,method);}
+ h.as('admin@example.com');h.effective('external@elsewhere.com');for(const method of methods)assert.throws(()=>h.scope[method]({}),/持有者身分/,method);
+});
+
+test('unified legacy delegated operator is never promoted even when configured',()=>{
+ const h=harness();h.setup();const person=h.employee();
+ h.scope.WP_PORTAL_KIND='unified';h.props.WORKPULSE_ACCESS_MODE='domain';h.props.WORKPULSE_OPERATOR_EMAIL='operator@example.com';
+ h.as('operator@example.com');assert.equal(h.scope.wpSharedBootstrap('2026-11').user.role,'guest');
+ assert.throws(()=>h.scope.wpOwnerBootstrap(),/持有帳號/);
+ h.effective('operator@example.com');assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/持有者身分/);
+ h.effective('admin@example.com');h.as('staff@example.com');
+ const payload={date:'2026-11-23',employeeId:person.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',expectedRevision:0,requestId:'unified-attendance-01'};
+ assert.equal(h.scope.wpAttendanceSave(payload).ok,true);
+ h.as('admin@example.com');assert.equal(h.scope.wpAttendanceSave({...payload,date:'2026-11-24',requestId:'unified-attendance-02'}).ok,true);
+});

@@ -263,18 +263,19 @@ function workPulseDeploymentCheck(){
  });
  check('backupFolder',function(){
   var id=String(props.getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim();
+  if(wpUnified_()&&!id)return '手動備份模式：尚未指定獨立備份資料夾；可由 Drive 手動建立副本，仍須實測';
   if(!id||id===cfg.folderId)throw Error('尚未設定獨立私人備份資料夾');
   wpBackupAssertPrivate_(DriveApp.getFolderById(id),cfg.adminEmail);return '私人備份資料夾權限初步通過';
  });
  check('backupRegistration',function(){
-  var uid=String(props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID')||'');if(!uid)throw Error('尚未登記每日備份觸發器');
+  var uid=String(props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID')||'');if(!uid&&wpUnified_())return '手動備份模式：未啟用自動排程，須人工完成備份與還原驗收';if(!uid)throw Error('尚未登記每日備份觸發器');
   var triggers=ScriptApp.getProjectTriggers().filter(function(t){return t.getHandlerFunction()==='wpDailyBackup_';});
   if(triggers.length!==1||String(triggers[0].getUniqueId())!==uid)throw Error('實際可見的備份觸發器與登記不符，請至 Apps Script 核對');
   var result=JSON.parse(props.getProperty('WORKPULSE_BACKUP_LAST_RUN')||'null'),age=result?Date.now()-Date.parse(result.completedAt):NaN;
   if(!result||!result.ok||!Number.isFinite(age)||age<0||age>48*3600000)throw Error('未有最近 48 小時成功的備份結果');
   return '觸發器識別及最近一次成功紀錄通過，仍須核對排程時間及實際副本';
  });
- return {readOnly:true,configurationPassed:checks.every(function(x){return x.ok;}),productionVerified:false,checks:checks,pausedAt:control?wpFieldPause_(control):'',checkedAt:new Date().toISOString()};
+ return {readOnly:true,backupMode:wpUnified_()&&!props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID')?'manual':'scheduled',configurationPassed:checks.every(function(x){return x.ok;}),productionVerified:false,checks:checks,pausedAt:control?wpFieldPause_(control):'',checkedAt:new Date().toISOString()};
 }
 
 
@@ -349,7 +350,7 @@ function workPulseInitializationCheck(){
  var checks=[],folderId=String(props.getProperty('WORKPULSE_FOLDER_ID')||'').trim(),sheetId=String(props.getProperty('WORKPULSE_SHEET_ID')||'').trim(),
  backupId=String(props.getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim(),scope=String(props.getProperty('WORKPULSE_OFFLINE_SCOPE')||'');
  function check(key,required,fn){try{checks.push({key:key,required:required,ok:true,detail:fn()});}catch(e){checks.push({key:key,required:required,ok:false,detail:String(e.message||e).slice(0,240)});}}
- check('operator',true,function(){if(operator&&(!/^[^\s@]+@[^\s@]+$/.test(operator)||!operator.endsWith('@'+domain)))throw Error('維護帳號須屬公司網域');return operator?'已設定維護帳號':'未設定選用維護帳號';});
+ check('operator',true,function(){if(wpUnified_()&&operator)throw Error('單一入口僅主資料持有者管理，請勿設定 WORKPULSE_OPERATOR_EMAIL');if(operator&&(!/^[^\s@]+@[^\s@]+$/.test(operator)||!operator.endsWith('@'+domain)))throw Error('維護帳號須屬公司網域');return operator?'已設定維護帳號':'未設定選用維護帳號';});
  check('accessMode',true,function(){wpFieldMode_();return '存取模式格式有效';});
  check('domainMode',false,function(){if(wpFieldMode_()!=='domain')throw Error('正式部署前須設定 domain 並驗證登入');return '已設定 domain，仍須實際驗證';});
  check('dataFolder',true,function(){if(!folderId)return '尚未設定，初始化將建立新資料夾';wpBackupAssertPrivate_(DriveApp.getFolderById(folderId),email);return '既有資料夾持有者與私人權限初步通過';});

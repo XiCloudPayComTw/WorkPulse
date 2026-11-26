@@ -32,7 +32,8 @@ if(/function\s+(?:workPulse(?:Initialize|InitializationCheck|DeploymentCheck|Com
  throw Error('Owner API accidentally included in public backend');
 // Always remove old build outputs, preventing stale privileged files in a public bundle.
 await rm('dist-gas',{recursive:true,force:true});
-for(const [portal,isOwner] of [['public',false],['admin',true]]){
+for(const [portal,isOwner] of [['public',false],['admin',true],['unified',false]]){
+ const unified=portal==='unified';
  const directory='dist-gas/'+portal;
  await mkdir(directory,{recursive:true});
  let output=html.replace('<!-- WORKPULSE_PWA_BUILD -->','')
@@ -40,10 +41,19 @@ for(const [portal,isOwner] of [['public',false],['admin',true]]){
    .replace(/<link rel="stylesheet"[^>]*>/,()=>'<style>\n'+css+'\n</style>')
    .replace(/<script type="module"[^>]*><\/script>/,'');
  output=output.replace('</body>',()=>{
-   const guard=isOwner?'<script>window.WORKPULSE_ADMIN_PORTAL=true;</script>\n':'';
+   const guard=unified?'<script>window.WORKPULSE_UNIFIED_PORTAL=true;</script>\n':isOwner?'<script>window.WORKPULSE_ADMIN_PORTAL=true;</script>\n':'';
    return guard+'<script>\n'+js+'\n</script>\n</body>';
  });
  if(output===html||output.includes('type="module"'))throw Error('HTMLService transformation failed');
+ if(unified){
+  const code="var WP_PORTAL_KIND='unified';\n"+[core,monthly,simple,attendance,attendanceSave,attendanceRange,owner,ownerCategories,ownerProjects,attendanceOwner].join('\n\n');
+  // Any newly exposed RPC must be deliberately audited. Trailing underscore functions are private.
+  const names=[...code.matchAll(/^function\s+(\w+)\s*\(/gm)].map(x=>x[1]);
+  const expected=['doGet','wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange','wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','workPulseInitialize','workPulseMigrateLegacy','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerRecoveryPreview','workPulseInstallDailyBackup','workPulseRemoveDailyBackup','workPulsePauseFieldWrites','workPulseResumeFieldWrites','workPulseDeploymentCheck','workPulseVerifyMonthFiles','wpOwnerMigrationPreflight','workPulseInitializationCheck','wpOwnerMonthIntegrity','workPulseCompareRestoredMonth','wpOwnerSaveCategories','wpOwnerSaveProject','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','workPulseUpgradeAttendance','wpOwnerSaveAttendanceSchedule'];
+  if(new Set(names).size!==names.length||JSON.stringify(names.filter(n=>!n.endsWith('_')).sort())!==JSON.stringify(expected.sort()))throw Error('Unified exposed function inventory changed; audit before release');
+  await Promise.all([writeFile(directory+'/Code.gs',code),writeFile(directory+'/Index.html',output),writeFile(directory+'/appsscript.json',JSON.stringify({...JSON.parse(manifest),oauthScopes:[...JSON.parse(manifest).oauthScopes,'https://www.googleapis.com/auth/script.scriptapp']},null,2)+'\n')]);
+  continue;
+ }
  await Promise.all([
    writeFile(directory+'/Index.html',output),
    writeFile(directory+'/Core.gs',"var WP_PORTAL_KIND='"+(isOwner?'admin':'public')+"';\n"+core),
@@ -60,3 +70,5 @@ for(const [portal,isOwner] of [['public',false],['admin',true]]){
   await writeFile(directory+'/OwnerAttendance.gs',attendanceOwner);}
 }
 console.log('Built dist-gas/public (no admin endpoints) and dist-gas/admin (owner-only endpoints).');
+
+console.log('Built dist-gas/unified (3 files; domain-only, primary-owner administration).');
