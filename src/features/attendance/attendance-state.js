@@ -1,10 +1,12 @@
 import {cloudEnabled,cloudCall} from '../../services/cloud.js';
+import {fieldSave} from '../../services/field-recovery.js';
+import {saveAttendanceDraft,readAttendanceDraft,clearAttendanceDraft} from './attendance-draft.js';
 import {currentMonth,localISODate,uid} from '../../shared/utils.js';
 import {validateAttendanceDraft} from './attendance.js';
 const KEY='workpulse-attendance-v1';
 export const attendanceState={month:currentMonth(),employeeId:'',date:localISODate(),rows:[],
   draft:null,phase:'idle',error:'',saving:false,requestId:null,expectedDays:null,
-  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false};
+  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true};
 export function newAttendanceDraft(date=attendanceState.date,source=null){
  return {date,employeeId:attendanceState.employeeId,dayType:source?.dayType||'workday',
    startTime:source?.startTime||'',endTime:source?.endTime||'',breakMinutes:source?.breakMinutes||0,
@@ -40,8 +42,10 @@ export function currentTemporaryWage(){
 export function attendanceSelectDate(date){
  attendanceState.date=date;
  attendanceState.draft=newAttendanceDraft(date,attendanceState.rows.find(r=>r.date===date));
- attendanceState.requestId=null;attendanceState.dirty=false;
+ attendanceState.requestId=null;attendanceState.dirty=false;attendanceState.draftStored=true;
+ if(cloudEnabled()){const saved=readAttendanceDraft(attendanceState.employeeId,date);if(saved){attendanceState.draft=saved;attendanceState.dirty=true;}}
 }
+export function discardAttendanceDraft(){const a=attendanceState;clearAttendanceDraft(a.employeeId,a.date);attendanceSelectDate(a.date);}
 let attendanceLoadSequence=0;
 /**
  * Always apply only the latest response. This prevents a slow cloud request for
@@ -90,10 +94,11 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
 }
 export function updateAttendance(field,value){
  const a=attendanceState;
- if(!a.draft||!['dayType','startTime','endTime','breakMinutes','leaveType','leaveMinutes','notes'].includes(field))return;
+ if(a.saving||!a.draft||!['dayType','startTime','endTime','breakMinutes','leaveType','leaveMinutes','notes'].includes(field))return;
  a.draft[field]=['breakMinutes','leaveMinutes'].includes(field)?Number(value):value;
  if(field==='leaveType'&&value==='none')a.draft.leaveMinutes=0;
  a.requestId=null;a.dirty=true;
+ if(cloudEnabled())a.draftStored=saveAttendanceDraft(a.draft);
 }
 export async function submitAttendance(){
  const a=attendanceState;
@@ -104,7 +109,7 @@ export async function submitAttendance(){
  try{
   const request={...data,employeeId:a.employeeId,expectedRevision:a.draft.revision||0,requestId:a.requestId};
   let result;
-  if(cloudEnabled())result=await cloudCall('wpAttendanceSave',request);
+  if(cloudEnabled()){a.draftStored=saveAttendanceDraft(a.draft);result=await fieldSave('wpAttendanceSave',request);}
   else{
    const existing=localRows();
    const item={...request,id:existing.find(r=>r.date===data.date&&r.employeeId===a.employeeId)?.id||uid(),
@@ -115,10 +120,13 @@ export async function submitAttendance(){
    result={ok:true,row:item};
   }
   if(!result?.ok||!result.row)throw Error('雲端尚未確認儲存結果');
+  const sameDraft=a.employeeId===request.employeeId&&a.date===request.date&&a.requestId===request.requestId;
+  if(cloudEnabled()&&sameDraft)clearAttendanceDraft(request.employeeId,request.date);
+  if(a.employeeId!==request.employeeId||a.month!==request.date.slice(0,7))return result;
   const index=a.rows.findIndex(r=>r.date===result.row.date);
   if(index>=0)a.rows[index]=result.row;else a.rows.push(result.row);
   a.rows.sort((x,y)=>x.date.localeCompare(y.date));
-  a.requestId=null;a.dirty=false;a.draft=newAttendanceDraft(result.row.date,result.row);
+  if(sameDraft){a.requestId=null;a.dirty=false;a.draftStored=true;a.draft=newAttendanceDraft(result.row.date,result.row);}
   return result;
  }finally{a.saving=false;}
 }

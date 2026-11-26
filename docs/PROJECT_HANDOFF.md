@@ -228,3 +228,20 @@
 - `src/app/loading.js` + `styles/field-mobile.css`：雲端請求統一果凍式浮層；900px 以下手機隱藏薪資／法規卡，但保留出勤操作；一般文字禁止圈選與複製，文字編輯欄保留正常操作。
 - `src/features/journals/description-memory.js`：每一個人員在單一裝置獨立記憶 35 筆已填寫／已儲存內容，手機執行內容輸入框有建議選單；沒有把建議額外寫入雲端。
 - 細節及所有功能：[docs/FIELD_V011.md](FIELD_V011.md)。CI 與後端整合驗證需通過；真正公司 Workspace 部署仍須另行進行。
+
+
+## v0.12.0 — 外勤弱網路與資料恢復
+
+- 起始 main 305af6d063452626a475b9635587c12893cd10e7，已合併 PR #16；獨立分支 feat/workpulse-v0.12.0-field-recovery，不自動 Merge。
+- `src/services/field-recovery.js`：工作日誌及出勤寫入的 per-tab 待同步；保留原始 requestId、expectedRevision 與內容；離線不發送、不自動重送；已知 CONFLICT 需人工核對；手動重送結果確認後移除待同步，使用者需重新查閱對應日期。
+- `src/features/attendance/attendance-draft.js`：按人員日期保存未提交草稿，保留原 revision，成功提交才清除；提供捨棄按鈕。薪資維持記憶體試算。
+- 連線狀態與待同步清單、同時讀寫載入提示修正、常用範本以工作類型／專案／執行內容區分。
+- 限制：sessionStorage 不保證跨關閉分頁／裝置；禁用儲存僅記憶體；不支援離線冷啟動或背景同步；Chrome 窄螢幕改採精準 CSS viewport（320／375／390／430px）與桌面 1366px；手機實機及公司 Workspace 正式部署仍待驗收。
+- 操作及驗收見 [FIELD_RECOVERY_V012.md](FIELD_RECOVERY_V012.md)；CI 狀態以 PR 最新提交為準。
+
+### 後續路線（2026-11-26 使用者提供原始規劃，可靠性優先調整）
+- v0.12.0：外勤弱網路與資料恢復；原規劃出勤月曆、前日時間複製、班表設定及異常提醒移至 v0.12.1。
+- v0.13.0：會計結算週期、發薪日、缺漏／異常檢查、Excel 列印／公式保護與逐人匯出；薪資維持記憶體試算。
+- v0.14.0：資料安全、刪除復原、備份／還原演練、版本衝突、權限與跨月效能。
+- v0.15.0：公司 Google Workspace 正式部署與跨裝置驗收，須取得公司授權；公開展示與正式入口分離。
+- v1.0.0：核心功能全數實際驗收才可稱正式營運；PWA 視 Apps Script 限制另列候選，不取代會計強化。

@@ -2,6 +2,7 @@ import { icon } from '../shared/icons.js';
 import { STORAGE_KEY, CATEGORIES, STATUSES, readState, writeState, saveJournal, journalFor, monthStats, csvExport, emptyState, validateState } from '../features/journals/data.js';
 import { currentMonth, localISODate, shiftDate, formatDate, formatHours, esc, uid, download } from '../shared/utils.js';
 import { cloudEnabled, cloudCall } from '../services/cloud.js';
+import {fieldOnline,readFieldPending,fieldRecoveryBusy,fieldRecoveryDurable,fieldSave,retryFieldPending,removeFieldPending} from '../services/field-recovery.js';
 import { adminState, loadAdmin, setAdminTab, editAdmin, updateAdminDraft, resetAdminEditor, renderTeam, saveAdmin } from '../features/admin/admin.js';
 import {renameLocalEmployee,renameLocalProject} from '../features/admin/rename.js';
 import { buildReport, reportCsv, reportSheets } from '../features/reports/reports.js';
@@ -83,6 +84,7 @@ function selectPersonId(id){
 }
 function changeSelectedPerson(id,{fromAttendance=false}={}){
  if(id===state.selectedPersonId)return true;
+ if(state.cloud.saving||attendanceState.saving)return false;
  if(!state.store.employees.some(p=>p.id===id))return false;
  if(state.dirty&&!confirm('切換人員後，未提交的工作內容會先暫存，確定切換？'))return false;
  flushQuickDraft();selectPersonId(id);
@@ -119,24 +121,37 @@ function renderPersonMenu(){
    <p class="wp-person-hint">切換後，其他頁面會同步使用此人員</p>
   </div></div>`;
 }
+function fieldRecoveryMarkup(){
+ if(!isCloud)return '';
+ const rows=readFieldPending().filter(x=>x.payload.employeeId===state.selectedPersonId),online=fieldOnline();
+ return '<div class="wp-recovery-status" role="status"><strong>'+(!online?'目前離線 · 資料尚未同步':'網路可用 · 仍以雲端確認為準')+'</strong>'+
+ (rows.length?' · '+rows.length+' 筆待處理':'')+(!fieldRecoveryDurable()?' <span>瀏覽器暫存受限，請勿關閉頁面。</span>':'')+'</div>'+
+ rows.map(x=>{const id=esc(x.payload.requestId),busy=fieldRecoveryBusy(x.payload.requestId);
+ return '<div class="wp-recovery-row"><span>'+esc(x.payload.date)+' · '+(x.method==='wpSharedSaveJournal'?'工作日誌':'出勤')+' · '+(busy?'同步中':x.status==='conflict'?'版本衝突，請先查閱雲端':x.status==='offline'?'尚未送出':'儲存結果未確認')+'</span>'+
+ '<div><button type="button" class="soft-button mini" data-action="field-retry" data-id="'+id+'" '+(!online||busy||x.status==='conflict'?'disabled':'')+'>重送原始請求</button> '+
+ '<button type="button" class="soft-button mini" data-action="field-discard" data-id="'+id+'" '+(busy?'disabled':'')+'>移除待同步</button></div></div>';
+ }).join('');
+}
+function updateFieldRecovery(){const panel=document.querySelector('#wp-field-recovery');if(panel)panel.innerHTML=fieldRecoveryMarkup();const banner=document.querySelector('.sync-banner');if(banner)banner.outerHTML=syncBanner();}
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班費與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.11.0</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.12.0</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button>${renderPersonMenu()}</div></header>
-   <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.11.0</footer></main>
+   ${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.12.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${mobileNav().length}" aria-label="手機導覽">${mobileNav().map(n=>navButton(n,true)).join('')}</nav>
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
   </div>`;
+ if(state.cloud.saving)for(const element of document.querySelectorAll('#page-content input,#page-content textarea,#page-content select'))element.disabled=true;
  if(state.toast) showToast(state.toast.text,state.toast.error,true);
 }
 function renderCloudWaiting(){return `<section class="soft-card card-pad-lg sync-stage" role="status" aria-live="polite"><span class="sync-dot loading"></span><h2>正在連接工作日誌資料庫</h2><p>正在載入可選的使用者與本月工作紀錄。</p></section>`;}
 function renderCloudError(){return `<section class="soft-card card-pad-lg sync-stage" role="alert"><span class="sync-dot failed"></span><h2>無法連接雲端工作日誌</h2><p>${esc(state.cloud.error)}</p><button class="soft-button" data-action="retry-cloud">${icon('arrowRight',16)} 重新驗證與載入</button><p class="xs muted">存取失敗時不會自動切換為本機資料，避免誤以為已同步。</p></section>`;}
-function syncBanner(){if(!isCloud)return '';const status=state.cloud.saving?'saving':state.cloud.loadingMonth?'saving':state.cloud.phase==='ready'?'ready':'error';const label=status==='ready'?'Google Sheets 已連線':status==='saving'?'正在與 Google Sheets 同步':'同步失敗';return `<div class="sync-banner ${status}" role="status"><span class="sync-dot ${status}"></span><span>${label}</span><span class="xs muted">${esc(state.cloud.user?.email||'')}</span><button class="soft-button ghost mini" data-action="refresh-cloud" ${status==='saving'?'disabled':''}>重新整理</button></div>`;}
+function syncBanner(){if(!isCloud)return '';const status=!fieldOnline()?'error':state.cloud.saving?'saving':state.cloud.loadingMonth?'saving':state.cloud.phase==='ready'?'ready':'error';const label=!fieldOnline()?'目前離線，尚未確認同步':status==='ready'?'Google Sheets 已連線':status==='saving'?'正在與 Google Sheets 同步':'同步失敗';return `<div class="sync-banner ${status}" role="status"><span class="sync-dot ${status}"></span><span>${label}</span><span class="xs muted">${esc(state.cloud.user?.email||'')}</span><button class="soft-button ghost mini" data-action="refresh-cloud" ${status==='saving'?'disabled':''}>重新整理</button></div>`;}
 function renderPage(){switch(state.view){case 'attendance':return `${syncBanner()}${renderAttendance(state.store.employees,isOwnerPortal)}`;case 'entry':return renderEntry();case 'history':return renderHistory();case 'insights':return renderInsights();case 'settings':return renderSettings();case 'team':return `${syncBanner()}${renderTeam(state.cloud.user)}`;default:return renderOverview();}}
 function summaryTiles(stats){
  return `<div class="stats-grid section-space flash-delay">
@@ -412,9 +427,9 @@ async function saveCloudJournal(){
  state.saveRequestId=state.saveRequestId||uid();
  const request={requestId:state.saveRequestId,expectedRevision:d.revision||0,date:d.date,employeeId:d.employeeId,
   note:d.note,tomorrow:d.tomorrow,tasks:d.tasks.filter(t=>String(t.category||'').trim()).map(t=>({...t,title:t.title?.trim()||t.category}))};
- state.cloud.saving=true;render();
+ flushQuickDraft();state.cloud.saving=true;render();
  try{
-  const result=await cloudCall('wpSharedSaveJournal',request);
+  const result=await fieldSave('wpSharedSaveJournal',request);
   if(!result?.ok || !result.journal)throw Error('雲端回傳資料不完整，請先重新整理再嘗試');
   state.saveRequestId=null;
   state.store={...state.store,journals:[...state.store.journals.filter(j=>!(j.date===result.journal.date && j.employeeId===result.journal.employeeId)),result.journal]};
@@ -430,6 +445,19 @@ async function saveCloudJournal(){
 root.addEventListener('click', event=>{
  const button=event.target.closest('[data-action]');if(!button)return;
  const action=button.dataset.action;
+ if(action==='field-retry'||action==='field-discard'){
+  const id=button.dataset.id;
+  if(!isCloud||!readFieldPending().some(x=>x.payload.requestId===id&&x.payload.employeeId===state.selectedPersonId))return;
+  if(action==='field-discard'){
+   if(confirm('請先查閱雲端確認原請求是否已儲存。移除只會清除本分頁的待同步請求，不會刪除雲端紀錄。確定移除？'))removeFieldPending(id);
+   return;
+  }
+  if(state.cloud.phase!=='ready'||state.cloud.saving||attendanceState.saving||fieldRecoveryBusy(id))return;
+  if(!confirm('以相同識別碼與原始資料重送？完成後請重新讀取對應紀錄；目前草稿不會被覆蓋。'))return;
+  retryFieldPending(id,state.selectedPersonId).then(()=>notify('雲端已確認原始請求。請重新讀取對應日期，核對並視需要捨棄舊草稿。'))
+   .catch(error=>notify('同步未完成：'+error.message,true));
+  return;
+ }
  if(action==='person-menu'){
   const box=button.closest('.wp-person-picker'),menu=box?.querySelector('.wp-person-menu');
   if(menu){menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));}
@@ -716,7 +744,11 @@ document.addEventListener('copy',event=>{
  if(event.target.closest?.('input,textarea,[contenteditable="true"]'))return;
  event.preventDefault();
 });
-window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
+window.addEventListener('online',updateFieldRecovery);
+window.addEventListener('offline',updateFieldRecovery);
+document.addEventListener('workpulse:field-recovery',updateFieldRecovery);
+window.addEventListener('pagehide',()=>{if(state.dirty)flushQuickDraft();});
+window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty||(attendanceState.dirty&&!attendanceState.draftStored)||!fieldRecoveryDurable()){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();
 else activateAttendancePage();
