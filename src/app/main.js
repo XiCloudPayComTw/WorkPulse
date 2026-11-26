@@ -62,7 +62,7 @@ function appendReusableTasks(rows){
   if(!rows?.length)return;
   const entries=rows.map(newTaskFromTemplate);
   const tasks=state.draft.tasks;
-  const empty=tasks.length===1&&!tasks[0].title?.trim()&&!tasks[0].description?.trim()&&!tasks[0].result?.trim();
+  const empty=tasks.length===1&&!tasks[0].description?.trim()&&!tasks[0].result?.trim()&&!tasks[0].project?.trim();
   if(tasks.length-(empty?1:0)+entries.length>100){notify('同一天最多可填寫 100 項工作',true);return;}
   if(empty)tasks.splice(0,1);
   tasks.push(...entries);markDraftDirty();render();notify(`已加入 ${entries.length} 項工作，進度和工時已重設`);
@@ -95,7 +95,7 @@ function changeSelectedPerson(id,{fromAttendance=false}={}){
  }else render();
  return true;
 }
-function makeItem(source={}) {return {id:source.id||uid(),project:source.project||'',category:source.category||'前端開發',title:source.title||'',description:source.description||'',result:source.result||'',status:source.status||'doing',hours:source.hours??0};}
+function makeItem(source={}) {const category=source.category||state.store.categories?.[0]||CATEGORIES[0];return {id:source.id||uid(),project:source.project||'',category,title:source.title||category,description:source.description||'',result:source.result||'',status:source.status||'doing',hours:source.hours??0};}
 function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord=null) {
   const record = fromRecord ?? (state.store.mode==='demo'?null:journalFor(state.store,date,employeeId));
   return {date,employeeId,note:record?.note||'',tomorrow:record?.tomorrow||'',tasks:record?.tasks.length?record.tasks.map(makeItem):[makeItem()],editing:!!record,revision:record?.revision||0};
@@ -210,14 +210,27 @@ function renderTask(t,i){
  const key=`task-${i}`;
  const options=(items,value)=>[...(value&&!items.includes(value)?[value]:[]),...items].map(v=>`<option value="${esc(v)}" ${value===v?'selected':''}>${esc(v||'未指定專案')}</option>`).join('');
  return `<article class="task-card"><div class="task-heading"><div class="task-number"><span class="task-number-spot">${String(i+1).padStart(2,'0')}</span> 工作內容</div><div class="task-heading-actions"><button class="soft-button ghost mini" data-action="save-template" data-index="${i}" title="儲存此工作為常用項目">${icon('sparkles',15)} 設為常用</button><button class="soft-button ghost mini danger" aria-label="刪除第 ${i+1} 項工作" data-action="remove-task" data-index="${i}">${icon('trash',16)}</button></div></div>
- <div class="form-fields"><label class="form-group full"><span class="field-label">工作名稱 *</span><input class="input" id="${key}-title" maxlength="160" data-task="${i}" data-field="title" placeholder="例如：確認自助洗衣設備配置" value="${esc(t.title)}" /></label>
+ <div class="form-fields"><label class="form-group full"><span class="field-label">工作類型 *</span><select class="input" data-task="${i}" data-field="category">${options(state.store.categories||CATEGORIES,t.category)}</select></label>
  <label class="form-group"><span class="field-label">所屬專案</span><select class="input" data-task="${i}" data-field="project"><option value="" ${!t.project?'selected':''}>未指定專案</option>${options(state.store.projects,t.project)}</select></label>
- <label class="form-group"><span class="field-label">工作類型</span><select class="input" data-task="${i}" data-field="category">${options(CATEGORIES,t.category)}</select></label>
- <label class="form-group full"><span class="field-label">執行內容</span><textarea class="input" data-task="${i}" data-field="description" maxlength="2000" placeholder="今天實際執行的工作、處理進度與細節…">${esc(t.description)}</textarea></label>
+ <label class="form-group full wp-description-field"><span class="field-label">執行內容</span>
+ <textarea class="input" data-task="${i}" data-field="description" maxlength="2000" autocomplete="off"
+ placeholder="工作名稱、現場施工與實際執行細節都寫在這裡…">${esc(t.description)}</textarea>
+ <div class="wp-description-suggestions" data-description-suggestions="${i}" hidden></div></label>
  <label class="form-group full"><span class="field-label">成果 / 交付項目</span><input class="input" maxlength="1000" data-task="${i}" data-field="result" placeholder="例如：完成平面配置圖初稿" value="${esc(t.result)}" /></label>
  <label class="form-group"><span class="field-label">處理狀態</span><select class="input" data-task="${i}" data-field="status">${Object.entries(STATUSES).map(([v,label])=>`<option value="${v}" ${v===t.status?'selected':''}>${label}</option>`).join('')}</select></label>
  <label class="form-group"><span class="field-label">投入工時</span><input class="input" type="number" inputmode="decimal" step="0.5" min="0" max="24" data-task="${i}" data-field="hours" value="${Number(t.hours)||0}" /></label>
  </div></article>`;
+}
+function updateDescriptionSuggestions(textarea){
+ if(!isMobileViewport())return;
+ const index=Number(textarea.dataset.task);
+ const target=document.querySelector('[data-description-suggestions="'+index+'"]');
+ if(!target)return;
+ const suggestions=descriptionSuggestions(permanentStorage(),state.selectedPersonId,textarea.value,state.store.journals);
+ target.innerHTML=suggestions.map((value,i)=>`<button type="button" class="wp-description-suggestion"
+ data-action="description-use" data-index="${index}" data-suggestion="${i}"
+ title="${esc(value)}">${esc(value.slice(0,100))}</button>`).join('');
+ target.hidden=!suggestions.length;
 }
 function totalDraftHours(){return state.draft.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);}
 function updateDraftSummary(){
@@ -254,7 +267,7 @@ function renderHistoryResults(){
  const tasks=g.journals.flatMap(j=>j.tasks);
  return `<article class="soft-card history-record"><button class="accordion-heading history-head" data-action="toggle-day" data-date="${g.date}" aria-expanded="${open}" aria-controls="day-${g.date}"><div class="row"><span class="date-icon">${icon('calendar',17)}</span><div><div class="history-date-name">${formatDate(g.date)}</div><div class="small muted">${g.date.slice(0,4)} 年 · ${g.journals.length} 位人員</div></div></div><div class="history-day-summary"><span>${tasks.length} 項工作</span><span>·</span><span>${formatHours(totalHours(g.journals))}</span>${icon('chevronDown',18,'accordion-arrow')}</div></button>
  <div id="day-${g.date}" ${open?'':'hidden'}>${open?g.journals.map(j=>`<div class="history-detail"><div class="row-between"><span class="small" style="font-weight:550">${icon('users',16)} &nbsp;${esc(employeeName(j.employeeId))}</span><span class="small muted">${j.tasks.length} 項</span></div>
- ${j.tasks.map(t=>`<div class="history-task"><div><div class="pill-row"><span class="tag">${esc(t.category)}</span>${t.project?`<span class="tag">${esc(t.project)}</span>`:''}</div><h4>${esc(t.title)}</h4>${t.description?`<p>${esc(t.description)}</p>`:''}${t.result?`<p>成果：${esc(t.result)}</p>`:''}</div><div style="text-align:right"><span class="tag ${t.status}">${STATUSES[t.status]}</span><p class="xs muted">${formatHours(t.hours)}</p></div></div>`).join('')}
+ ${j.tasks.map(t=>`<div class="history-task"><div><div class="pill-row"><span class="tag">${esc(t.category)}</span>${t.project?`<span class="tag">${esc(t.project)}</span>`:''}</div>${t.title&&t.title!==t.category?`<h4>${esc(t.title)}</h4>`:''}${t.description?`<p>${esc(t.description)}</p>`:''}${t.result?`<p>成果：${esc(t.result)}</p>`:''}</div><div style="text-align:right"><span class="tag ${t.status}">${STATUSES[t.status]}</span><p class="xs muted">${formatHours(t.hours)}</p></div></div>`).join('')}
   ${j.note?`<p class="small muted">當日備註：${esc(j.note)}</p>`:''}${j.tomorrow?`<p class="small muted">後續計畫：${esc(j.tomorrow)}</p>`:''}
   <div class="history-foot"><span class="xs muted">最後更新：${esc((j.updatedAt||'').slice(0,10))}</span><div class="review-actions">${isCloud&&state.cloud.user?.role==='admin'?`<button class="soft-button sm danger" data-action="admin-delete-journal" data-id="${esc(j.id)}">${icon('trash',15)} 刪除此紀錄</button>`:''}${canEditJournal(j.employeeId)?`<button class="soft-button sm" data-action="edit-journal" data-id="${esc(j.id)}">${icon('edit',15)} 編輯這一天</button>`:'<span class="xs muted">僅供查閱</span>'}</div></div></div>`).join(''):''}</div></article>`;
  }).join('');
@@ -385,12 +398,12 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
 async function saveCloudJournal(){
  if(state.cloud.saving || state.cloud.phase!=='ready')return;
  const d=state.draft;
- if(!d.date || !d.employeeId || !d.tasks.some(t=>t.title.trim())){notify('請選日期、人員並至少填寫一項工作名稱',true);return;}
+ if(!d.date || !d.employeeId || !d.tasks.some(t=>String(t.category||'').trim())){notify('請選日期、人員並至少選擇一個工作類型',true);return;}
  const hours=d.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);
  if(d.tasks.some(t=>Number(t.hours)<0||Number(t.hours)>24) || hours>24){notify('每日總工時不可超過 24 小時',true);return;}
  state.saveRequestId=state.saveRequestId||uid();
  const request={requestId:state.saveRequestId,expectedRevision:d.revision||0,date:d.date,employeeId:d.employeeId,
-  note:d.note,tomorrow:d.tomorrow,tasks:d.tasks.filter(t=>t.title.trim()).map(t=>({...t}))};
+  note:d.note,tomorrow:d.tomorrow,tasks:d.tasks.filter(t=>String(t.category||'').trim()).map(t=>({...t,title:t.title?.trim()||t.category}))};
  state.cloud.saving=true;render();
  try{
   const result=await cloudCall('wpSharedSaveJournal',request);
@@ -514,7 +527,7 @@ root.addEventListener('click', event=>{
   clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount());
   state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;state.saveRequestId=null;state.draftStatus='草稿已捨棄';render();return;
  }
- if(action==='add-task'){if(state.draft.tasks.length>=100){notify('同一天最多可填寫 100 項工作',true);return;}state.draft.tasks.push(makeItem());markDraftDirty();render();document.querySelector('.task-card:last-child input[data-field="title"]')?.focus();return;}
+ if(action==='add-task'){if(state.draft.tasks.length>=100){notify('同一天最多可填寫 100 項工作',true);return;}state.draft.tasks.push(makeItem());markDraftDirty();render();document.querySelector('.task-card:last-child select[data-field="category"]')?.focus();return;}
  if(action==='remove-task'){const index=Number(button.dataset.index);state.draft.tasks.splice(index,1);if(!state.draft.tasks.length)state.draft.tasks.push(makeItem());markDraftDirty();render();return;}
  if(action==='save-journal'){
    if(isCloud){saveCloudJournal();return;}
