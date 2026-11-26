@@ -1,10 +1,12 @@
 // Per-tab recovery. Never automatically replay writes, or change a saved request's revision.
 import {cloudCall} from './cloud.js';
+import {offlineDraftStorage,flushOfflineVault,offlineVaultStatus} from './offline-vault.js';
 const WP_FIELD_QUEUE='workpulse:field-recovery:v1';
 const WP_FIELD_METHODS=['wpSharedSaveJournal','wpAttendanceSave'];
 const wpFieldBusy=new Set();
 let wpFieldMemory=null;
-function wpFieldStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
+function wpFieldStorage(){try{return offlineDraftStorage();}catch{return null;}}
+export function resetFieldRecoveryMemory(){wpFieldMemory=null;}
 function wpFieldSignal(){if(typeof document!=='undefined'&&typeof document.dispatchEvent==='function'&&typeof Event==='function')document.dispatchEvent(new Event('workpulse:field-recovery'));}
 export function fieldOnline(){return typeof navigator==='undefined'||navigator.onLine!==false;}
 function wpFieldPayload(method,p){
@@ -32,7 +34,7 @@ function wpFieldWrite(rows){
  catch{wpFieldMemory=rows;}
  wpFieldSignal();
 }
-export function fieldRecoveryDurable(){return wpFieldMemory===null;}
+export function fieldRecoveryDurable(){const v=offlineVaultStatus();return wpFieldMemory===null&&v.phase!=='error'&&(!v.enabled||v.pending===0);}
 export function stageFieldPending(method,payload){
  const clean=wpFieldPayload(method,payload),rows=readFieldPending();
  const old=rows.find(x=>x.method===method&&x.payload.date===clean.date&&x.payload.employeeId===clean.employeeId);
@@ -52,15 +54,17 @@ export function removeFieldPending(id){
 function wpFieldStatus(id,status){wpFieldWrite(readFieldPending().map(x=>x.payload.requestId===id?{...x,status}:x));}
 export async function fieldSave(method,payload){
  const entry=stageFieldPending(method,payload),id=entry.payload.requestId;
- if(!fieldOnline()){wpFieldStatus(id,'offline');throw Error(fieldRecoveryDurable()?'目前離線，已暫存待同步；恢復網路後請手動重送':'目前離線且無法持久暫存，請保持頁面開啟');}
  if(wpFieldBusy.has(id))throw Error('此筆正在同步中');
- wpFieldBusy.add(id);wpFieldStatus(id,'uncertain');
+ wpFieldBusy.add(id);
  try{
+  wpFieldStatus(id,fieldOnline()?'uncertain':'offline');
+  if(!await flushOfflineVault())throw Error('持久暫存未確認，尚未送出；請保存原始請求並核對離線設定');
+  if(!fieldOnline())throw Error(fieldRecoveryDurable()?'目前離線，已暫存待同步；恢復網路後請手動重送':'目前離線且無法持久暫存，請保持頁面開啟');
   const result=await cloudCall(method,entry.payload);
   const row=method==='wpSharedSaveJournal'?result?.journal:result?.row;
   if(!result?.ok||!row||row.employeeId!==entry.payload.employeeId||row.date!==entry.payload.date)throw Error('雲端儲存結果尚未確認');
-  wpFieldBusy.delete(id);removeFieldPending(id);return result;
- }catch(error){wpFieldStatus(id,String(error?.message||'').includes('CONFLICT:')?'conflict':'uncertain');throw error;}
+  wpFieldBusy.delete(id);removeFieldPending(id);await flushOfflineVault();return result;
+ }catch(error){wpFieldStatus(id,String(error?.message||'').includes('CONFLICT:')?'conflict':!fieldOnline()?'offline':'uncertain');await flushOfflineVault();throw error;}
  finally{wpFieldBusy.delete(id);wpFieldSignal();}
 }
 export async function retryFieldPending(id,employeeId){

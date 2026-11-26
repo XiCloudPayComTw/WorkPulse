@@ -41,8 +41,10 @@ function wsMonth_(control,month){
 }
 function wpSharedBootstrap(month){
   var verified=wpFieldAccess_();
+  var offlineScope=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_OFFLINE_SCOPE')||'');
+  if(!verified||!/^[A-Za-z0-9_-]{16,80}$/.test(offlineScope))offlineScope='';
   var book=wsBook_(),m=wpMonth_(month),people=wsPeople_(book,false);
-  return {month:m,store:{version:1,mode:'cloud',
+  return {month:m,offlineScope:offlineScope,store:{version:1,mode:'cloud',
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
       .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m)},

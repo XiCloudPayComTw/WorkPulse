@@ -29,7 +29,7 @@ export function readQuickDraft(storage,account,maxAgeMs=7*86400000){
 }
 export function saveQuickDraft(storage,account,draft){
  if(!storage||!draft||!isDay(draft.date)||!Array.isArray(draft.tasks)||!draft.tasks.length||draft.tasks.length>100)return false;
- try{storage.setItem(draftKey(account),JSON.stringify({account:String(account),savedAt:Date.now(),draft:{...draft,tasks:draft.tasks.map(normalizeTask)}}));return true;}catch{return false;}
+ try{storage.setItem(draftKey(account),JSON.stringify({account:String(account),savedAt:Date.now(),draft:{date:draft.date,employeeId:plain(draft.employeeId,180),note:plain(draft.note,2000),tomorrow:plain(draft.tomorrow,2000),editing:!!draft.editing,revision:Number(draft.revision)||0,tasks:draft.tasks.map(normalizeTask)}}));return true;}catch{return false;}
 }
 export function clearQuickDraft(storage,account){try{storage?.removeItem(draftKey(account));}catch{/* storage disabled */}}
 export function readTemplates(storage,account){
