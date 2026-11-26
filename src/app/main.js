@@ -370,7 +370,7 @@ function activateAttendancePage(){
    onError:error=>{attendanceState.phase='error';attendanceState.error=error?.message||'出勤表讀取失敗';}
  });
 }
-function changeView(view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
+function changeView(view){if(state.view==='attendance'&&view!=='attendance'&&(attendanceState.scheduleSaving||(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定離開？'))))return;if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;const promise=loadAdmin();render();await promise;render();}
 function notify(text,error=false){state.toast={text,error};showToast(text,error);}
 function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;if(!preserve)container.innerHTML='';container.insertAdjacentHTML('beforeend',`<div class="toast ${error?'error':''}">${icon(error?'alert':'checkCircle',18)} ${esc(text)}</div>`);}

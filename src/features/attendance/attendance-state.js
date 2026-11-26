@@ -7,9 +7,9 @@ import {attendancePlannedDay,previousAttendanceTimes,attendanceMonthDates} from 
 const KEY='workpulse-attendance-v1';
 export const attendanceState={month:currentMonth(),employeeId:'',date:localISODate(),rows:[],
   draft:null,phase:'idle',error:'',saving:false,requestId:null,expectedDays:null,
-  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true,schedule:{days:{},revision:0},scheduleDirty:false,scheduleSaving:false,scheduleRequest:null};
+  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true,schedule:{days:{},revision:0},scheduleDirty:false,scheduleSaving:false,scheduleRequest:null,confirmedSchedule:{days:{},revision:0}};
 export function newAttendanceDraft(date=attendanceState.date,source=null){
- return {date,employeeId:attendanceState.employeeId,dayType:source?.dayType||attendancePlannedDay(date,attendanceState.schedule.days),
+ return {date,employeeId:attendanceState.employeeId,dayType:source?.dayType||attendancePlannedDay(date,attendanceState.confirmedSchedule.days),
    startTime:source?.startTime||'',endTime:source?.endTime||'',breakMinutes:source?.breakMinutes||0,
    leaveType:source?.leaveType||'none',leaveMinutes:source?.leaveMinutes||0,
    notes:source?.notes||'',revision:source?.revision||0};
@@ -58,7 +58,7 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
   clearTemporarySalary();
   attendanceState.month=month;attendanceState.phase='ready';
   attendanceState.employeeId='';attendanceState.rows=[];
-  attendanceState.expectedDays=null;attendanceState.adminConfig=null;attendanceState.schedule={days:{},revision:0};attendanceState.scheduleDirty=false;
+  attendanceState.expectedDays=null;attendanceState.adminConfig=null;attendanceState.schedule={days:{},revision:0};attendanceState.confirmedSchedule={days:{},revision:0};attendanceState.scheduleDirty=false;
   attendanceState.draft=null;attendanceState.error='';
   return true;
  }
@@ -83,7 +83,7 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
   attendanceState.rows=rows;
   attendanceState.expectedDays=expectedDays;
   attendanceState.adminConfig=adminConfig;
-  attendanceState.schedule=schedule;attendanceState.scheduleDirty=false;attendanceState.scheduleRequest=null;
+  attendanceState.schedule=schedule;attendanceState.confirmedSchedule=schedule;attendanceState.scheduleDirty=false;attendanceState.scheduleRequest=null;
   const requested=attendanceState.date.startsWith(month)?attendanceState.date:month+'-01';
   attendanceSelectDate(requested);
   attendanceState.phase='ready';
@@ -178,7 +178,7 @@ export async function saveAttendanceSchedule(){
  try{
   const result=await cloudCall('wpOwnerSaveAttendanceSchedule',{employeeId,month,requestId,expectedRevision:a.schedule.revision,days:a.schedule.days});
   if(!result?.ok||!result.schedule)throw Error('班表未確認儲存');
-  if(a.employeeId===employeeId&&a.month===month&&a.scheduleRequest===requestId){a.schedule=result.schedule;a.scheduleDirty=false;a.scheduleRequest=null;}
+  if(a.employeeId===employeeId&&a.month===month&&a.scheduleRequest===requestId){a.schedule=result.schedule;a.confirmedSchedule=result.schedule;a.scheduleDirty=false;a.scheduleRequest=null;}
   return result;
  }finally{a.scheduleSaving=false;}
 }

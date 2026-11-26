@@ -21,8 +21,8 @@ export function renderAttendance(people,isAdmin=false){
  if(a.phase==='idle'||a.phase==='loading')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="status">正在讀取出勤資料…</section></div>';
  if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'</section></div>';
  const wage=currentTemporaryWage();
- const days=attendanceCalendar(a.month,a.rows,a.schedule.days,localISODate(),a.date,a.dirty?a.draft:null);
- const expected=a.expectedDays??(Object.keys(a.schedule.days).length?days.filter(x=>x.planned==='workday').length:null);
+ const days=attendanceCalendar(a.month,a.rows,a.confirmedSchedule.days,localISODate(),a.date,a.dirty?a.draft:null);
+ const expected=a.expectedDays??(Object.keys(a.confirmedSchedule.days).length?days.filter(x=>x.planned==='workday').length:null);
  const info=attendanceSummary(a.rows,a.month,expected,wage);
  const salaryPanel='<section class="soft-card card-pad-lg att-salary-panel" aria-label="本次臨時薪資試算">'+
   '<div><h3 class="card-title">薪資基準 · 即時計算</h3>'+
@@ -166,7 +166,8 @@ document.addEventListener('input',event=>{
   updateTemporarySalary(el.value);
   // Update monetary cells in place; never rebuild the input during typing.
   const panel=el.closest('.att-page'),wage=currentTemporaryWage(),a=attendanceState;
-  const sum=attendanceSummary(a.rows,a.month,a.expectedDays,wage);
+  const expected=a.expectedDays??(Object.keys(a.confirmedSchedule.days).length?attendanceCalendar(a.month,[],a.confirmedSchedule.days,localISODate()).filter(x=>x.planned==='workday').length:null);
+  const sum=attendanceSummary(a.rows,a.month,expected,wage);
   const total=panel.querySelector('[data-att-monthly-pay]');
   if(total)total.textContent=cost(sum.totalPay);
   const preview=panel.querySelector('[data-att-preview-pay]');
@@ -205,6 +206,7 @@ document.addEventListener('change',event=>{
   const date=el.value;
   if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date)){attendanceNotice='日期格式無效';refreshAttendanceDom();return;}
   if(date.slice(0,7)!==attendanceState.month){
+   if(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定切換月份？')){refreshAttendanceDom();return;}
    attendanceState.date=date;
    changeAttendanceMonth(date.slice(0,7),attendanceState.employeeId)
     .catch(e=>{attendanceNotice=e.message;refreshAttendanceDom();});

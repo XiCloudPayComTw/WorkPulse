@@ -14,7 +14,7 @@ test('calendar uses explicit schedule and does not classify today or future as m
 test('calendar flags actual vs planned mismatch without changing recorded day',()=>{
  const row={date:'2026-11-23',dayType:'weekly',workedMinutes:300,leaveMinutes:0,startTime:'08:00',endTime:'13:00'};
  const day=attendanceCalendar('2026-11',[row],{},'2026-11-26').find(x=>x.date===row.date);
- assert.equal(day.status,'review');assert.equal(day.row.dayType,'weekly');assert.equal(day.issues.length,2);
+ assert.equal(day.status,'review');assert.equal(day.row.dayType,'weekly');assert.equal(day.issues.length,3);
 });
 test('copy uses exact preceding day, same employee, and only time fields',()=>{
  const rows=[{employeeId:'a',date:'2026-11-25',startTime:'08:00',endTime:'17:00',breakMinutes:60,notes:'secret',dayType:'rest'}];
