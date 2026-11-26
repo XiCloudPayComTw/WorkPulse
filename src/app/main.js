@@ -3,10 +3,11 @@ import { STORAGE_KEY, CATEGORIES, STATUSES, readState, writeState, saveJournal, 
 import { currentMonth, localISODate, shiftDate, formatDate, formatHours, esc, uid, download } from '../shared/utils.js';
 import { cloudEnabled, cloudCall } from '../services/cloud.js';
 import { adminState, loadAdmin, setAdminTab, editAdmin, updateAdminDraft, resetAdminEditor, renderTeam, saveAdmin } from '../features/admin/admin.js';
+import {renameLocalEmployee,renameLocalProject} from '../features/admin/rename.js';
 import { buildReport, reportCsv, reportSheets } from '../features/reports/reports.js';
 import { buildXlsx } from '../shared/xlsx.js';
 import { renderReportWorkspace } from '../features/reports/report-ui.js';
-import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemplate, removeTemplate, newTaskFromTemplate, recentPriorJournal } from '../features/journals/quick-entry.js';
+import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemplate, removeTemplate, renameTemplatesProject, newTaskFromTemplate, recentPriorJournal } from '../features/journals/quick-entry.js';
 import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig} from '../features/attendance/attendance-state.js';
 import {renderAttendance} from '../features/attendance/attendance-ui.js';
 import {shouldLoadAttendance,activateAttendance} from './attendance-lifecycle.js';
@@ -19,7 +20,7 @@ const isCloud = cloudEnabled();
 const isOwnerPortal = isCloud && typeof window!=='undefined' && window.WORKPULSE_ADMIN_PORTAL===true;
 const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
-  filters:{query:'',employee:'all',status:'all'},
+  filters:{query:'',employee:'all',status:'all'},localRename:null,
   expanded:new Set([today,shiftDate(today,-1)]),draft:null,dirty:false,draftRestored:false,draftStatus:'未有暫存草稿',templates:[],
   toast:null,cloud:{phase:isCloud?'loading':'local',user:null,error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
   report:{filters:{startDate:today.slice(0,7)+'-01',endDate:today,employeeId:'all',departmentId:'all',project:'all',category:'all',status:'all'},phase:'idle',error:'',payload:null,applied:null,token:0}
@@ -71,12 +72,14 @@ function employeeName(id){return state.store.employees.find(e=>e.id===id)?.name 
 function navButton(n,mobile=false){return renderNavigationButton(n,state.view,mobile);}
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班費與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
+ const modeName=isCloud?(state.cloud.user?.role==='admin'?'管理員':'共用'):'展示版';
+ const modeTip=isCloud?(state.cloud.user?.role==='admin'?'已驗證的管理員入口':'共用填寫，選擇姓名不代表已驗證個人身分'):'本機展示模式，資料只存於目前瀏覽器';
  root.innerHTML = `<div class="shell">
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
    <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.10.1</div></div></aside>
    <main class="main"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
-   <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button><span class="avatar" title="${esc(isCloud?(state.cloud.user?.email||'Google 帳號驗證中'):'展示模式，尚無登入機制')}">${esc(isCloud?(state.cloud.user?.name||'雲').slice(0,1):'示')}</span></div></header>
+   <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button><span class="mode-chip" title="${esc(modeTip)}" aria-label="${esc(modeTip)}">${esc(modeName)}</span></div></header>
    <div id="page-content" class="flash">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.10.1</footer></main>
    <nav class="mobile-nav" style="--nav-count:${visibleNav().length}" aria-label="手機導覽">${visibleNav().map(n=>navButton(n,true)).join('')}</nav>
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
@@ -233,12 +236,25 @@ function exportReport(type){
  else download(`WorkPulse-明細-${span}.csv`,reportCsv(report),'text/csv;charset=utf-8');
  notify(`已產生 ${type==='xlsx'?'Excel':'CSV'} 報表（${report.count} 項）`);
 }
+function renderLocalNamedItem(kind,id,name){
+ const editing=state.localRename?.kind===kind&&state.localRename?.id===id;
+ const max=kind==='employee'?80:100;
+ if(editing)return `<span class="chip local-rename-editor">
+  <input class="input" data-local-rename maxlength="${max}" value="${esc(name)}" aria-label="編輯${kind==='employee'?'人員':'專案'}名稱">
+  <button class="soft-button mini" data-action="local-rename-save">儲存</button>
+  <button class="soft-button mini" data-action="local-rename-cancel">取消</button></span>`;
+ return `<span class="chip local-named-chip"><span>${esc(name)}</span>
+  <button data-action="local-rename-start" data-kind="${kind}" data-id="${esc(id)}"
+   aria-label="編輯${esc(name)}名稱">${icon('edit',13)}</button>
+  <button data-action="remove-${kind}" data-id="${esc(id)}" aria-label="移除 ${esc(name)}">${icon('x',13)}</button>
+  </span>`;
+}
 function renderSettings(){
  if(isCloud)return `${syncBanner()}<section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">管理者 Google Drive</h2><p class="card-sub">只有驗證通過的管理員能維護使用者與刪除日誌。</p></div></div><div class="notice">${icon('info',18)}<div>一般使用者直接選擇姓名填寫與查閱；請注意姓名選單並非登入身分驗證。</div></div><button class="soft-button primary section-space" data-action="navigate" data-view="team">${icon('users',16)} 管理員控制台</button></section>`;
 
  return `<div class="notice">${icon('shield',20)}<div><strong style="font-weight:550">資料存放與權限提醒</strong><br/>這是可操作的本機原型，所有紀錄只存在目前瀏覽器的 localStorage。人員選單不等於登入驗證，且資料尚未同步至 Google Sheets。請先使用測試資料。</div></div>
- <div class="settings-grid section-space"><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">填寫人員</h2><p class="card-sub">管理日誌表單的人員選單</p></div>${icon('users',19)}</div><div class="inline-add"><input class="input" id="new-employee" maxlength="80" placeholder="新增人員名稱" aria-label="新增人員名稱"/><button class="soft-button icon-only" data-action="add-employee" aria-label="新增人員">${icon('plus',17)}</button></div><div class="chip-list">${state.store.employees.map(e=>`<span class="chip">${esc(e.name)}<button aria-label="移除 ${esc(e.name)}" data-action="remove-employee" data-id="${esc(e.id)}">${icon('x',13)}</button></span>`).join('')}</div></section>
- <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">專案清單</h2><p class="card-sub">管理表單中可選的專案</p></div>${icon('folder',19)}</div><div class="inline-add"><input class="input" id="new-project" maxlength="100" placeholder="新增專案名稱" aria-label="新增專案名稱"/><button class="soft-button icon-only" data-action="add-project" aria-label="新增專案">${icon('plus',17)}</button></div><div class="chip-list">${state.store.projects.map(p=>`<span class="chip">${esc(p)}<button aria-label="移除 ${esc(p)}" data-action="remove-project" data-id="${esc(p)}">${icon('x',13)}</button></span>`).join('')}</div></section></div>
+ <div class="settings-grid section-space"><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">填寫人員</h2><p class="card-sub">管理日誌表單的人員選單</p></div>${icon('users',19)}</div><div class="inline-add"><input class="input" id="new-employee" maxlength="80" placeholder="新增人員名稱" aria-label="新增人員名稱"/><button class="soft-button icon-only" data-action="add-employee" aria-label="新增人員">${icon('plus',17)}</button></div><div class="chip-list">${state.store.employees.map(e=>renderLocalNamedItem('employee',e.id,e.name)).join('')}</div></section>
+ <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">專案清單</h2><p class="card-sub">管理表單中可選的專案</p></div>${icon('folder',19)}</div><div class="inline-add"><input class="input" id="new-project" maxlength="100" placeholder="新增專案名稱" aria-label="新增專案名稱"/><button class="soft-button icon-only" data-action="add-project" aria-label="新增專案">${icon('plus',17)}</button></div><div class="chip-list">${state.store.projects.map(p=>renderLocalNamedItem('project',p,p)).join('')}</div></section></div>
  <section class="soft-card card-pad-lg section-space"><div class="card-head"><div><h2 class="card-title">資料備份與匯出</h2><p class="card-sub">所有功能皆在本機執行，不會上傳至外部伺服器</p></div>${icon('database',19)}</div><div class="row" style="flex-wrap:wrap"><button class="soft-button" data-action="export-json">${icon('download',16)} 匯出 JSON 備份</button><button class="soft-button" data-action="export-csv">${icon('download',16)} 匯出 CSV 報表</button><button class="soft-button" data-action="import-json">${icon('upload',16)} 匯入 JSON 備份</button></div><div class="divider"></div><div class="row-between" style="flex-wrap:wrap"><div><div class="small">重設本機資料</div><div class="xs muted">這會清除目前瀏覽器內的工作日誌與設定，無法復原。</div></div><button class="soft-button danger sm" data-action="reset-data">${icon('trash',15)} 清空資料</button></div></section>
  <section class="soft-card card-pad-lg section-space"><div class="card-head"><div><h2 class="card-title">下一步：Google Sheets</h2><p class="card-sub">正式多人使用需先完成伺服端權限驗證</p></div>${icon('arrowUpRight',19)}</div><p class="small muted" style="line-height:1.95">規劃使用 Google Workspace 帳號辨識員工，由受控的服務端處理資料存取、操作紀錄及編輯權限。完成前不提供可供匿名使用者直接寫入試算表的公開介面。</p></section>`;
 }
