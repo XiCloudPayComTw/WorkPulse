@@ -31,7 +31,7 @@ test('CSS browser imports and Apps Script inline CSS have identical ordering',()
  const filenames=[...manifest.matchAll(/@import url\("\.\/([^"]+)"\);/g)].map(x=>x[1]);
  assert.deepEqual(filenames,[
   'base.css','cloud.css','admin.css','reports.css','stability.css',
-  'legacy-review.css','attendance.css','payroll.css'
+  'legacy-review.css','attendance.css','payroll.css','field-mobile.css'
  ]);
  const gas=read('scripts/build-gas.mjs');
  const declared=gas.match(/const styleFiles=(\[[^\]]+\]);/);
