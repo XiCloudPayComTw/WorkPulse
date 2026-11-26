@@ -207,3 +207,12 @@
 - `src/app/main.js` 加上 bootstrap 重試請求序號以及月份讀取最後請求保護，避免網路回應順序顛倒造成過時資料覆蓋。出勤 loader 額外在未預期拋錯時進入 error 畫面。
 - 增加路由／報表日期／雲端讀寫逾時／Bootstrap 重試的 Node 回歸測試；GitHub Actions 額外增加 Headless Chrome 的窄螢幕、桌面路由煙霧測試，成功才建 Pages artifact。
 - 不調整既有 Google Sheets Schema、薪資暫時試算、權限架構與 UI 主題。正式 Workspace 部署仍待公司帳號驗收。
+
+## v0.10.3 — 名稱編輯、管理員專案與出勤排版（PR #15）
+
+- 本批來自成功合併且 Pages 已部署的 v0.10.2 main，獨立分支 feat/workpulse-v0.10.3-edit-names-layout。
+- 展示版新增「編輯人員名稱」、「編輯專案名稱」內嵌輸入框；原員工 ID 不變，本機專案更名會連同已儲存日誌與常用範本文字更新。
+- 雲端 Admin 原本可以編輯姓名，此批新增專案管理分頁與私人 `wpOwnerSaveProject`（新增／更名／停用）和各項伺服端安全檢查；公開 Apps Script 封包不包含私人 API。
+- 雲端歷史日誌仍保存原本專案名稱。歷史紀錄保留舊標籤並允許回編，新紀錄限用目前啟用專案。
+- 出勤薪資試算卡片移至明細後、勞基法公式前；公式卡片改緊湊；頭部模式改明確「展示版／共用／管理員」。
+- 不更改 Google Sheets schema，不擅自操作公司 Drive。須在公司管理員正式部署後驗證 private `OwnerProjects.gs` 的寫入權限。
