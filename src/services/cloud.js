@@ -2,7 +2,7 @@ import {startFieldLoading,stopFieldLoading} from '../app/loading.js';
 /** Apps Script HTMLService provides google.script.run only inside its own web-app origin. */
 const METHODS = new Set([
  'wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
- 'wpOwnerBootstrap','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
+ 'wpOwnerBootstrap','wpOwnerMaintenance','wpOwnerRecoveryPreview','wpOwnerBackupWorkbook','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
  'wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule','wpAttendanceRange'
 ]);

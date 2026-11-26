@@ -465,3 +465,10 @@ test('daily backup requires registered trigger and effective owner, records succ
  assert.equal(JSON.parse(h.props.WORKPULSE_BACKUP_LAST_RUN).ok,true);
  h.scope.wpDailyBackup_({triggerUid:'trigger-123'});assert.equal(h.files.size,2);
 });
+
+test('task index groups by journal and preserves revision filtering',()=>{
+ const h=harness(),j={journalId:'a',date:'2026-11-01',employeeId:'e',revision:2};
+ const tasks=[{journalId:'a',revision:1,title:'old'},{journalId:'a',revision:2,title:'new',position:1},{journalId:'b',revision:2,title:'other'}];
+ const index=h.scope.wsTaskIndex_(tasks);assert.equal(index.get('a').length,2);
+ const result=h.scope.wsRecord_(j,index.get('a'));assert.equal(result.tasks.length,1);assert.equal(result.tasks[0].title,'new');
+});
