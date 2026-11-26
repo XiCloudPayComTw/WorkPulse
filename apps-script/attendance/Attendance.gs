@@ -62,5 +62,29 @@ function wpAttendanceLoad(payload){
   var m=wpMonth_(payload&&payload.month),control=wsBook_(),id=String(payload&&payload.employeeId||'');
   wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,m,false),settings=wpAttConfig_(control,id,m);
-  return {month:m,employeeId:id,rows:wpAttRows_(file,id),expectedDays:settings.expectedDays};
+  var schedule=wpAttSchedule_(control,id,m);
+  return {month:m,employeeId:id,rows:wpAttRows_(file,id),expectedDays:settings.expectedDays,schedule:{days:schedule.days,revision:schedule.revision}};
+}
+
+// Schedule is independent of recorded attendance and monthly payroll. A single Meta row
+// per person/month avoids changing the existing AttendanceSettings schema.
+function wpAttScheduleKey_(id,month){return 'attendanceSchedule:'+encodeURIComponent(id)+':'+month;}
+function wpAttSchedule_(control,id,month){
+ var row=wpRows_(wpSheet_(control,'Meta')).find(function(x){return x.key===wpAttScheduleKey_(id,month);});
+ if(!row)return {days:{},revision:0};
+ try{
+  var data=JSON.parse(String(row.value));
+  if(!data||!Number.isSafeInteger(data.revision)||data.revision<1||!data.days||typeof data.days!=='object')throw Error('invalid');
+  return {days:wpAttScheduleValidate_(data.days,month),revision:data.revision,requestId:String(data.requestId||'')};
+ }catch(error){throw Error('班表設定損毀，請管理員核對');}
+}
+function wpAttScheduleValidate_(days,month){
+ if(!days||typeof days!=='object'||Array.isArray(days)||Object.keys(days).length>31)throw Error('班表格式無效');
+ var clean={};
+ Object.keys(days).sort().forEach(function(date){
+  if(wpDate_(date)!==date||date.slice(0,7)!==month||WP_ATTENDANCE_DAYS.indexOf(days[date])<0)
+   throw Error('班表日期或日別無效');
+  clean[date]=days[date];
+ });
+ return clean;
 }

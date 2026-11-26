@@ -382,3 +382,16 @@ test('public source contains dynamic category reader but no owner category mutat
  assert.doesNotMatch(shared+'\n'+simple,/function wpOwnerSaveCategories/);
  assert.match(privileged,/function wpOwnerSaveCategories/);
 });
+
+test('schedule edits are private, revisioned, monthly and do not mutate attendance',()=>{
+ const h=harness();h.setup();const e=h.employee();
+ const input={employeeId:e.id,month:'2026-11',days:{'2026-11-23':'holiday'},expectedRevision:0,requestId:'schedule-00000001'};
+ h.as('');assert.throws(()=>h.scope.wpOwnerSaveAttendanceSchedule(input),/管理員/);
+ h.as('admin@example.com');const result=h.scope.wpOwnerSaveAttendanceSchedule(input);
+ assert.equal(result.schedule.revision,1);assert.equal(h.scope.wpOwnerSaveAttendanceSchedule(input).deduplicated,true);
+ assert.throws(()=>h.scope.wpOwnerSaveAttendanceSchedule({...input,requestId:'schedule-00000002'}),/CONFLICT/);
+ assert.throws(()=>h.scope.wpOwnerSaveAttendanceSchedule({...input,days:{'2026-12-01':'rest'}}),/日期/);
+ h.as('');const loaded=h.scope.wpAttendanceLoad({employeeId:e.id,month:'2026-11'});
+ assert.equal(loaded.schedule.days['2026-11-23'],'holiday');assert.equal(loaded.rows.length,0);
+ assert.equal(h.files.size,1);
+});

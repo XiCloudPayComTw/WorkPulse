@@ -143,3 +143,8 @@ Chrome 執行環境依賴 Ubuntu Runner 預裝的 `google-chrome`；開發者本
 ## v0.12.0 外勤恢復層
 
 `src/services/field-recovery.js` 在 cloudCall 上方保存原始日誌／出勤寫入請求，僅明確手動重送；`src/features/attendance/attendance-draft.js` 管理分人員日期未提交草稿。兩者加入 Apps Script 前端打包，既有 public/admin 後端 API 與 schema 不變。詳見 [FIELD_RECOVERY_V012.md](FIELD_RECOVERY_V012.md)。
+
+
+## v0.12.1
+
+`src/features/attendance/calendar.js` 負責純月曆／班表／前日複製規則；`Attendance.gs` 讀取 Meta 中分人員月份的班表，私人 `OwnerAttendance.gs` 管理變更。原有出勤與薪資 schema 不變。詳見 ATTENDANCE.md。

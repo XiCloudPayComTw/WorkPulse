@@ -53,6 +53,15 @@ const probe=`<script>
          personChoice=(stored===id && inForm===id && after!==before)?'ok':'not-synced';
        }
      }
+     let calendarCheck='skip',spacingCheck='skip';
+     if(location.hash.includes('/attendance')){
+       const cell=document.querySelector('.att-cal-day[data-date]');
+       if(cell){const date=cell.dataset.date;cell.click();calendarCheck=document.querySelector('[data-att-date]')?.value===date?'ok':'wrong-date';}else calendarCheck='missing';
+     }
+     if(location.hash.includes('/entry')||location.hash.includes('/history')){
+       const heading=document.querySelector('.section-head.section-space');
+       spacingCheck=heading&&parseFloat(getComputedStyle(heading).marginTop)>=26?'ok':'missing-gap';
+     }
      const copyCheck=new Event('copy',{bubbles:true,cancelable:true});
      const titleElement=document.querySelector('h1.page-title');
      titleElement?.dispatchEvent(copyCheck);
@@ -68,6 +77,8 @@ const probe=`<script>
      output.dataset.failed=failed?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
+     output.dataset.calendarCheck=calendarCheck;
+     output.dataset.spacingCheck=spacingCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
@@ -114,7 +125,8 @@ try{
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
-      (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0')))
+      (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'))||
+      (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}px, no page overflow`);
    count++;
