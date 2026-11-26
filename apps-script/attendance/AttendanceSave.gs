@@ -1,8 +1,9 @@
 /** Attendance write endpoint. Separate file to keep public APIs auditable. */
 function wpAttendanceSave(input){
+ wpFieldAccess_();
  if(!input||typeof input!=='object')throw Error('出勤資料錯誤');
  if(Object.prototype.hasOwnProperty.call(input,'monthlyWage')||Object.prototype.hasOwnProperty.call(input,'overtimePay'))
-  throw Error('薪資及試算金額只能在目前瀏覽器試算，禁止上傳');
+  throw Error('薪資及試算金額只在本機 Excel 處理，禁止上傳');
  var id=String(input.employeeId||''),date=wpDate_(input.date),month=date.slice(0,7);
  var day=String(input.dayType||'workday'),leave=String(input.leaveType||'none');
  var request=String(input.requestId||''),revision=Number(input.expectedRevision);
@@ -14,7 +15,7 @@ function wpAttendanceSave(input){
  if(!worked&&!leaveMinutes)throw Error('請填寫出勤時間或請假');
  var lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
-  var control=wsBook_();wpAttEmployee_(control,id);
+  var control=wsBook_();wpFieldWriteGuard_(control);wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,month,true);wpInitializeSheet_(file,'Attendance');
   var sheet=wpSheet_(file,'Attendance'),rows=wpRows_(sheet);
   var oldRequest=wpRows_(wpSheet_(file,'Requests')).find(function(x){return x.requestId===request;});

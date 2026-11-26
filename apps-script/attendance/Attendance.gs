@@ -59,6 +59,7 @@ function wpAttEmployee_(control,id){
   return person;
 }
 function wpAttendanceLoad(payload){
+  wpFieldAccess_();
   var m=wpMonth_(payload&&payload.month),control=wsBook_(),id=String(payload&&payload.employeeId||'');
   wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,m,false),settings=wpAttConfig_(control,id,m);

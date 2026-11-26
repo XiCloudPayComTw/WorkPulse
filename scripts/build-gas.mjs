@@ -45,7 +45,7 @@ for(const [portal,isOwner] of [['public',false],['admin',true]]){
  if(output===html||output.includes('type="module"'))throw Error('HTMLService transformation failed');
  await Promise.all([
    writeFile(directory+'/Index.html',output),
-   writeFile(directory+'/Core.gs',core),
+   writeFile(directory+'/Core.gs',"var WP_PORTAL_KIND='"+(isOwner?'admin':'public')+"';\n"+core),
    writeFile(directory+'/Monthly.gs',monthly),
    writeFile(directory+'/Simple.gs',simple),
    writeFile(directory+'/Attendance.gs',attendance),

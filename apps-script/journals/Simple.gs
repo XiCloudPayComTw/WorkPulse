@@ -40,15 +40,16 @@ function wsMonth_(control,month){
   return rows.map(function(j){return wsRecord_(j,tasks.get(String(j.journalId))||[]);});
 }
 function wpSharedBootstrap(month){
+  var verified=wpFieldAccess_();
   var book=wsBook_(),m=wpMonth_(month),people=wsPeople_(book,false);
   return {month:m,store:{version:1,mode:'cloud',
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
       .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m)},
-    user:{id:'guest',name:'共用填寫',role:'guest',email:'',
+    user:{id:'guest',name:'共用填寫',role:'guest',email:verified,
       canWriteIds:people.map(function(p){return p.id;})}};
 }
-function wpSharedLoadMonth(month){var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}
+function wpSharedLoadMonth(month){wpFieldAccess_();var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}
 function wsValidated_(input,book){
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('工作資料格式無效');
   var employeeId=String(input.employeeId||'');
@@ -116,9 +117,9 @@ function wsValidated_(input,book){
     tasks:tasks,note:wpText_(input.note,2000),tomorrow:wpText_(input.tomorrow,2000)};
 }
 function wpSharedSaveJournal(payload){
-  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  wpFieldAccess_();var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
-    var control=wsBook_(),p=wsValidated_(payload,control);
+    var control=wsBook_();wpFieldWriteGuard_(control);var p=wsValidated_(payload,control);
     var book=wpMonthFile_(control,p.date.slice(0,7),true),deleted=wsDeleted_(book);
     var sheet=wpSheet_(book,'Journals'),rows=wpRows_(sheet),allRequests=wpRows_(wpSheet_(book,'Requests'));
     var previous=allRequests.find(function(r){return String(r.requestId)===p.requestId;});
@@ -149,7 +150,7 @@ function wpSharedSaveJournal(payload){
   }finally{lock.releaseLock();}
 }
 function wpSharedQueryReport(criteria){
-  var book=wsBook_();
+  wpFieldAccess_();var book=wsBook_();
   if(!criteria||typeof criteria!=='object')throw Error('報表條件無效');
   var start=wpDate_(criteria.startDate),end=wpDate_(criteria.endDate);
   var span=(Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000;
