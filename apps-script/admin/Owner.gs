@@ -377,3 +377,87 @@ function workPulseInitializationCheck(){
  check('offlineScope',true,function(){if(scope&&!/^[A-Za-z0-9_-]{16,80}$/.test(scope))throw Error('離線範圍必須為 16–80 位英數、底線或連字號');return scope?'已設定，須確認與其他環境不同':'未啟用選用持久暫存範圍';});
  return {readOnly:true,canInitialize:checks.every(function(x){return !x.required||x.ok;}),productionVerified:false,checks:checks,checkedAt:new Date().toISOString()};
 }
+
+
+/** Read-only, one indexed month, owner only. No record content or identifiers in result. */
+function wpOwnerMonthIntegrity(input){
+ var cfg=wpPrimaryOwnerAssert_(),month=wpMonth_(input&&input.month),control=wsBook_(),index=wpMonthIndex_(control);
+ var id=index[month],checkedAt=new Date().toISOString();
+ if(!id)return {readOnly:true,productionVerified:false,month:month,status:'not-found',checkedAt:checkedAt,counts:{},issues:[]};
+ if(id===cfg.sheetId||Object.values(index).filter(function(x){return x===id;}).length!==1)throw Error('月份索引異常，停止檢查');
+ wpBackupAssertPrivate_(DriveApp.getFileById(id),cfg.adminEmail);
+ var book=wpMonthFile_(control,month,false),names=['Journals','Tasks','Requests','Audit','Meta','Attendance'],data={},cells=0;
+ if(book.getSheets().length!==names.length)throw Error('月份工作表數量不符');
+ names.forEach(function(n){var s=wpSheet_(book,n),headers=WP_HEADERS[n],rows=s.getLastRow();
+  cells+=rows*headers.length;if(cells>250000)throw Error('本月超過 250000 儲存格核對上限，須人工檢查');
+  if(JSON.stringify(s.getRange(1,1,1,headers.length).getValues()[0])!==JSON.stringify(headers))throw Error(n+' 表頭不符');
+  data[n]=wpRows_(s);
+ });
+ var people=new Set(wpRows_(wpSheet_(control,'Employees')).map(function(x){return String(x.employeeId);}));
+ var issues=new Map(),journals=new Map(),attendance=new Map(),active=new Set(),attKeys=new Set(),tasks=new Map(),requests=new Map(),deleted=new Set();
+ function issue(code,sheet,row){var a=issues.get(code);if(!a){a={code:code,count:0,examples:[]};issues.set(code,a);}a.count++;if(a.examples.length<5)a.examples.push({sheet:sheet,row:row});}
+ function rev(x){var n=Number(x);return Number.isSafeInteger(n)&&n>=1?n:0;}
+ function validDate(x){try{return wpDate_(x).slice(0,7)===month;}catch(e){return false;}}
+ function key(a,b){return JSON.stringify([String(a),String(b)]);}
+ data.Audit.forEach(function(x){if(x.action==='journal.deleted')deleted.add(String(x.journalId));});
+ function addRecords(rows,map,idKey,keys,sheet,isJournal){
+  rows.forEach(function(x){
+   var id=String(x[idKey]||''),r=rev(x.revision),person=String(x.employeeId||''),k=key(person,x.date);
+   if(!id||map.has(id))issue('record-id',sheet,x.__row);else map.set(id,x);
+   if(!r)issue('record-revision',sheet,x.__row);
+   if(!validDate(x.date))issue('record-date',sheet,x.__row);
+   if(!people.has(person))issue('unknown-employee',sheet,x.__row);
+   if(!isJournal||!deleted.has(id)){if(keys.has(k))issue('duplicate-person-date',sheet,x.__row);keys.add(k);}
+  });
+ }
+ addRecords(data.Journals,journals,'journalId',active,'Journals',true);
+ addRecords(data.Attendance,attendance,'attendanceId',attKeys,'Attendance',false);
+ data.Tasks.forEach(function(x){
+  var j=journals.get(String(x.journalId)),r=rev(x.revision),position=Number(x.position),k=key(x.journalId,r);
+  if(!j||!r||r>rev(j.revision)){issue('task-reference','Tasks',x.__row);return;}
+  var g=tasks.get(k);if(!g){g=new Set();tasks.set(k,g);}
+  if(x.position===''||!Number.isInteger(position)||position<0||position>=100||g.has(position))issue('task-position','Tasks',x.__row);
+  else g.add(position);
+ });
+ data.Journals.forEach(function(j){
+  var g=tasks.get(key(j.journalId,rev(j.revision)));
+  if(!g||!g.size||Array.from(g).some(function(n){return n>=g.size;}))issue('current-tasks','Journals',j.__row);
+ });
+ data.Requests.forEach(function(x){
+  var id=String(x.requestId||''),actor=String(x.actorEmail||''),isAttendance=actor.indexOf('attendance:')===0,
+   target=(isAttendance?attendance:journals).get(String(x.journalId));
+  if(!id||requests.has(id))issue('request-id','Requests',x.__row);else requests.set(id,x);
+  if(!target||!rev(x.revision)||rev(x.revision)>rev(target.revision)||actor!==(isAttendance?'attendance:':'selected:')+String(target.employeeId))issue('request-reference','Requests',x.__row);
+ });
+ function latest(rows,idKey,prefix,sheet){
+  rows.forEach(function(x){
+   var request=requests.get(String(x.requestId||''));
+   if(!request||String(request.journalId)!==String(x[idKey])||rev(request.revision)!==rev(x.revision)||String(request.actorEmail)!==prefix+String(x.employeeId))issue('current-request',sheet,x.__row);
+  });
+ }
+ latest(data.Journals,'journalId','selected:','Journals');latest(data.Attendance,'attendanceId','attendance:','Attendance');
+ data.Audit.forEach(function(x){if(x.action==='journal.deleted'&&!journals.has(String(x.journalId)))issue('deleted-reference','Audit',x.__row);});
+ var counts={journals:data.Journals.length,deletedJournals:data.Journals.filter(function(x){return deleted.has(String(x.journalId));}).length,tasks:data.Tasks.length,attendance:data.Attendance.length,requests:data.Requests.length,audit:data.Audit.length};
+ return {readOnly:true,productionVerified:false,month:month,status:issues.size?'issues':'passed',checkedAt:checkedAt,counts:counts,issues:Array.from(issues.values())};
+}
+
+/** Editor-only workflow: compare two private, non-live monthly files selected by owner.
+ * Never remaps MonthIndex, never opens a restore target for writes. */
+function workPulseCompareRestoredMonth(){
+ var cfg=wpPrimaryOwnerAssert_(),props=PropertiesService.getScriptProperties(),control=wsBook_(),index=wpMonthIndex_(control);
+ var month=wpMonth_(props.getProperty('WORKPULSE_RESTORE_VERIFY_MONTH')),
+ a=String(props.getProperty('WORKPULSE_RESTORE_SOURCE_ID')||'').trim(),b=String(props.getProperty('WORKPULSE_RESTORE_COPY_ID')||'').trim();
+ var live=new Set([cfg.sheetId].concat(Object.values(index)));
+ if(!a||!b||a===b||live.has(a)||live.has(b))throw Error('須指定兩份不同且不在正式索引中的私人月檔');
+ function open(id){
+  wpBackupAssertPrivate_(DriveApp.getFileById(id),cfg.adminEmail);
+  var book=SpreadsheetApp.openById(id),names=['Journals','Tasks','Requests','Audit','Meta','Attendance'];
+  if(book.getSheets().length!==names.length)throw Error('復原月檔分頁數量不符');
+  names.forEach(function(n){var s=wpSheet_(book,n),h=WP_HEADERS[n];if(JSON.stringify(s.getRange(1,1,1,h.length).getValues()[0])!==JSON.stringify(h))throw Error('復原月檔表頭不符：'+n);});
+  var meta=wpRows_(wpSheet_(book,'Meta'));
+  if(meta.filter(function(x){return x.key==='month'&&String(x.value)===month;}).length!==1||meta.filter(function(x){return x.key==='schemaVersion'&&String(x.value)==='month-1';}).length!==1)throw Error('指定月份或版本不符');
+  return book;
+ }
+ var source=open(a),copy=open(b),before=wpBackupContent_(source),actual=wpBackupContent_(copy),stable=before===wpBackupContent_(source)&&actual===wpBackupContent_(copy);
+ return {readOnly:true,productionVerified:false,month:month,checkedAt:new Date().toISOString(),valuesMatch:stable&&before===actual,stableDuringCheck:stable,sourceRows:wpBackupShape_(source),copyRows:wpBackupShape_(copy)};
+}
