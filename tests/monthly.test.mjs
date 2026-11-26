@@ -517,3 +517,18 @@ test('month file verification detects malformed header and leaves source untouch
  h.props.WORKPULSE_VERIFY_FROM_MONTH='2026-11';assert.equal(h.scope.workPulseVerifyMonthFiles().checked,1);
  assert.equal(h.files.size,before);h.as('');assert.throws(()=>h.scope.workPulseVerifyMonthFiles(),/持有帳號/);
 });
+
+test('migration preflight is owner-only, read-only and flags existing or deleted journals',()=>{
+ const h=harness();h.setup();const p=h.employee();
+ const row=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ const key={kind:'journal',date:row.date,employeeId:p.id},input={month:'2026-11',keys:[key,{...key,date:'2026-11-24'}]};
+ const before=h.files.size;
+ let result=h.scope.wpOwnerMigrationPreflight(input);
+ assert.equal(result.results[0].status,'exists');assert.equal(result.results[1].status,'not-found');assert.equal(result.readOnly,true);
+ assert.throws(()=>h.scope.wpOwnerMigrationPreflight({month:'2026-11',keys:[key,key]}),/重複/);
+ assert.throws(()=>h.scope.wpOwnerMigrationPreflight({month:'2026-11',keys:[{...key,note:'secret'}]}),/只接受/);
+ h.scope.wpOwnerDeleteJournal({journalId:row.id,date:row.date,expectedRevision:1,requestId:'migration-delete-001'});
+ assert.equal(h.scope.wpOwnerMigrationPreflight(input).results[0].status,'deleted-history');
+ assert.equal(h.scope.wpOwnerMigrationPreflight({month:'2026-12',keys:[{...key,date:'2026-12-01'}]}).results[0].status,'not-found');
+ assert.equal(h.files.size,before);h.as('');assert.throws(()=>h.scope.wpOwnerMigrationPreflight(input),/持有帳號/);
+});
