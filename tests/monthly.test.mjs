@@ -611,3 +611,11 @@ test('restore comparison rejects live file IDs, distinguishes copied values and 
  h.props.WORKPULSE_RESTORE_COPY_ID=live;assert.throws(()=>h.scope.workPulseCompareRestoredMonth(),/正式索引/);
  assert.equal(h.scope.wpMonthIndex_(h.control)['2026-11'],live);
 });
+
+test('integrity accepts attendance and a recreated same-date journal after logical deletion',()=>{
+ const h=harness();h.setup();const p=h.employee(),j=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ h.scope.wpOwnerDeleteJournal({journalId:j.id,date:j.date,expectedRevision:1,requestId:'accept-delete-0001'});
+ h.scope.wpSharedSaveJournal(h.entry(p,'2026-11',0,'accept-create-0001'));
+ h.scope.wpAttendanceSave({date:j.date,employeeId:p.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',expectedRevision:0,requestId:'accept-att-0001'});
+ const report=h.scope.wpOwnerMonthIntegrity({month:'2026-11'});assert.equal(report.status,'passed');assert.equal(report.counts.deletedJournals,1);assert.equal(report.counts.attendance,1);
+});
