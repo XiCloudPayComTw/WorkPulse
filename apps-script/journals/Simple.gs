@@ -59,12 +59,34 @@ function wsValidated_(input,book){
     throw Error('每天必須包含 1 至 100 個工作項目');
   var projects=wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
     .map(function(p){return wpPlainText_(p.name);});
+  // Older journal revisions store the project name as text. When the company
+  // renames/disables a project, allow its original selection only while editing
+  // that exact existing journal. New journal entries must use an active name.
+  var olderProjects=null;
+  function preservedProjects_(){
+   if(olderProjects!==null)return olderProjects;
+   olderProjects=[];
+   var previousBook=wpMonthFile_(book,date.slice(0,7),false);
+   if(!previousBook)return olderProjects;
+   var removed=wsDeleted_(previousBook);
+   var record=wpRows_(wpSheet_(previousBook,'Journals')).find(function(row){
+    return String(row.date)===date&&String(row.employeeId)===employeeId&&
+      !removed[String(row.journalId)];
+   });
+   if(!record)return olderProjects;
+   olderProjects=wpRows_(wpSheet_(previousBook,'Tasks')).filter(function(task){
+    return String(task.journalId)===String(record.journalId)&&
+      Number(task.revision)===Number(record.revision);
+   }).map(function(task){return wpPlainText_(task.project);});
+   return olderProjects;
+  }
   var tasks=input.tasks.map(function(t){
     if(!t||typeof t!=='object')throw Error('工作項目格式無效');
     var title=wpText_(t.title,160),project=wpText_(t.project,100),category=String(t.category||'');
     var status=String(t.status||''),hours=Number(t.hours);
     if(!title)throw Error('工作名稱不可空白');
-    if(project&&projects.indexOf(project)<0)throw Error('專案尚未建立');
+    if(project&&projects.indexOf(project)<0&&preservedProjects_().indexOf(project)<0)
+      throw Error('專案尚未建立或已更名，請重新選擇');
     if(WP_CATEGORIES.indexOf(category)<0||WP_STATUS.indexOf(status)<0||!isFinite(hours)||hours<0||hours>24)
       throw Error('分類、狀態或投入工時無效');
     return {id:Utilities.getUuid(),title:title,project:project,category:category,status:status,hours:hours,

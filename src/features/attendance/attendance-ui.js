@@ -60,7 +60,7 @@ export function renderAttendance(people,isAdmin=false){
  '<div class="att-actions"><span class="small muted">例假出勤、國定假日調移、變形工時需另行人工核對。</span>'+
  '<button class="soft-button primary" data-action="attendance-save" '+(a.saving?'disabled':'')+'>'+(a.saving?'儲存中…':'儲存出勤紀錄')+'</button></div></section>';
  const admin=isAdmin&&a.adminConfig?'<section class="soft-card card-pad-lg att-panel"><h3 class="card-title">管理員排班設定</h3>'+
- '<p class="card-sub">可設定當月應上班天數。月薪基準改在上方臨時輸入框試算，不儲存。</p>'+
+ '<p class="card-sub">可設定當月應上班天數。月薪基準改在頁面下方的臨時輸入框試算，不儲存。</p>'+
  '<div class="att-fields">'+
  '<label class="form-group"><span class="field-label">當月應上班天數</span><input class="input" type="number" min="0" max="31" data-att-config="expectedDays" value="'+esc(String(a.adminConfig.expectedDays??''))+'" placeholder="不填則為週一～五估計"></label></div>'+
  '<div class="att-actions"><span class="small muted">應上班天數會儲存。臨時月薪和試算加班費不儲存。</span>'+
@@ -74,16 +74,16 @@ export function renderAttendance(people,isAdmin=false){
  '<td><span class="att-note" title="'+esc(r.notes||'')+'">'+esc(r.notes||'—')+'</span></td>'+
  '<td><button class="soft-button mini" data-action="attendance-edit" data-date="'+esc(r.date)+'">編輯</button></td></tr>').join('')+
  '</tbody></table></div>':'<p class="small muted">尚無本月出勤紀錄。</p>')+'</section>';
- const law='<section class="soft-card card-pad-lg att-panel"><h3 class="card-title">加班費計算公式（勞基法）</h3>'+
+ const law='<section class="soft-card att-law-panel att-panel"><h3 class="card-title">加班費計算公式（勞基法）</h3>'+
  '<div class="att-law"><p><strong>月薪制基準時薪</strong>月薪工資總額 ÷ 240</p>'+
  '<p><strong>平日加班</strong>前 2 小時 × 4/3；第 3–4 小時 × 5/3</p>'+
  '<p><strong>休息日工作</strong>前 2 小時 × 4/3；第 3–8 小時 × 5/3；第 9–12 小時 × 8/3</p>'+
  '<p><strong>國定假日／特休出勤</strong>月薪制 8 小時內另加 1 日工資；超過 8 小時依延長工時計。</p></div>'+
  '<p class="small muted">本欄為月薪制標準工時的估算，例假原則不得出勤；換班、週逾40小時、補休、天災特殊情形請人工核算。'+
  '<a href="https://calcr2.mol.gov.tw/Index" target="_blank" rel="noopener noreferrer">勞動部加班費試算</a></p></section>';
- return '<div class="att-page">'+toolbar+salaryPanel+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
+ return '<div class="att-page">'+toolbar+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
  (info.expectedIsEstimate?'<p class="small muted att-estimate">應上班天數暫用週一至週五推估，未扣除國定假日與調班，管理員可設定確切天數。</p>':'')+
- '<div class="att-layout">'+editor+admin+'</div>'+table+law+'</div>';
+ '<div class="att-layout">'+editor+admin+'</div>'+table+salaryPanel+law+'</div>';
 }
 
 /** Attendance interactions are delegated here to avoid coupling the journal editor. */

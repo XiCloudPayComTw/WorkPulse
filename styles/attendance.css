@@ -69,3 +69,13 @@
 
 
 
+
+
+/* v0.10.3 Compact legal reference, kept immediately below accountant's calculator. */
+.att-law-panel{padding:16px 20px 14px;min-width:0}
+.att-law-panel .card-title{font-size:16px;line-height:1.4}
+.att-law-panel .att-law{gap:9px;margin:12px 0}
+.att-law-panel .att-law p{padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.55}
+.att-law-panel .att-law strong{font-size:14px;margin-bottom:2px}
+.att-law-panel>.small{font-size:12px;line-height:1.55;margin:8px 0 0}
+@media(max-width:600px){.att-law-panel{padding:14px 16px 12px}.att-law-panel .att-law{gap:7px}.att-law-panel .att-law p{padding:9px 11px}}

@@ -118,3 +118,14 @@ apps-script/
 4. GitHub Pages 在 PR 會先檢查 Node 測試與瀏覽器測試，兩者皆成功才允許建立發布封包。真正的 Pages 部署仍需 Merge 後的 `main` 工作流程另外驗證。
 
 Chrome 執行環境依賴 Ubuntu Runner 預裝的 `google-chrome`；開發者本地需自行安裝 Chrome/Chromium 後才能執行瀏覽器檢查。Chrome 模擬測試不等於真實公司 Google Workspace 的資料讀寫驗收。
+
+## v0.10.3 命名與權限模組
+
+- `src/features/admin/rename.js`：本機展示版可測試的純函式，用穩定的員工 ID 更名，並在本機專案改名時更新所有該專案名稱的歷史日誌文字。
+- `src/features/admin/admin.js`：正式管理員的使用者／專案雙分頁、現有資料編輯、狀態切換與後端異動。
+- `apps-script/admin/OwnerProjects.gs`：只在私人管理員 Apps Script 產物提供 `wpOwnerSaveProject`，含身分驗證、版本衝突、鎖定、請求去重與 Audit；公開網站不含此敏感 endpoint。
+- `apps-script/journals/Simple.gs`：歷史日誌可能儲存舊專案名稱，僅當該名稱原本就屬於同一員工同一天的現有工作日誌時允許繼續編輯，防止新日誌採用已更名或停用專案。
+- `src/features/attendance/attendance-ui.js` 與 `styles/attendance.css`：會計區塊移至出勤明細下方，法規參考縮小但保持完整。
+- `styles/stability.css`：以「展示版」、「共用」、「管理員」文字標籤替代先前單字「示」。
+- 正式雲端的**舊專案名稱不會批次改寫**；這是保留歷史紀錄的設計，與本機模式會同步改名不同。
+

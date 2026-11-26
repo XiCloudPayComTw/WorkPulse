@@ -133,3 +133,16 @@ input[type=date],input[type=month],select.input{min-width:0;max-width:100%}
 
 
 
+
+
+/* v0.10.3 An explicit mode label replaces the ambiguous initial 示. */
+.mode-chip{display:inline-flex;align-items:center;justify-content:center;flex:none;
+ min-width:64px;min-height:37px;padding:7px 12px;border-radius:999px;
+ background:#e7eef5;box-shadow:var(--shadow-sm);color:#526f83;
+ font-size:13px;font-weight:650;line-height:1.25;white-space:nowrap}
+@media(max-width:600px){
+ .top-actions{gap:8px;min-width:0}
+ .top-actions .soft-button{min-width:0}
+ .mode-chip{min-width:52px;padding:7px 10px;font-size:12px}
+}
+@media(max-width:420px){.topbar{flex-wrap:wrap}.top-actions{width:100%;justify-content:flex-end}}

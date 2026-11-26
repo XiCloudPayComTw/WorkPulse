@@ -1,7 +1,7 @@
 import {readFile,mkdir,writeFile,rm} from 'node:fs/promises';
 // WorkPulse v0.8: produce physically separate public and administrator Apps Script projects.
 // The public deployment MUST NOT include Owner.gs or the old Code.gs / Review.gs.
-const ordered=['src/shared/utils.js','src/features/journals/data.js','src/shared/icons.js','src/app/navigation.js','src/services/cloud.js','src/features/admin/admin.js',
+const ordered=['src/shared/utils.js','src/features/journals/data.js','src/shared/icons.js','src/app/navigation.js','src/services/cloud.js','src/features/admin/rename.js','src/features/admin/admin.js',
  'src/features/reports/reports.js','src/features/reports/periods.js','src/shared/xlsx.js','src/features/reports/report-ui.js','src/features/journals/quick-entry.js','src/features/attendance/attendance.js','src/features/payroll/payroll.js','src/features/payroll/payroll-xlsx.js','src/features/attendance/attendance-state.js','src/features/attendance/attendance-ui.js','src/features/payroll/payroll-ui.js','src/app/attendance-lifecycle.js','src/app/main.js'];
 let js='';
 for(const name of ordered){
@@ -22,6 +22,7 @@ const core=await readFile('apps-script/shared/Core.gs','utf8');
 const monthly=await readFile('apps-script/shared/Monthly.gs','utf8');
 const simple=await readFile('apps-script/journals/Simple.gs','utf8');
 const owner=await readFile('apps-script/admin/Owner.gs','utf8');
+const ownerProjects=await readFile('apps-script/admin/OwnerProjects.gs','utf8');
 const attendance=await readFile('apps-script/attendance/Attendance.gs','utf8');
 const attendanceSave=await readFile('apps-script/attendance/AttendanceSave.gs','utf8');
 const attendanceRange=await readFile('apps-script/attendance/AttendanceRange.gs','utf8');
@@ -51,7 +52,8 @@ for(const [portal,isOwner] of [['public',false],['admin',true]]){
    writeFile(directory+'/AttendanceRange.gs',attendanceRange),
    writeFile(directory+'/appsscript.json',manifest)
  ]);
- if(isOwner){await writeFile(directory+'/Owner.gs',owner);
+ if(isOwner){await writeFile(directory+'/OwnerProjects.gs',ownerProjects);
+  await writeFile(directory+'/Owner.gs',owner);
   await writeFile(directory+'/OwnerAttendance.gs',attendanceOwner);}
 }
 console.log('Built dist-gas/public (no admin endpoints) and dist-gas/admin (owner-only endpoints).');

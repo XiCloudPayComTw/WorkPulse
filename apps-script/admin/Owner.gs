@@ -5,7 +5,7 @@ function wsOwner_(){
 }
 function wsRequireOwner_(){wpOwnerAssert_();}
 function wpOwnerBootstrap(){
-  wsRequireOwner_();return {employees:wsPeople_(wsBook_(),true),owner:wpConfig_().adminEmail};
+  wsRequireOwner_();var book=wsBook_();return {employees:wsPeople_(book,true),projects:wsProjects_(book,true),owner:wpConfig_().adminEmail};
 }
 function wpOwnerSaveEmployee(payload){
   wsRequireOwner_();

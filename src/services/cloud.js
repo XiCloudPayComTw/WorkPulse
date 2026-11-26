@@ -1,12 +1,12 @@
 /** Apps Script HTMLService provides google.script.run only inside its own web-app origin. */
 const METHODS = new Set([
  'wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
- 'wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal',
+ 'wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
  'wpOwnerSaveAttendanceConfig','wpAttendanceRange'
 ]);
 const MUTATIONS = new Set([
- 'wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerDeleteJournal',
+ 'wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerDeleteJournal',
  'wpAttendanceSave','wpOwnerSaveAttendanceConfig'
 ]);
 

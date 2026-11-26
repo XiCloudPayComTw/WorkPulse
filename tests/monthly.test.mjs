@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-const serverFileNames={"Core.gs":"shared/Core.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
+const serverFileNames={"Core.gs":"shared/Core.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","OwnerProjects.gs":"admin/OwnerProjects.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
 const read=n=>readFileSync(new URL('../apps-script/'+(serverFileNames[n]||n),import.meta.url),'utf8');
-const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
+const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','OwnerProjects.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
 function harness(){
  let current='admin@example.com',effective='admin@example.com',counter=1,locked=false;
  const books=new Map(),files=new Map(),folders=new Map();
@@ -290,4 +290,50 @@ test('payroll range rejects salary transport, invalid employees and oversized sp
  assert.throws(()=>h.scope.wpAttendanceRange({...input,overtimePay:10}),/不得傳送/);
  assert.throws(()=>h.scope.wpAttendanceRange({...input,employeeId:'fake-employee'}),/有效的出勤人員/);
  assert.throws(()=>h.scope.wpAttendanceRange({...input,endDate:'2028-12-31'}),/366/);
+});
+
+test('owner can rename a project without changing its id or saved historic journal text',()=>{
+ const h=harness();h.setup();const e=h.employee();
+ const oldProject=h.scope.wpOwnerBootstrap().projects.find(p=>p.name==='一般專案');
+ assert.ok(oldProject);
+ const record=h.entry(e);record.tasks[0].project='一般專案';
+ h.as('');
+ const saved=h.scope.wpSharedSaveJournal(record);
+ assert.equal(saved.journal.tasks[0].project,'一般專案');
+ h.as('admin@example.com');
+ const input={id:oldProject.id,name:'營運設計',active:true,expectedRevision:oldProject.revision,
+  requestId:'project-rename-00001'};
+ const changed=h.scope.wpOwnerSaveProject(input);
+ assert.equal(changed.ok,true);
+ assert.equal(changed.projects.find(p=>p.id===oldProject.id).name,'營運設計');
+ assert.equal(h.scope.wpOwnerSaveProject(input).deduplicated,true);
+ assert.throws(()=>h.scope.wpOwnerSaveProject({...input,requestId:'project-stale-00001'}),/CONFLICT/);
+ const audit=h.control.getSheetByName('Audit').rows;
+ assert.ok(audit.some(row=>row[3]==='project.saved'));
+ h.as('');
+ const bootstrap=h.scope.wpSharedBootstrap('2026-11');
+ assert.ok(bootstrap.store.projects.includes('營運設計'));
+ assert.ok(!bootstrap.store.projects.includes('一般專案'));
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals[0].tasks[0].project,'一般專案');
+ const edited=h.entry(e,'2026-11',1,'previous-project-0001');
+ edited.tasks[0].project='一般專案';
+ assert.equal(h.scope.wpSharedSaveJournal(edited).journal.revision,2);
+ const another=h.entry(e,'2026-11',0,'archived-project-0001');
+ another.date='2026-11-24';another.tasks[0].project='一般專案';
+ assert.throws(()=>h.scope.wpSharedSaveJournal(another),/專案尚未建立或已更名/);
+});
+test('project management is private, validates duplicates and supports new projects',()=>{
+ const h=harness();h.setup();
+ const payload={name:'專案 A',active:true,expectedRevision:0,requestId:'project-create-0001'};
+ h.as('guest@example.com');
+ assert.throws(()=>h.scope.wpOwnerSaveProject(payload),/管理員/);
+ h.as('admin@example.com');
+ const created=h.scope.wpOwnerSaveProject(payload);
+ assert.equal(created.ok,true);
+ assert.ok(created.projects.some(p=>p.name==='專案 A'));
+ assert.throws(()=>h.scope.wpOwnerSaveProject({...payload,requestId:'project-create-0002'}),/重複/);
+ const item=created.projects.find(p=>p.name==='專案 A');
+ assert.equal(h.scope.wpOwnerSaveProject({id:item.id,name:'專案 A',active:false,
+  expectedRevision:item.revision,requestId:'project-disable-0001'}).ok,true);
+ assert.ok(!h.scope.wpSharedBootstrap('2026-11').store.projects.includes('專案 A'));
 });
