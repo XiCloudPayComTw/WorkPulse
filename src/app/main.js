@@ -324,15 +324,22 @@ function renderLocalNamedItem(kind,id,name){
  return `<span class="chip local-named-chip"><span>${esc(name)}</span>
   <button data-action="local-rename-start" data-kind="${kind}" data-id="${esc(id)}"
    aria-label="編輯${esc(name)}名稱">${icon('edit',13)}</button>
-  <button data-action="remove-${kind}" data-id="${esc(id)}" aria-label="移除 ${esc(name)}">${icon('x',13)}</button>
+${kind==='category'?'':`<button data-action="remove-${kind}" data-id="${esc(id)}" aria-label="移除 ${esc(name)}">${icon('x',13)}</button>`}
   </span>`;
 }
 function renderSettings(){
+ const categoryUI=` <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">工作類型</h2>
+  <p class="card-sub">填寫日誌的第一個欄位，可以新增或編輯類型名稱</p></div>${icon('edit',19)}</div>
+  <div class="inline-add"><input class="input" id="new-category" maxlength="100"
+   placeholder="新增工作類型" aria-label="新增工作類型">
+   <button class="soft-button icon-only" data-action="add-category" aria-label="新增工作類型">${icon('plus',17)}</button></div>
+  <div class="chip-list">${(state.store.categories||CATEGORIES).map(value=>renderLocalNamedItem('category',value,value)).join('')}</div></section>`;
  if(isCloud)return `${syncBanner()}<section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">管理者 Google Drive</h2><p class="card-sub">只有驗證通過的管理員能維護使用者與刪除日誌。</p></div></div><div class="notice">${icon('info',18)}<div>一般使用者直接選擇姓名填寫與查閱；請注意姓名選單並非登入身分驗證。</div></div><button class="soft-button primary section-space" data-action="navigate" data-view="team">${icon('users',16)} 管理員控制台</button></section>`;
 
  return `<div class="notice">${icon('shield',20)}<div><strong style="font-weight:550">資料存放與權限提醒</strong><br/>這是可操作的本機原型，所有紀錄只存在目前瀏覽器的 localStorage。人員選單不等於登入驗證，且資料尚未同步至 Google Sheets。請先使用測試資料。</div></div>
  <div class="settings-grid section-space"><section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">填寫人員</h2><p class="card-sub">管理日誌表單的人員選單</p></div>${icon('users',19)}</div><div class="inline-add"><input class="input" id="new-employee" maxlength="80" placeholder="新增人員名稱" aria-label="新增人員名稱"/><button class="soft-button icon-only" data-action="add-employee" aria-label="新增人員">${icon('plus',17)}</button></div><div class="chip-list">${state.store.employees.map(e=>renderLocalNamedItem('employee',e.id,e.name)).join('')}</div></section>
- <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">專案清單</h2><p class="card-sub">管理表單中可選的專案</p></div>${icon('folder',19)}</div><div class="inline-add"><input class="input" id="new-project" maxlength="100" placeholder="新增專案名稱" aria-label="新增專案名稱"/><button class="soft-button icon-only" data-action="add-project" aria-label="新增專案">${icon('plus',17)}</button></div><div class="chip-list">${state.store.projects.map(p=>renderLocalNamedItem('project',p,p)).join('')}</div></section></div>
+ <section class="soft-card card-pad-lg"><div class="card-head"><div><h2 class="card-title">專案清單</h2><p class="card-sub">管理表單中可選的專案</p></div>${icon('folder',19)}</div><div class="inline-add"><input class="input" id="new-project" maxlength="100" placeholder="新增專案名稱" aria-label="新增專案名稱"/><button class="soft-button icon-only" data-action="add-project" aria-label="新增專案">${icon('plus',17)}</button></div><div class="chip-list">${state.store.projects.map(p=>renderLocalNamedItem('project',p,p)).join('')}</div></section>
+ ${categoryUI}</div>
  <section class="soft-card card-pad-lg section-space"><div class="card-head"><div><h2 class="card-title">資料備份與匯出</h2><p class="card-sub">所有功能皆在本機執行，不會上傳至外部伺服器</p></div>${icon('database',19)}</div><div class="row" style="flex-wrap:wrap"><button class="soft-button" data-action="export-json">${icon('download',16)} 匯出 JSON 備份</button><button class="soft-button" data-action="export-csv">${icon('download',16)} 匯出 CSV 報表</button><button class="soft-button" data-action="import-json">${icon('upload',16)} 匯入 JSON 備份</button></div><div class="divider"></div><div class="row-between" style="flex-wrap:wrap"><div><div class="small">重設本機資料</div><div class="xs muted">這會清除目前瀏覽器內的工作日誌與設定，無法復原。</div></div><button class="soft-button danger sm" data-action="reset-data">${icon('trash',15)} 清空資料</button></div></section>
  <section class="soft-card card-pad-lg section-space"><div class="card-head"><div><h2 class="card-title">下一步：Google Sheets</h2><p class="card-sub">正式多人使用需先完成伺服端權限驗證</p></div>${icon('arrowUpRight',19)}</div><p class="small muted" style="line-height:1.95">規劃使用 Google Workspace 帳號辨識員工，由受控的服務端處理資料存取、操作紀錄及編輯權限。完成前不提供可供匿名使用者直接寫入試算表的公開介面。</p></section>`;
 }
@@ -470,7 +477,8 @@ root.addEventListener('click', event=>{
    if(isCloud)return;
    const kind=button.dataset.kind,id=button.dataset.id;
    if(!((kind==='employee'&&state.store.employees.some(e=>e.id===id))||
-        (kind==='project'&&state.store.projects.includes(id))))return;
+        (kind==='project'&&state.store.projects.includes(id))||
+        (kind==='category'&&(state.store.categories||CATEGORIES).includes(id))))return;
    state.localRename={kind,id};render();
    document.querySelector('[data-local-rename]')?.focus();return;
  }
@@ -482,10 +490,20 @@ root.addEventListener('click', event=>{
    const {kind,id}=state.localRename;
    const value=document.querySelector('[data-local-rename]')?.value;
    try{
-    const before=kind==='project'?id:state.store.employees.find(e=>e.id===id)?.name;
+    const before=kind==='project'||kind==='category'?id:state.store.employees.find(e=>e.id===id)?.name;
     const next=kind==='employee'?renameLocalEmployee(state.store,id,value):
+      kind==='category'?renameLocalWorkCategory(state.store,id,value.trim()):
       renameLocalProject(state.store,id,value);
     if(saveStore(next)){
+     if(kind==='category'&&id!==value?.trim()){
+      const target=value.trim();
+      state.draft.tasks=state.draft.tasks.map(t=>t.category===id?{
+       ...t,category:target,title:t.title===id?target:t.title
+      }:t);
+      state.templates=renameTemplatesCategory(draftStorage(),draftAccount(),id,target);
+      if(state.report.filters.category===id)state.report.filters.category=target;
+      if(state.dirty)scheduleQuickDraft();
+     }
      if(kind==='project'&&id!==value?.trim()){
       const target=value.trim();
       state.draft.tasks=state.draft.tasks.map(t=>t.project===id?{...t,project:target}:t);
@@ -494,7 +512,7 @@ root.addEventListener('click', event=>{
       if(state.dirty)scheduleQuickDraft();
      }
      state.localRename=null;render();
-     notify((kind==='employee'?'人員':'專案')+'已由「'+before+'」更名為「'+value.trim()+'」');
+     notify((kind==='employee'?'人員':kind==='category'?'工作類型':'專案')+'已由「'+before+'」更名為「'+value.trim()+'」');
     }
    }catch(e){notify(e.message||'更名失敗',true);}
    return;
@@ -565,6 +583,15 @@ root.addEventListener('click', event=>{
  }
  if(action==='toggle-day'){const date=button.dataset.date;if(state.expanded.has(date))state.expanded.delete(date);else state.expanded.add(date);const oldTop=window.scrollY;const target=document.querySelector('#history-results');if(target)target.innerHTML=renderHistoryResults();window.scrollTo(0,oldTop);return;}
  if(action==='edit-journal'){const record=state.store.journals.find(j=>j.id===button.dataset.id);if(record&&canEditJournal(record.employeeId))openRecord(record);return;}
+ if(action==='add-category'){
+  if(isCloud)return;
+  try{
+   const categories=addWorkCategory(state.store.categories||CATEGORIES,
+     document.querySelector('#new-category')?.value);
+   if(saveStore({...state.store,categories})){render();notify('已新增工作類型');}
+  }catch(error){notify(error.message,true);}
+  return;
+ }
  if(action==='add-employee'){if(isCloud){notify('雲端員工由管理員維護',true);return;}
    const input=document.querySelector('#new-employee');const name=input?.value.trim();if(!name){notify('請輸入人員名稱',true);return;}
    if(state.store.employees.some(e=>e.name===name)){notify('人員名稱已存在',true);return;}
@@ -642,6 +669,7 @@ window.addEventListener('keydown',event=>{
 root.addEventListener('keydown',event=>{
  if(event.key==='Enter'&&event.target.matches('#new-employee')){event.preventDefault();document.querySelector('[data-action="add-employee"]')?.click();}
  if(event.key==='Enter'&&event.target.matches('#new-project')){event.preventDefault();document.querySelector('[data-action="add-project"]')?.click();}
+ if(event.key==='Enter'&&event.target.matches('#new-category')){event.preventDefault();document.querySelector('[data-action="add-category"]')?.click();}
  if(event.target.matches('[data-local-rename]')){
   if(event.key==='Enter'){event.preventDefault();document.querySelector('[data-action="local-rename-save"]')?.click();}
   if(event.key==='Escape'){event.preventDefault();document.querySelector('[data-action="local-rename-cancel"]')?.click();}
