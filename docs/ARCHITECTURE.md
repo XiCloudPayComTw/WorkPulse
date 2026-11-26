@@ -101,3 +101,20 @@ apps-script/
 執行 `npm run verify`（Node.js 20+），涵蓋靜態站與 Apps Script 雙部署包建置。新增出勤啟動測試，涵蓋直接用 `#/attendance` 載入本機展示及雲端 bootstrap、切換後的畫面清理。
 
 正式公司 Google Workspace 的實際多人瀏覽器測試，仍必須在公司部署後執行，不能用 Node 模擬測試取代。
+
+## v0.10.2 穩定性與自動驗收
+
+- `src/app/navigation.js`：頁面清單、Hash 路由解析、管理員頁面與系統設定可見性的判斷。
+- `src/features/reports/periods.js`：日期驗證、上個完整月份、當月及近 90 日等報表期間計算。
+- `src/services/cloud.js`：Apps Script API 加入等待期限。讀取最多 60 秒、寫入最多 90 秒；逾時後網頁顯示錯誤，且不會自動再次執行任何可能寫入資料的 API。手動重試前先確認上一筆資料是否成功。
+- `src/app/main.js`：雲端初始化重試用請求序號避免舊回應覆蓋；快速切換雲端日誌月份也只接受最後一次載入結果。
+- `src/app/attendance-lifecycle.js`：額外捕捉非預期的出勤載入錯誤，轉成頁面錯誤與重新讀取入口。
+
+測試分層：
+
+1. `npm run test`：Node 原生測試（日期、權限、逾時、資料不重覆寫入、出勤與薪資）。
+2. `npm run verify`：語法檢查、單元與模擬整合測試、靜態網站建置、公開與私人 Apps Script 編譯。
+3. `npm run smoke:browser`：**真實無頭 Chrome** 在窄螢幕和桌面尺寸開啟六個網站路由，確認畫面載入、無 JS 例外與整頁水平溢出。
+4. GitHub Pages 在 PR 會先檢查 Node 測試與瀏覽器測試，兩者皆成功才允許建立發布封包。真正的 Pages 部署仍需 Merge 後的 `main` 工作流程另外驗證。
+
+Chrome 執行環境依賴 Ubuntu Runner 預裝的 `google-chrome`；開發者本地需自行安裝 Chrome/Chromium 後才能執行瀏覽器檢查。Chrome 模擬測試不等於真實公司 Google Workspace 的資料讀寫驗收。
