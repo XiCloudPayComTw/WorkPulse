@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-const serverFileNames={"Core.gs":"shared/Core.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","OwnerProjects.gs":"admin/OwnerProjects.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
+const serverFileNames={"Core.gs":"shared/Core.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","OwnerProjects.gs":"admin/OwnerProjects.gs","OwnerCategories.gs":"admin/OwnerCategories.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
 const read=n=>readFileSync(new URL('../apps-script/'+(serverFileNames[n]||n),import.meta.url),'utf8');
-const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','OwnerProjects.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
+const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','OwnerProjects.gs','OwnerCategories.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
 function harness(){
  let current='admin@example.com',effective='admin@example.com',counter=1,locked=false;
  const books=new Map(),files=new Map(),folders=new Map();
@@ -336,4 +336,41 @@ test('project management is private, validates duplicates and supports new proje
  assert.equal(h.scope.wpOwnerSaveProject({id:item.id,name:'專案 A',active:false,
   expectedRevision:item.revision,requestId:'project-disable-0001'}).ok,true);
  assert.ok(!h.scope.wpSharedBootstrap('2026-11').store.projects.includes('專案 A'));
+});
+
+test('owner-managed work types are stored in controller Meta without altering monthly files',()=>{
+ const h=harness();h.setup();
+ h.as('');
+ const initial=h.scope.wpSharedBootstrap('2026-11').store.categories;
+ assert.ok(initial.includes('前端開發'));
+ const update={categories:['現場施工','工程管理','前端開發'],expectedRevision:0,requestId:'category-save-00001'};
+ assert.throws(()=>h.scope.wpOwnerSaveCategories(update),/管理員/);
+ h.as('admin@example.com');
+ const first=h.scope.wpOwnerSaveCategories(update);
+ assert.equal(first.ok,true);assert.equal(first.revision,1);
+ assert.equal(h.scope.wpOwnerSaveCategories(update).deduplicated,true);
+ assert.throws(()=>h.scope.wpOwnerSaveCategories({...update,requestId:'category-stale-0001'}),/CONFLICT/);
+ assert.throws(()=>h.scope.wpOwnerSaveCategories({categories:['相同','相同'],expectedRevision:1,requestId:'category-dupe-00001'}),/重複/);
+ const meta=h.control.getSheetByName('Meta');
+ assert.ok(meta.rows.some(row=>row[0]==='workCategories'));
+ assert.equal(h.files.size,1);
+ h.as('');
+ assert.deepEqual(Array.from(h.scope.wpSharedBootstrap('2026-11').store.categories),update.categories);
+});
+test('renamed work type does not erase old journal and old type is only valid on original edits',()=>{
+ const h=harness();h.setup();const worker=h.employee();
+ h.as('');
+ const first=h.scope.wpSharedSaveJournal(h.entry(worker));
+ assert.equal(first.journal.tasks[0].category,'前端開發');
+ h.as('admin@example.com');
+ h.scope.wpOwnerSaveCategories({categories:['現場施工','設計整合'],expectedRevision:0,requestId:'category-rename-001'});
+ h.as('');
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals[0].tasks[0].category,'前端開發');
+ const edit=h.entry(worker,'2026-11',1,'category-edit-00001');
+ assert.equal(h.scope.wpSharedSaveJournal(edit).journal.revision,2);
+ const fresh=h.entry(worker,'2026-11',0,'category-new-00001');
+ fresh.date='2026-11-24';
+ assert.throws(()=>h.scope.wpSharedSaveJournal(fresh),/分類、狀態或投入工時無效/);
+ fresh.tasks[0].category='現場施工';
+ assert.equal(h.scope.wpSharedSaveJournal(fresh).journal.tasks[0].category,'現場施工');
 });

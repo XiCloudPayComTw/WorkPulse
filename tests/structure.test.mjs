@@ -46,7 +46,7 @@ test('Apps Script public/private and legacy sources remain physically isolated',
   'apps-script/journals/Simple.gs',
   'apps-script/attendance/Attendance.gs','apps-script/attendance/AttendanceSave.gs',
   'apps-script/attendance/AttendanceRange.gs',
-  'apps-script/admin/Owner.gs','apps-script/admin/OwnerProjects.gs','apps-script/admin/OwnerAttendance.gs',
+  'apps-script/admin/Owner.gs','apps-script/admin/OwnerCategories.gs','apps-script/admin/OwnerProjects.gs','apps-script/admin/OwnerAttendance.gs',
   'apps-script/legacy/Code.gs','apps-script/legacy/Review.gs'
  ];
  for(const path of required)assert.ok(present(path),'Missing '+path);
@@ -56,6 +56,7 @@ test('Apps Script public/private and legacy sources remain physically isolated',
  const gas=read('scripts/build-gas.mjs');
  assert.match(gas,/apps-script\/admin\/Owner\.gs/);
  assert.match(gas,/apps-script\/admin\/OwnerProjects\.gs/);
+ assert.match(gas,/apps-script\/admin\/OwnerCategories\.gs/);
  assert.match(gas,/if\(isOwner\)/);
  assert.doesNotMatch(gas,/readFile\('apps-script\/legacy\/(?:Code|Review)\.gs'/);
 });
