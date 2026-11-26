@@ -374,3 +374,11 @@ test('renamed work type does not erase old journal and old type is only valid on
  fresh.tasks[0].category='現場施工';
  assert.equal(h.scope.wpSharedSaveJournal(fresh).journal.tasks[0].category,'現場施工');
 });
+
+test('public source contains dynamic category reader but no owner category mutation',()=>{
+ const shared=read('Core.gs'),simple=read('Simple.gs'),privileged=read('OwnerCategories.gs');
+ assert.match(shared,/function wsCategories_/);
+ assert.match(simple,/wsCategories_\(book\)/);
+ assert.doesNotMatch(shared+'\n'+simple,/function wpOwnerSaveCategories/);
+ assert.match(privileged,/function wpOwnerSaveCategories/);
+});

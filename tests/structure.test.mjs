@@ -57,6 +57,9 @@ test('Apps Script public/private and legacy sources remain physically isolated',
  assert.match(gas,/apps-script\/admin\/Owner\.gs/);
  assert.match(gas,/apps-script\/admin\/OwnerProjects\.gs/);
  assert.match(gas,/apps-script\/admin\/OwnerCategories\.gs/);
+ assert.match(read('apps-script/shared/Core.gs'),/function wsCategories_/);
+ assert.doesNotMatch(read('apps-script/admin/OwnerCategories.gs'),/function wsCategories_/);
+ assert.match(read('apps-script/admin/OwnerCategories.gs'),/function wpOwnerSaveCategories/);
  assert.match(gas,/if\(isOwner\)/);
  assert.doesNotMatch(gas,/readFile\('apps-script\/legacy\/(?:Code|Review)\.gs'/);
 });

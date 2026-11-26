@@ -216,3 +216,15 @@
 - 雲端歷史日誌仍保存原本專案名稱。歷史紀錄保留舊標籤並允許回編，新紀錄限用目前啟用專案。
 - 出勤薪資試算卡片移至明細後、勞基法公式前；公式卡片改緊湊；頭部模式改明確「展示版／共用／管理員」。
 - 不更改 Google Sheets schema，不擅自操作公司 Drive。須在公司管理員正式部署後驗證 private `OwnerProjects.gs` 的寫入權限。
+
+## v0.11.0 — 外勤手機 UI／全站人員／動態工作類型（PR #16）
+
+- branch feat/workpulse-v0.11.0-field-mobile 自 v0.10.3 已成功合併與 Pages 部署的 main 建立。
+- `src/app/person.js`：用穩定 ID 於 localStorage 保存已選人員，右上角只顯示最後兩字，點開自訂名單。明確人員變更同步至工作日誌、出勤表、歷史查詢、報表。選姓名不是驗證。
+- `src/app/main.js`：手機外勤首頁採大面積功能入口，mobile 導覽不含 insights/settings，且阻擋手機深連結進入這兩頁。日誌第一欄使用工作類型，工作名稱改向下相容資料欄，歷史內容保留。
+- `src/features/journals/categories.js` 及 `src/features/journals/data.js`：本機工作類型新增／改名、舊日誌映射及 JSON 匯入相容。
+- `apps-script/shared/Core.gs`：公開讀取的 `wsCategories_`、`wsCategoryRevision_` 讀取 Meta JSON，保留預設 `WP_CATEGORIES`。
+- `apps-script/admin/OwnerCategories.gs`：管理員私人變更清單、LockService + revision + requestId + Audit；公開 GAS 不包含修改函式，並不改動月表 schema。
+- `src/app/loading.js` + `styles/field-mobile.css`：雲端請求統一果凍式浮層；900px 以下手機隱藏薪資／法規卡，但保留出勤操作；一般文字禁止圈選與複製，文字編輯欄保留正常操作。
+- `src/features/journals/description-memory.js`：每一個人員在單一裝置獨立記憶 35 筆已填寫／已儲存內容，手機執行內容輸入框有建議選單；沒有把建議額外寫入雲端。
+- 細節及所有功能：[docs/FIELD_V011.md](FIELD_V011.md)。CI 與後端整合驗證需通過；真正公司 Workspace 部署仍須另行進行。
