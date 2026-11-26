@@ -80,7 +80,7 @@ export function renderAttendance(people,isAdmin=false){
  '<p><strong>國定假日／特休出勤</strong>月薪制 8 小時內另加 1 日工資；超過 8 小時依延長工時計。</p></div>'+
  '<p class="small muted">本欄為月薪制標準工時的估算，例假原則不得出勤；換班、週逾40小時、補休、天災特殊情形請人工核算。'+
  '<a href="https://calcr2.mol.gov.tw/Index" target="_blank" rel="noopener noreferrer">勞動部加班費試算</a></p></section>';
- return '<div class="att-page">'+toolbar+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
+ return '<div class="att-page"><span class="sr-only" data-att-dock-status>'+esc(a.saving?'正在儲存…':a.dirty?(a.draftStored?'尚未正式提交 · 請儲存出勤':'草稿暫存受限 · 請儲存出勤'):attendanceNotice||'出勤紀錄 · 儲存後才正式提交')+'</span>'+toolbar+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
  (info.expectedIsEstimate?'<p class="small muted att-estimate">應上班天數暫用週一至週五推估，未扣除國定假日與調班，管理員可設定確切天數。</p>':'')+
  calendar+'<div class="att-layout">'+editor+admin+scheduleEditor+'</div>'+table+exportPanel+law+'</div>';
 }
@@ -142,7 +142,7 @@ document.addEventListener('click',event=>{
   if(!attendanceState.saving&&confirm('確定捨棄未儲存的出勤草稿？待同步請求需另外處理。')){discardAttendanceDraft();refreshAttendanceDom();}
  }else if(action==='attendance-save'){
   attendanceNotice='正在儲存出勤紀錄…';
-  submitAttendance().then(()=>attendanceNotice='出勤紀錄已成功儲存至 Google Sheets／本機展示資料。')
+  submitAttendance().then(()=>attendanceNotice=cloudEnabled()?'出勤紀錄已成功儲存至 Google Sheets。':'出勤紀錄已儲存至此瀏覽器，未同步 Google Drive。')
    .catch(e=>attendanceNotice='無法儲存：'+e.message).finally(refreshAttendanceDom);
   refreshAttendanceDom();
 
@@ -156,7 +156,7 @@ document.addEventListener('click',event=>{
 document.addEventListener('input',event=>{
  const el=event.target;
  if(!el.closest('.att-page'))return;
- if(el.matches('[data-att-field]')){updateAttendance(el.dataset.attField,el.value);const status=document.querySelector('#wp-mobile-dock [data-dock-status]');if(status)status.textContent=attendanceState.draftStored?'未正式提交 · 請儲存出勤':'暫存受限 · 請儲存出勤';}
+ if(el.matches('[data-att-field]')){updateAttendance(el.dataset.attField,el.value);const status=document.querySelector('.att-page [data-att-dock-status]');if(status)status.textContent=attendanceState.draftStored?'未正式提交 · 請儲存出勤':'暫存受限 · 請儲存出勤';syncMobileDock();}
  if(el.matches('[data-att-config]'))updateAttendanceConfig(el.dataset.attConfig,el.value);
 });
 document.addEventListener('change',event=>{
