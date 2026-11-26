@@ -35,3 +35,10 @@ test('divergent session is not silently merged and unknown keys are rejected',as
  const session=memory();session.setItem('workpulse:offline:v1:a',JSON.stringify({[key]:'different'}));
  const c=h.vault(session);await c.configure('a');assert.equal(c.status().phase,'error');assert.equal(c.storage().getItem(key),'different');assert.equal(h.saved.get('a')[key],'saved');
 });
+
+test('vault transitions reject synchronous changes before activation completes',async()=>{
+ const h=setup(),a=h.vault();await a.configure('a');const enabling=a.enable();
+ assert.throws(()=>a.storage().setItem(key,'during open'),/設定正在變更/);
+ assert.equal(await a.flush(),false);assert.equal(await enabling,true);
+ assert.equal(a.storage().getItem(key),null);await a.disable();
+});

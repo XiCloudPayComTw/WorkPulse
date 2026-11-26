@@ -53,6 +53,7 @@ export function removeFieldPending(id){
 }
 function wpFieldStatus(id,status){wpFieldWrite(readFieldPending().map(x=>x.payload.requestId===id?{...x,status}:x));}
 export async function fieldSave(method,payload){
+ if(offlineVaultStatus().busy)throw Error('離線設定正在變更，請稍後再儲存');
  const entry=stageFieldPending(method,payload),id=entry.payload.requestId;
  if(wpFieldBusy.has(id))throw Error('此筆正在同步中');
  wpFieldBusy.add(id);

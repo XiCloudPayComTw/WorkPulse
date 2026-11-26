@@ -71,10 +71,10 @@ export function createOfflineVault({session=wpVaultSession,preferences=wpVaultPr
  }
  const adapter={
   getItem(k){if(!wpVaultAllowed(k))return null;return Object.hasOwn(data,k)?data[k]:null;},
-  setItem(k,v){if(!wpVaultAllowed(k))throw Error('不允許持久保存此資料');const next=wpVaultSnapshot({...data,[k]:String(v)});data=next;write();},
-  removeItem(k){if(!wpVaultAllowed(k))return;const next={...data};delete next[k];data=next;write();}
+  setItem(k,v){if(busy)throw Error('離線設定正在變更，請稍後再儲存');if(!wpVaultAllowed(k))throw Error('不允許持久保存此資料');const next=wpVaultSnapshot({...data,[k]:String(v)});data=next;write();},
+  removeItem(k){if(busy)throw Error('離線設定正在變更，請稍後再清除');if(!wpVaultAllowed(k))return;const next={...data};delete next[k];data=next;write();}
  };
- async function flush(){if(db)return Boolean(await chain)&&!failure;if(phase!=='error')return true;try{return preferences()?.getItem(pref())!=='1';}catch{return false;}}
+ async function flush(){if(busy)return false;if(db)return Boolean(await chain)&&!failure;if(phase!=='error')return true;try{return preferences()?.getItem(pref())!=='1';}catch{return false;}}
  function releaseDb(){db?.close();db=null;release?.();release=null;}
  async function enable(){
   if(!scope||busy||db)return false;
@@ -111,7 +111,7 @@ export function createOfflineVault({session=wpVaultSession,preferences=wpVaultPr
    else{release=await acquire(scope);if(!release)throw Error('其他分頁正在使用持久資料');db=await open();}
    await tx(db,'delete',scope);
    preferences()?.removeItem(pref());saveSession();releaseDb();failure='';phase='off';chain=Promise.resolve(true);return true;
-  }catch(e){failure=e.message||'無法清除持久副本';phase='error';return false;}
+  }catch(e){failure=e.message||'無法清除持久副本';phase='error';if(!db){release?.();release=null;}return false;}
   finally{busy=false;emit();}
  }
  return {status,configure,enable,disable,flush,storage:()=>scope?adapter:session(),snapshot:()=>wpVaultSnapshot(data)};

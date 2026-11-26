@@ -89,7 +89,7 @@ function selectPersonId(id){
 }
 function changeSelectedPerson(id,{fromAttendance=false}={}){
  if(id===state.selectedPersonId)return true;
- if(state.cloud.saving||state.cloud.loadingMonth||(isCloud&&state.cloud.phase!=='ready')||attendanceState.saving||attendanceState.scheduleSaving)return false;
+ if(offlineVaultStatus().busy||state.cloud.saving||state.cloud.loadingMonth||(isCloud&&state.cloud.phase!=='ready')||attendanceState.saving||attendanceState.scheduleSaving)return false;
  if(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定切換人員？'))return false;
  if(!state.store.employees.some(p=>p.id===id))return false;
  if(state.dirty&&!confirm('切換人員後，未提交的工作內容會先暫存，確定切換？'))return false;
@@ -128,7 +128,7 @@ function renderPersonMenu(){
   </div></div>`;
 }
 function fieldRecoveryMarkup(){
- if(!isCloud||state.cloud.phase!=='ready')return '';
+ if(!isCloud)return '';if(state.cloud.phase!=='ready')return '<p class="small muted">需先完成雲端驗證，才能查看此帳號的離線資料。</p>';
  const all=readFieldPending(),rows=all.filter(x=>x.payload.employeeId===state.selectedPersonId),online=fieldOnline(),other=all.length-rows.length;
  return '<div class="wp-recovery-status" role="status"><strong>'+(!online?'目前離線 · 資料尚未同步':'網路可用 · 仍以雲端確認為準')+'</strong>'+
  (rows.length?' · '+rows.length+' 筆待處理':'')+(other?' <span class="wp-recovery-other">另有 '+other+' 筆其他人員待同步，切換人員後核對。</span>':'')+(!fieldRecoveryDurable()?' <span>瀏覽器暫存受限，請勿關閉頁面。</span>':'')+'</div>'+
@@ -440,7 +440,7 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
 }
 async function saveCloudJournal(){
- if(state.cloud.saving||state.cloud.loadingMonth||state.cloud.phase!=='ready')return;
+ if(offlineVaultStatus().busy||state.cloud.saving||state.cloud.loadingMonth||state.cloud.phase!=='ready')return;
  const d=state.draft;
  if(!d.date || !d.employeeId || !d.tasks.some(t=>String(t.category||'').trim())){notify('請選日期、人員並至少選擇一個工作類型',true);return;}
  const hours=d.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);
@@ -466,18 +466,21 @@ async function saveCloudJournal(){
 root.addEventListener('click', event=>{
  const button=event.target.closest('[data-action]');if(!button)return;
  const action=button.dataset.action;
+ if(offlineVaultStatus().busy)return;
  if(['vault-enable','vault-disable','vault-open-draft'].includes(action)){
   if(!isCloud||state.cloud.phase!=='ready'||state.cloud.saving||attendanceState.saving||offlineVaultStatus().busy||readFieldPending().some(x=>fieldRecoveryBusy(x.payload.requestId)))return;
   if(action==='vault-open-draft'){
    const date=button.dataset.date;if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return;
    if(button.dataset.kind==='attendance'){
     if(attendanceState.dirty&&!confirm('目前出勤尚未正式提交，確定切換日期？'))return;
-    attendanceState.date=date;attendanceState.month=date.slice(0,7);changeView('attendance');
-    if(attendanceState.phase==='ready'&&attendanceState.month===date.slice(0,7)&&attendanceState.employeeId===state.selectedPersonId){attendanceSelectDate(date);render();}return;
+    if(attendanceState.scheduleDirty||attendanceState.scheduleSaving){notify('請先處理尚未儲存的班表',true);return;}
+    attendanceState.date=date;attendanceState.month=date.slice(0,7);changeView('attendance');return;
    }
    if(!requireDiscard())return;const stored=readQuickDraft(draftStorage(),`selected:${state.selectedPersonId}`,offlineVaultStatus().enabled?7*86400000:86400000);
    if(!stored||stored.date!==date){notify('草稿已不存在或超過保留期限',true);return;}
-   state.draft=makeDraft(date,state.selectedPersonId);state.dirty=false;state.saveRequestId=null;restoreQuickDraft(date);changeView('entry');return;
+   const person=state.selectedPersonId;
+   const reopen=()=>{if(state.selectedPersonId!==person||state.month!==date.slice(0,7))return;state.draft=makeDraft(date,person);state.dirty=false;state.saveRequestId=null;restoreQuickDraft(date);changeView('entry');};
+   if(state.month!==date.slice(0,7)){void loadCloudMonth(date.slice(0,7)).then(reopen);return;}reopen();return;
   }
   if(action==='vault-enable'){
    if(!confirm('僅限公司授權的專用裝置。啟用後未提交的工作內容會留在此瀏覽器，即使關閉亦可能保留；資料未加密，不可在共用裝置啟用。確定繼續？'))return;
@@ -487,6 +490,7 @@ root.addEventListener('click', event=>{
   flushQuickDraft();void offlineVault.disable().then(ok=>{notify(ok?'持久副本已清除，仍保留此分頁暫存':'清除未確認，請查看離線狀態',!ok);render();});return;
  }
  if(action==='field-retry'||action==='field-discard'||action==='field-download'){
+  if(offlineVaultStatus().busy)return;
   const id=button.dataset.id;
   if(!isCloud||!readFieldPending().some(x=>x.payload.requestId===id&&x.payload.employeeId===state.selectedPersonId))return;
   if(action==='field-download'){
@@ -728,6 +732,7 @@ root.addEventListener('click', event=>{
 });
 root.addEventListener('input',event=>{
  const el=event.target;
+ if(offlineVaultStatus().busy)return;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
  if(el.matches('[data-task]')){
   const t=state.draft.tasks[Number(el.dataset.task)];if(!t)return;

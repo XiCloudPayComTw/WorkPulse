@@ -1,5 +1,6 @@
 import {cloudEnabled,cloudCall} from '../../services/cloud.js';
 import {fieldSave} from '../../services/field-recovery.js';
+import {flushOfflineVault,offlineVaultStatus} from '../../services/offline-vault.js';
 import {saveAttendanceDraft,readAttendanceDraft,clearAttendanceDraft} from './attendance-draft.js';
 import {currentMonth,localISODate,uid} from '../../shared/utils.js';
 import {validateAttendanceDraft,DAY_TYPES} from './attendance.js';
@@ -92,7 +93,7 @@ export function updateAttendance(field,value){
 }
 export async function submitAttendance(){
  const a=attendanceState;
- if(a.saving||a.phase!=='ready'||!a.draft)throw Error('出勤表尚未準備完成');
+ if(offlineVaultStatus().busy||a.saving||a.phase!=='ready'||!a.draft)throw Error('出勤表尚未準備完成');
  const data=validateAttendanceDraft(a.draft);
  if(!a.employeeId)throw Error('請先選擇人員');
  a.saving=true;a.requestId=a.requestId||uid();
@@ -111,7 +112,7 @@ export async function submitAttendance(){
   }
   if(!result?.ok||!result.row)throw Error('雲端尚未確認儲存結果');
   const sameDraft=a.employeeId===request.employeeId&&a.date===request.date&&a.requestId===request.requestId;
-  if(cloudEnabled()&&sameDraft)clearAttendanceDraft(request.employeeId,request.date);
+  if(cloudEnabled()&&sameDraft){clearAttendanceDraft(request.employeeId,request.date);await flushOfflineVault();}
   if(a.employeeId!==request.employeeId||a.month!==request.date.slice(0,7))return result;
   const index=a.rows.findIndex(r=>r.date===result.row.date);
   if(index>=0)a.rows[index]=result.row;else a.rows.push(result.row);
