@@ -236,7 +236,7 @@
 - `src/services/field-recovery.js`：工作日誌及出勤寫入的 per-tab 待同步；保留原始 requestId、expectedRevision 與內容；離線不發送、不自動重送；已知 CONFLICT 需人工核對；手動重送結果確認後移除待同步，使用者需重新查閱對應日期。
 - `src/features/attendance/attendance-draft.js`：按人員日期保存未提交草稿，保留原 revision，成功提交才清除；提供捨棄按鈕。薪資維持記憶體試算。
 - 連線狀態與待同步清單、同時讀寫載入提示修正、常用範本以工作類型／專案／執行內容區分。
-- 限制：sessionStorage 不保證跨關閉分頁／裝置；禁用儲存僅記憶體；不支援離線冷啟動或背景同步；真實窄螢幕與公司 Workspace 正式部署仍待驗收。
+- 限制：sessionStorage 不保證跨關閉分頁／裝置；禁用儲存僅記憶體；不支援離線冷啟動或背景同步；Chrome 窄螢幕改採精準 CSS viewport（320／375／390／430px）與桌面 1366px；手機實機及公司 Workspace 正式部署仍待驗收。
 - 操作及驗收見 [FIELD_RECOVERY_V012.md](FIELD_RECOVERY_V012.md)；CI 狀態以 PR 最新提交為準。
 
 ### 後續路線（2026-11-26 使用者提供原始規劃，可靠性優先調整）

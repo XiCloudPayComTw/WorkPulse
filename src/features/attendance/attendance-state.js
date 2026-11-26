@@ -94,7 +94,7 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
 }
 export function updateAttendance(field,value){
  const a=attendanceState;
- if(!a.draft||!['dayType','startTime','endTime','breakMinutes','leaveType','leaveMinutes','notes'].includes(field))return;
+ if(a.saving||!a.draft||!['dayType','startTime','endTime','breakMinutes','leaveType','leaveMinutes','notes'].includes(field))return;
  a.draft[field]=['breakMinutes','leaveMinutes'].includes(field)?Number(value):value;
  if(field==='leaveType'&&value==='none')a.draft.leaveMinutes=0;
  a.requestId=null;a.dirty=true;

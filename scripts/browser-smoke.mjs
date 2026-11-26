@@ -16,6 +16,7 @@ if(!browser)throw new Error('Chromium/Google Chrome 未安裝，無法執行真�
 const port=Number(process.env.WORKPULSE_SMOKE_PORT||5287);
 const fileName=`workpulse-browser-smoke-${process.pid}.html`;
 const testFile=join(root,fileName);
+const frameName=`workpulse-viewport-${process.pid}.html`,frameFile=join(root,frameName);
 const html=await readFile(join(root,'index.html'),'utf8');
 const bootstrap=`<script>
  window.__wpSmokeErrors=[];
@@ -70,6 +71,7 @@ const probe=`<script>
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
      document.body.appendChild(output);
+     if(window.parent!==window)window.parent.document.body.appendChild(output.cloneNode(true));
    },850);
  });
  </script>`;
@@ -91,19 +93,22 @@ try{
   ['overview','工作總覽'],['attendance','出勤表'],['entry','填寫工作日誌'],
   ['history','歷史工作紀錄'],['insights','統計分析'],['settings','系統設定']];
  let count=0;
- for(const width of [390,1366]){
+ // Chrome clamps its top-level window to 500px. A same-origin iframe gives an exact CSS viewport.
+ for(const width of [320,375,390,430,1366]){
   for(const [route,title] of routes){
-   const url=`http://127.0.0.1:${port}/${fileName}#/${route}`;
+   const mobile=width<900;
+   if(mobile)await writeFile(frameFile,`<!doctype html><html><body style="margin:0"><iframe title="Exact CSS viewport" style="display:block;border:0;width:${width}px;height:900px" src="/${fileName}#/${route}"></iframe></body></html>`);
+   const url=`http://127.0.0.1:${port}/${mobile?frameName:fileName+'#/'+route}`;
    const output=execFileSync(browser,[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
     '--no-first-run','--no-default-browser-check','--disable-extensions',
-    '--virtual-time-budget=3500','--window-size='+width+',900',
+    '--virtual-time-budget=5000','--window-size='+Math.max(width,500)+',1000',
     '--dump-dom',url
    ],{cwd:root,encoding:'utf8',maxBuffer:15*1024*1024,timeout:25000,stdio:['ignore','pipe','pipe']});
    const match=output.match(/<output id="workpulse-smoke-result"([^>]*)><\/output>/);
    if(!match)throw new Error(`${route}@${width}: 頁面未完成初始化或瀏覽器測試探針未載入`);
    const attrs=Object.fromEntries([...match[1].matchAll(/data-([\w-]+)="([^"]*)"/g)].map(([,k,v])=>[k,v]));
-   const mobile=width===390;
+   if(Number(attrs.width)!==width)throw new Error(`${route}: expected exact ${width}px, got ${attrs.width}px`);
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
    if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||
       attrs['copy-blocked']!=='1'||
@@ -119,4 +124,5 @@ try{
 }finally{
  server.kill('SIGTERM');
  await rm(testFile,{force:true});
+ await rm(frameFile,{force:true});
 }

@@ -32,3 +32,18 @@ test('known conflict is retained, and never replayed automatically',async()=>{
  try{await assert.rejects(fieldSave('wpAttendanceSave',payload()),/CONFLICT/);assert.equal(readFieldPending()[0].status,'conflict');
  await assert.rejects(retryFieldPending(payload().requestId,'e1'),/版本衝突/);assert.equal(calls,1);}finally{delete globalThis.google;delete globalThis.sessionStorage;}
 });
+
+test('offline journal is staged without RPC, and reconnect does not auto-send',async()=>{
+ const nav=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{onLine:false}});
+ globalThis.sessionStorage=db();let calls=0;
+ globalThis.google={script:{run:{withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(){return this;},wpSharedSaveJournal(arg){calls++;this.ok({ok:true,journal:{date:arg.date,employeeId:arg.employeeId,revision:3}});}}}};
+ try{
+  const journal={employeeId:'e1',date:'2026-11-26',requestId:'journal_12345678',expectedRevision:2,tasks:[{category:'工務',description:'丈量'}]};
+  await assert.rejects(fieldSave('wpSharedSaveJournal',journal),/離線/);
+  assert.equal(calls,0);assert.equal(readFieldPending()[0].status,'offline');
+  globalThis.navigator.onLine=true;
+  assert.equal(calls,0);
+  await retryFieldPending(journal.requestId,'e1');assert.equal(calls,1);assert.equal(readFieldPending().length,0);
+ }finally{if(nav)Object.defineProperty(globalThis,'navigator',nav);else delete globalThis.navigator;delete globalThis.google;delete globalThis.sessionStorage;}
+});

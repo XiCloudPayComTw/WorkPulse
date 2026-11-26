@@ -132,7 +132,7 @@ function fieldRecoveryMarkup(){
  '<button type="button" class="soft-button mini" data-action="field-discard" data-id="'+id+'" '+(busy?'disabled':'')+'>移除待同步</button></div></div>';
  }).join('');
 }
-function updateFieldRecovery(){const panel=document.querySelector('#wp-field-recovery');if(panel)panel.innerHTML=fieldRecoveryMarkup();}
+function updateFieldRecovery(){const panel=document.querySelector('#wp-field-recovery');if(panel)panel.innerHTML=fieldRecoveryMarkup();const banner=document.querySelector('.sync-banner');if(banner)banner.outerHTML=syncBanner();}
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班費與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
  root.innerHTML = `<div class="shell">
@@ -146,11 +146,12 @@ function renderShell(){
    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
   </div>`;
+ if(state.cloud.saving)for(const element of document.querySelectorAll('#page-content input,#page-content textarea,#page-content select'))element.disabled=true;
  if(state.toast) showToast(state.toast.text,state.toast.error,true);
 }
 function renderCloudWaiting(){return `<section class="soft-card card-pad-lg sync-stage" role="status" aria-live="polite"><span class="sync-dot loading"></span><h2>正在連接工作日誌資料庫</h2><p>正在載入可選的使用者與本月工作紀錄。</p></section>`;}
 function renderCloudError(){return `<section class="soft-card card-pad-lg sync-stage" role="alert"><span class="sync-dot failed"></span><h2>無法連接雲端工作日誌</h2><p>${esc(state.cloud.error)}</p><button class="soft-button" data-action="retry-cloud">${icon('arrowRight',16)} 重新驗證與載入</button><p class="xs muted">存取失敗時不會自動切換為本機資料，避免誤以為已同步。</p></section>`;}
-function syncBanner(){if(!isCloud)return '';const status=state.cloud.saving?'saving':state.cloud.loadingMonth?'saving':state.cloud.phase==='ready'?'ready':'error';const label=status==='ready'?'Google Sheets 已連線':status==='saving'?'正在與 Google Sheets 同步':'同步失敗';return `<div class="sync-banner ${status}" role="status"><span class="sync-dot ${status}"></span><span>${label}</span><span class="xs muted">${esc(state.cloud.user?.email||'')}</span><button class="soft-button ghost mini" data-action="refresh-cloud" ${status==='saving'?'disabled':''}>重新整理</button></div>`;}
+function syncBanner(){if(!isCloud)return '';const status=!fieldOnline()?'error':state.cloud.saving?'saving':state.cloud.loadingMonth?'saving':state.cloud.phase==='ready'?'ready':'error';const label=!fieldOnline()?'目前離線，尚未確認同步':status==='ready'?'Google Sheets 已連線':status==='saving'?'正在與 Google Sheets 同步':'同步失敗';return `<div class="sync-banner ${status}" role="status"><span class="sync-dot ${status}"></span><span>${label}</span><span class="xs muted">${esc(state.cloud.user?.email||'')}</span><button class="soft-button ghost mini" data-action="refresh-cloud" ${status==='saving'?'disabled':''}>重新整理</button></div>`;}
 function renderPage(){switch(state.view){case 'attendance':return `${syncBanner()}${renderAttendance(state.store.employees,isOwnerPortal)}`;case 'entry':return renderEntry();case 'history':return renderHistory();case 'insights':return renderInsights();case 'settings':return renderSettings();case 'team':return `${syncBanner()}${renderTeam(state.cloud.user)}`;default:return renderOverview();}}
 function summaryTiles(stats){
  return `<div class="stats-grid section-space flash-delay">
@@ -747,7 +748,7 @@ window.addEventListener('online',updateFieldRecovery);
 window.addEventListener('offline',updateFieldRecovery);
 document.addEventListener('workpulse:field-recovery',updateFieldRecovery);
 window.addEventListener('pagehide',()=>{if(state.dirty)flushQuickDraft();});
-window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty||(attendanceState.dirty&&!attendanceState.draftStored)||!fieldRecoveryDurable()){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();
 else activateAttendancePage();

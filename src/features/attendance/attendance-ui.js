@@ -1,4 +1,5 @@
 import {esc} from '../../shared/utils.js';
+import {cloudEnabled} from '../../services/cloud.js';
 import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,TWD_FORMAT,validateAttendanceDraft,payEstimate} from './attendance.js';
 import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,discardAttendanceDraft} from './attendance-state.js';
 function opts(items,selected){
@@ -57,7 +58,7 @@ export function renderAttendance(people,isAdmin=false){
  '<div><span>當日加班／假日出勤時數</span><strong>'+hoursLabel(extra)+'</strong></div>'+
  '<div><span>當日加班費估算</span><strong data-att-preview-pay>'+cost(previewPay)+'</strong></div></div>'+
  (previewError?'<p class="att-error" role="alert">'+esc(previewError)+'</p>':'')+
- (a.dirty?'<p class="small muted" role="status">'+(a.draftStored?'尚未正式儲存；雲端模式的草稿暫存於本分頁。':'無法暫存草稿，請勿關閉頁面。')+'</p><button class="soft-button sm" data-action="attendance-discard" '+(a.saving?'disabled':'')+'>捨棄未儲存修改</button>':'')+
+ (a.dirty?'<p class="small muted" role="status">'+(!cloudEnabled()?'尚未正式儲存。':a.draftStored?'尚未正式儲存；草稿暫存於本分頁。':'無法暫存草稿，請勿關閉頁面。')+'</p><button class="soft-button sm" data-action="attendance-discard" '+(a.saving?'disabled':'')+'>捨棄未儲存修改</button>':'')+
  '<div class="att-actions"><span class="small muted">例假出勤、國定假日調移、變形工時需另行人工核對。</span>'+
  '<button class="soft-button primary" data-action="attendance-save" '+(a.saving?'disabled':'')+'>'+(a.saving?'儲存中…':'儲存出勤紀錄')+'</button></div></section>';
  const admin=isAdmin&&a.adminConfig?'<section class="soft-card card-pad-lg att-panel"><h3 class="card-title">管理員排班設定</h3>'+
@@ -90,7 +91,7 @@ export function renderAttendance(people,isAdmin=false){
 /** Attendance interactions are delegated here to avoid coupling the journal editor. */
 function refreshAttendanceDom(){
  const element=document.querySelector('.att-page');
- if(element)element.outerHTML=renderAttendance(knownPeople,knownAdmin);
+ if(element){element.outerHTML=renderAttendance(knownPeople,knownAdmin);if(attendanceState.saving)for(const input of document.querySelectorAll('.att-page input,.att-page select,.att-page textarea'))input.disabled=true;}
 }
 async function changeAttendanceMonth(month,employee){
  attendanceNotice='';
