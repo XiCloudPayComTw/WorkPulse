@@ -1,6 +1,7 @@
 // Per-person, per-date, unsubmitted drafts. No wages or calculated pay.
+import {offlineDraftStorage} from '../../services/offline-vault.js';
 function wpAttDraftKey(id,date){return 'workpulse:attendance-draft:v1:'+encodeURIComponent(id)+':'+date;}
-function wpAttDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
+function wpAttDraftStorage(){try{return offlineDraftStorage();}catch{return null;}}
 export function saveAttendanceDraft(d,storage=wpAttDraftStorage()){
  if(!d?.employeeId||!/^\d{4}-\d{2}-\d{2}$/.test(d.date||''))return false;
  const keys=['employeeId','date','revision','dayType','startTime','endTime','breakMinutes','leaveType','leaveMinutes','notes'];

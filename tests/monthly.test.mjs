@@ -532,3 +532,11 @@ test('migration preflight is owner-only, read-only and flags existing or deleted
  assert.equal(h.scope.wpOwnerMigrationPreflight({month:'2026-12',keys:[{...key,date:'2026-12-01'}]}).results[0].status,'not-found');
  assert.equal(h.files.size,before);h.as('');assert.throws(()=>h.scope.wpOwnerMigrationPreflight(input),/持有帳號/);
 });
+
+test('offline scope is only advertised with verified domain identity and explicit deployment namespace',()=>{
+ const h=harness();h.setup();h.employee();h.props.WORKPULSE_OFFLINE_SCOPE='company_offline_2026_v1';
+ assert.equal(h.scope.wpSharedBootstrap('2026-11').offlineScope,'');
+ h.props.WORKPULSE_ACCESS_MODE='domain';h.as('staff@example.com');
+ assert.equal(h.scope.wpSharedBootstrap('2026-11').offlineScope,'company_offline_2026_v1');
+ h.props.WORKPULSE_OFFLINE_SCOPE='short';assert.equal(h.scope.wpSharedBootstrap('2026-11').offlineScope,'');
+});

@@ -53,7 +53,7 @@ export function renderAttendance(people,isAdmin=false){
  '<div class="att-preview"><div><span>當日上班時數</span><strong>'+hoursLabel(worked)+'</strong></div>'+
  '<div><span>當日加班／假日出勤時數</span><strong>'+hoursLabel(extra)+'</strong></div></div>'+
  (previewError?'<p class="att-error" role="alert">'+esc(previewError)+'</p>':'')+
- (a.dirty?'<p class="small muted" role="status">'+(!cloudEnabled()?'尚未正式儲存。':a.draftStored?'尚未正式儲存；草稿暫存於本分頁。':'無法暫存草稿，請勿關閉頁面。')+'</p><button class="soft-button sm" data-action="attendance-discard" '+(a.saving?'disabled':'')+'>捨棄未儲存修改</button>':'')+
+ (a.dirty?'<p class="small muted" role="status">'+(!cloudEnabled()?'尚未正式儲存。':a.draftStored?'尚未正式儲存；草稿已送入本機暫存流程；請查看離線狀態。':'無法暫存草稿，請勿關閉頁面。')+'</p><button class="soft-button sm" data-action="attendance-discard" '+(a.saving?'disabled':'')+'>捨棄未儲存修改</button>':'')+
  '<div class="att-actions"><span class="small muted">例假出勤、國定假日調移、變形工時需另行人工核對。</span>'+
  '<button class="soft-button primary" data-action="attendance-save" '+(a.saving?'disabled':'')+'>'+(a.saving?'儲存中…':'儲存出勤紀錄')+'</button></div></section>';
  const admin=isAdmin&&a.adminConfig?'<section class="soft-card card-pad-lg att-panel"><h3 class="card-title">管理員排班設定</h3>'+
