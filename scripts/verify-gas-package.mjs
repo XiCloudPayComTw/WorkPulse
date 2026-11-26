@@ -1,0 +1,28 @@
+import {readFile,readdir} from 'node:fs/promises';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const dir='dist-gas/unified/';
+const expected=['Code.gs','Index.html','appsscript.json'];
+const files=await readdir(dir,{withFileTypes:true});
+assert.deepEqual(files.map(x=>x.name).sort(),expected,'unified bundle must contain exactly three files');
+assert.ok(files.every(x=>x.isFile()),'unified bundle must contain only regular files');
+const [code,html,manifestText]=await Promise.all(expected.map(x=>readFile(dir+x,'utf8')));
+assert.match(code,/^var WP_PORTAL_KIND='unified';/);
+assert.match(code,/function workPulseInitializationCheck\(/);
+assert.match(code,/function wpOwnerBackupPlan\(/);
+assert.match(code,/function wpOwnerCompareBackupCopies\(/);
+assert.doesNotMatch(code,/^var WP_PORTAL_KIND='(?:public|admin)';/m);
+new vm.Script(code,{filename:'Code.gs'});
+assert.match(html,/window\.WORKPULSE_UNIFIED_PORTAL=true;/);
+assert.doesNotMatch(html,/window\.WORKPULSE_ADMIN_PORTAL=true;|WORKPULSE_PWA_BUILD|type="module"/);
+const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(x=>x[1]);
+assert.ok(scripts.length>=2,'missing embedded scripts');
+for(let i=0;i<scripts.length;i++)new vm.Script(scripts[i],{filename:'Index.html script '+i});
+const pkg=JSON.parse(await readFile('package.json','utf8'));
+assert.ok(html.includes('v'+pkg.version),'HTML version differs from package version');
+const manifest=JSON.parse(manifestText);
+assert.equal(manifest.timeZone,'Asia/Taipei');assert.equal(manifest.runtimeVersion,'V8');
+assert.deepEqual([...manifest.oauthScopes].sort(),[
+ 'https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/script.scriptapp','https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/userinfo.email'
+].sort());
+console.log('Verified WorkPulse v'+pkg.version+' unified three-file deployment package (structure, syntax, portal, manifest).');
