@@ -10,7 +10,7 @@ import { currentMonth, localISODate, shiftDate, formatDate, formatHours, esc, ui
 import { cloudEnabled, cloudCall } from '../services/cloud.js';
 import {offlineVault,offlineScopeKey,offlineDraftStorage,offlineVaultStatus,flushOfflineVault} from '../services/offline-vault.js';
 import {fieldOnline,readFieldPending,fieldRecoveryBusy,fieldRecoveryDurable,fieldSave,retryFieldPending,removeFieldPending,resetFieldRecoveryMemory} from '../services/field-recovery.js';
-import {backupCenterState,renderBackupCenter,loadBackupPlan,prepareBackupFolder,startBackupBatch,continueBackupBatch,downloadBackupReport,exportBackupValues,compareBackupCopies} from '../features/admin/backup-center.js';
+import {backupCenterState,renderBackupCenter,loadBackupPlan,prepareBackupFolder,setBackupPause,startBackupBatch,continueBackupBatch,downloadBackupReport,exportBackupValues,compareBackupCopies} from '../features/admin/backup-center.js';
 import { adminState, loadAdmin, setAdminTab, editAdmin, updateAdminDraft, resetAdminEditor, renderTeam, saveAdmin, maintenanceState, renderMaintenance, loadMaintenance, deploymentCheckState, renderDeploymentCheck, loadDeploymentCheck, integrityState, renderMonthIntegrity, loadMonthIntegrity, downloadMonthIntegrity, backupMaintenance, previewMaintenanceRecovery, downloadMaintenanceRecovery } from '../features/admin/admin.js';
 import {renameLocalEmployee,renameLocalProject} from '../features/admin/rename.js';
 import { buildReport, reportCsv, reportSheets } from '../features/reports/reports.js';
@@ -577,6 +577,8 @@ root.addEventListener('click', event=>{
   if(!isOwnerPortal||state.cloud.user?.role!=='admin'||backupCenterState.busy)return;
   let promise;const month=document.querySelector('#backup-center-month')?.value||state.month;backupCenterState.month=month;
   if(action==='backup-center-load')promise=loadBackupPlan();
+  if(action==='backup-center-pause'&&confirm('暫停全公司日誌及出勤正式儲存？請通知同仁保留草稿。'))promise=setBackupPause(true);
+  if(action==='backup-center-unpause'&&confirm('已核對備份結果，恢復日誌及出勤儲存？'))promise=setBackupPause(false);
   if(action==='backup-center-folder'&&confirm('建立或重用公司持有者專用備份資料夾？不會修改正式資料。'))promise=prepareBackupFolder();
   if(action==='backup-center-all'||action==='backup-center-month'||action==='backup-center-control'){
    if(!confirm('建立獨立 Drive 副本。請先確認暫停填寫；全部備份為逐檔處理，並非原子快照。確定執行？'))return;

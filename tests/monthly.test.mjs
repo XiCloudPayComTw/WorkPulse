@@ -623,7 +623,7 @@ test('integrity accepts attendance and a recreated same-date journal after logic
 
 test('unified portal fails closed, only verified primary owner can call any privileged RPC',()=>{
  const h=harness();h.setup();const p=h.employee();h.scope.WP_PORTAL_KIND='unified';
- const ownerMethods=['wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','workPulseInitialize','workPulseMigrateLegacy','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerRecoveryPreview','workPulseInstallDailyBackup','workPulseRemoveDailyBackup','workPulsePauseFieldWrites','workPulseResumeFieldWrites','workPulseDeploymentCheck','workPulseVerifyMonthFiles','wpOwnerMigrationPreflight','workPulseInitializationCheck','wpOwnerMonthIntegrity','workPulseCompareRestoredMonth','wpOwnerSaveCategories','wpOwnerSaveProject','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','workPulseUpgradeAttendance','wpOwnerSaveAttendanceSchedule'];
+ const ownerMethods=['wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','workPulseInitialize','workPulseMigrateLegacy','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerBackupPlan','wpOwnerPrepareBackupFolder','wpOwnerExportBackupJson','wpOwnerCompareBackupCopies','wpOwnerRecoveryPreview','workPulseInstallDailyBackup','workPulseRemoveDailyBackup','workPulsePauseFieldWrites','workPulseResumeFieldWrites','workPulseDeploymentCheck','workPulseVerifyMonthFiles','wpOwnerMigrationPreflight','workPulseInitializationCheck','wpOwnerMonthIntegrity','workPulseCompareRestoredMonth','wpOwnerSaveCategories','wpOwnerSaveProject','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','workPulseUpgradeAttendance','wpOwnerSaveAttendanceSchedule'];
  assert.throws(()=>h.scope.wpSharedBootstrap('2026-11'),/禁止匿名/);
  assert.throws(()=>h.scope.doGet(),/禁止匿名/);
  h.props.WORKPULSE_ACCESS_MODE='domain';
@@ -669,4 +669,32 @@ test('unified legacy delegated operator is never promoted even when configured',
  const payload={date:'2026-11-23',employeeId:person.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',expectedRevision:0,requestId:'unified-attendance-01'};
  assert.equal(h.scope.wpAttendanceSave(payload).ok,true);
  h.as('admin@example.com');assert.equal(h.scope.wpAttendanceSave({...payload,date:'2026-11-24',requestId:'unified-attendance-02'}).ok,true);
+});
+
+test('backup center plan and folder setup are owner-only, idempotent and preserve live index',()=>{
+ const h=harness();h.setup();const p=h.employee();h.scope.wpSharedSaveJournal(h.entry(p));
+ const before=JSON.stringify(h.scope.wpMonthIndex_(h.control));
+ assert.equal(h.scope.wpOwnerBackupPlan().folderConfigured,false);
+ h.as('staff@example.com');for(const name of ['wpOwnerBackupPlan','wpOwnerPrepareBackupFolder','wpOwnerExportBackupJson','wpOwnerCompareBackupCopies'])assert.throws(()=>h.scope[name]({}),/持有帳號/);
+ h.as('admin@example.com');assert.equal(h.scope.wpOwnerPrepareBackupFolder().created,true);
+ const id=h.props.WORKPULSE_BACKUP_FOLDER_ID;assert.equal(h.scope.wpOwnerPrepareBackupFolder().created,false);assert.equal(h.props.WORKPULSE_BACKUP_FOLDER_ID,id);
+ assert.deepEqual(Array.from(h.scope.wpOwnerBackupPlan().targets),['control','2026-11']);assert.equal(JSON.stringify(h.scope.wpMonthIndex_(h.control)),before);
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=h.props.WORKPULSE_FOLDER_ID;assert.throws(()=>h.scope.wpOwnerBackupPlan(),/不可相同/);assert.throws(()=>h.scope.wpOwnerPrepareBackupFolder(),/不可相同/);
+});
+test('backup refuses stale pause token before copying and retains exact requested files',()=>{
+ const h=harness();h.setup();h.scope.wpOwnerPrepareBackupFolder();const before=h.files.size;
+ assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'pause-guard-00001',requiredPausedAt:'2026-11-01T00:00:00Z'}),/停寫狀態/);
+ assert.equal(h.files.size,before);
+ h.scope.workPulsePauseFieldWrites();const token=h.scope.wpOwnerBackupPlan().pausedAt;
+ assert.equal(h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'pause-guard-00001',requiredPausedAt:token}).ok,true);
+ h.scope.workPulseResumeFieldWrites();assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'pause-guard-00002',requiredPausedAt:token}),/停寫狀態/);
+});
+test('JSON values export redacts legacy salary and does not change workbook',()=>{
+ const h=harness();h.setup();const p=h.employee();h.scope.wpSharedSaveJournal(h.entry(p));
+ const settings=h.control.getSheetByName('AttendanceSettings');settings.appendRow([p.id,'2026-11',987654,22,1,'','']);
+ const before=JSON.stringify(settings.rows);
+ const out=h.scope.wpOwnerExportBackupJson({target:'control'});assert.equal(out.restoreSupported,false);assert.equal(out.redactedSalaryCells,1);
+ assert.equal(out.sheets.find(x=>x.name==='AttendanceSettings').rows[0][2],'');assert.equal(JSON.stringify(settings.rows),before);
+ assert.equal(h.scope.wpOwnerExportBackupJson({target:'2026-11'}).format,'workpulse-values-v1');
+ assert.throws(()=>h.scope.wpOwnerExportBackupJson({target:'2026-12'}),/沒有資料/);
 });

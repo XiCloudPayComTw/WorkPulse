@@ -135,6 +135,7 @@ function wpBackupWorkbook_(input,scheduled){
  var lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
   wpBackupActor_(scheduled);wpBackupAssertPrivate_(folder,cfg.adminEmail);
+  if(input.requiredPausedAt&&wpFieldPause_(control)!==input.requiredPausedAt)throw Error('停寫狀態已改變，停止全部備份');
   var before=wpBackupContent_(source);
   var title='WorkPulse_Backup_'+target+'_'+request,matching=folder.getFilesByName(title),copy,duplicate=false;
   if(matching.hasNext()){copy=matching.next();duplicate=true;if(matching.hasNext())throw Error('備份名稱重複，請人工核對');}

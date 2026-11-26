@@ -10,6 +10,7 @@ async function wpBackupReadPlan(){
 }
 export async function loadBackupPlan(){const a=backupCenterState;if(a.busy)return;a.busy=true;a.error='';a.plan=null;try{await wpBackupReadPlan();}catch(e){a.error=e.message;}finally{a.busy=false;}}
 export async function prepareBackupFolder(){const a=backupCenterState;if(a.busy)return;a.busy=true;a.error='';try{const r=await cloudCall('wpOwnerPrepareBackupFolder');if(!r?.ok||!r.folderConfigured)throw Error('資料夾結果未確認');await wpBackupReadPlan();}catch(e){a.error=e.message+'；請先到 Drive 確認是否已建立資料夾，再重試。';}finally{a.busy=false;}}
+export async function setBackupPause(paused){const a=backupCenterState;if(a.busy)return;a.busy=true;a.error='';try{await cloudCall(paused?'workPulsePauseFieldWrites':'workPulseResumeFieldWrites');const p=await wpBackupReadPlan();if(Boolean(p.pausedAt)!==paused)throw Error('停寫結果未確認');}catch(e){a.error=e.message+'；請更新備份清單，核對實際狀態。';}finally{a.busy=false;}}
 export async function startBackupBatch(target,onProgress=()=>{}){
  const a=backupCenterState;if(a.busy)return;
  if(a.job&&a.job.items.some(x=>x.status!=='done')){a.error='尚有未完成備份，請先核對並繼續，或重新載入後在 Drive 人工核對';return;}
@@ -18,7 +19,7 @@ export async function startBackupBatch(target,onProgress=()=>{}){
   const p=await wpBackupReadPlan();if(!p.folderConfigured)throw Error('請先建立獨立備份資料夾');
   const targets=target==='all'?p.targets:[target];if(!targets.every(x=>p.targets.includes(x)))throw Error('該月份尚無資料');
   if(target==='all'&&!p.pausedAt)throw Error('全部備份前請由持有者執行停寫，並確認沒有進行中寫入');
-  a.job={startedAt:new Date().toISOString(),all:target==='all',items:targets.map(target=>({target,requestId:uid(),status:'pending'}))};
+  a.job={startedAt:new Date().toISOString(),all:target==='all',pausedAt:p.pausedAt||'',items:targets.map(target=>({target,requestId:uid(),status:'pending'}))};
   await wpRunBackupBatch(onProgress);
  }catch(e){a.error=e.message;}finally{a.busy=false;}
 }
@@ -28,13 +29,14 @@ async function wpRunBackupBatch(progress){
   if(item.status==='done')continue;
   item.status='running';progress();
   try{
-   if(j.all){const p=await wpBackupReadPlan();if(!p.pausedAt||JSON.stringify(p.targets)!==JSON.stringify(j.items.map(x=>x.target)))throw Error('停寫或月份清單已改變，須人工核對');}
-   const r=await cloudCall('wpOwnerBackupWorkbook',{target:item.target,requestId:item.requestId},{timeoutMs:180000});
+   if(j.all){const p=await wpBackupReadPlan();if(!p.pausedAt||p.pausedAt!==j.pausedAt||JSON.stringify(p.targets)!==JSON.stringify(j.items.map(x=>x.target)))throw Error('停寫或月份清單已改變，須人工核對');}
+   const r=await cloudCall('wpOwnerBackupWorkbook',{target:item.target,requestId:item.requestId,...(j.all?{requiredPausedAt:j.pausedAt}:{})},{timeoutMs:180000});
    if(!r?.ok||r.target!==item.target||typeof r.name!=='string'||!Array.isArray(r.sheets))throw Error('備份結果未確認');
    item.status='done';item.name=r.name;item.sheets=r.sheets.length;
   }catch(e){item.status='unconfirmed';item.error=e.message;throw Error(wpBackupTargetName(item.target)+'：'+e.message+'；已停止，請核對 Drive 後以原識別碼繼續。');}
   progress();
  }
+ if(j.all){const p=await wpBackupReadPlan();if(p.pausedAt!==j.pausedAt||JSON.stringify(p.targets)!==JSON.stringify(j.items.map(x=>x.target)))throw Error('備份副本已建立，但最終停寫或清單核對失敗；不得視為完整批次');}
  j.completedAt=new Date().toISOString();
 }
 export async function continueBackupBatch(progress=()=>{}){
@@ -59,10 +61,10 @@ export function renderBackupCenter(month){
  const a=backupCenterState,p=a.plan,j=a.job,busy=a.busy?'disabled':'',pending=j&&!j.completedAt,ready=p?.folderConfigured&&!pending&&!a.busy;
  const button=(action,label,disabled=false)=>'<button type="button" class="soft-button" data-action="backup-center-'+action+'" '+(disabled||a.busy?'disabled':'')+'>'+label+'</button>';
  return '<section class="soft-card card-pad-lg section-space wp-backup-center"><h2 class="card-title">手動備份與復原中心</h2><p class="card-sub">管理員專用 · 不需要每日排程。全部備份逐檔處理，須先停寫；不會覆寫正式資料。</p>'+
- '<div class="row wp-backup-actions">'+button('load','更新備份清單')+button('folder','建立／確認私人備份資料夾')+'</div>'+
+ '<div class="row wp-backup-actions">'+button('load','更新備份清單')+button('folder','建立／確認私人備份資料夾')+button('pause','暫停日常寫入',!p||!!p.pausedAt)+button('unpause','恢復日常寫入',!p?.pausedAt||!!pending)+'</div>'+
  (p?'<p role="status">'+(p.folderConfigured?'私人備份資料夾已設定':'尚未設定私人備份資料夾')+' · '+(p.targets.length-1)+' 個月份 · '+(p.pausedAt?'已停寫（仍須確認寫入結束）':'尚未停寫')+'</p>':'')+
  '<label class="form-group"><span class="field-label">指定月份</span><input class="input" id="backup-center-month" type="month" value="'+esc(a.month||month)+'" '+busy+'></label><div class="row wp-backup-actions">'+button('all','備份全部資料',!ready||!p?.pausedAt)+button('control','備份控制表',!ready)+button('month','備份指定月份',!ready)+'</div>'+
- '<p class="small muted">全部備份前由持有者執行 workPulsePauseFieldWrites，確認寫入停止；完成核對後執行 workPulseResumeFieldWrites。關閉頁面不會繼續未送出的項目。</p>'+
+ '<p class="small muted">全部備份前請暫停日常寫入，並確認舊入口與進行中的寫入已停止；完成核對後手動恢復。若無法續傳，請先下載結果、人工核對，再重新載入並恢復日常寫入。關閉頁面不會繼續未送出的項目。</p>'+
  (j?'<p role="status"><strong>'+j.items.filter(x=>x.status==='done').length+' / '+j.items.length+' 檔已確認</strong></p><div class="maintenance-list">'+j.items.map(x=>'<div><strong>'+esc(wpBackupTargetName(x.target))+' · '+({done:'完成',running:'處理中',pending:'未開始',unconfirmed:'未確認'}[x.status])+'</strong><span>'+esc(x.name||x.error||'')+'</span></div>').join('')+'</div><div class="row wp-backup-actions">'+button('resume','核對後繼續',!pending)+button('report','下載備份結果')+'</div>':'')+
  '<h3 class="card-title section-space">下載 JSON 資料值</h3><p class="small muted">僅供人工核對，薪資欄位清空；不含公式及格式，不可直接匯入。請私下保存。</p><label class="form-group"><span class="field-label">匯出目標</span><select class="input" id="backup-json-target" '+busy+'>'+([...(p?.targets||['control',month])].map(x=>'<option value="'+esc(x)+'">'+esc(wpBackupTargetName(x))+'</option>').join(''))+'</select></label>'+button('json','下載所選 JSON')+
  '<h3 class="card-title section-space">獨立月檔復原預檢</h3><p class="small muted">先在 Drive 手動複製備份到獨立測試位置。輸入兩份非正式索引檔案的 ID，唯讀比較資料值；月份使用上方指定月份。</p><label class="form-group"><span class="field-label">原始備份試算表 ID</span><input class="input" id="backup-source-id" autocomplete="off" '+busy+'></label><label class="form-group"><span class="field-label">獨立復原副本 ID</span><input class="input" id="backup-copy-id" autocomplete="off" '+busy+'></label>'+button('compare','唯讀比對')+
