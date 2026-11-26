@@ -102,3 +102,22 @@ input,textarea,select,[contenteditable="true"]{user-select:text;-webkit-user-sel
  .att-mobile-record>.soft-button{width:100%}
 }
 @media(max-width:350px){.main{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.att-mobile-record{padding:10px}}
+
+
+/* v0.14.2: mobile workflow. Native selects remain available on desktop/unsupported browsers. */
+.wp-sheet-trigger,.wp-mobile-dock{display:none}
+.wp-bottom-sheet{border:1px solid #fff;border-radius:26px 26px 0 0;background:#e9f0f7;color:#344e60;padding:18px 18px max(20px,env(safe-area-inset-bottom,0px));width:min(100%,600px);max-width:100%;max-height:80dvh;margin:auto auto 0;box-shadow:0 -12px 45px #38536a35;overflow:auto}
+.wp-bottom-sheet::backdrop{background:#273b5066;backdrop-filter:blur(3px)}
+.wp-sheet-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}.wp-sheet-heading h2{font-size:20px;margin:0}.wp-sheet-heading button{min-height:44px}
+.wp-sheet-list{display:grid;gap:8px}.wp-sheet-option{font-size:16px;color:#36556b;background:#edf3f9;border:1px solid #fff;border-radius:14px;text-align:left;padding:12px;min-height:48px;overflow-wrap:anywhere}.wp-sheet-option[aria-pressed=true]{background:#d5e5ee;box-shadow:var(--inset);font-weight:650}.wp-sheet-option:disabled{opacity:.5}
+.wp-read-skeleton{min-height:180px}.wp-read-skeleton p{color:#536f83;margin:0 0 16px}.wp-read-skeleton>div,.wp-overlay-skeleton{display:grid;gap:12px}.wp-read-skeleton span,.wp-overlay-skeleton span{display:block;height:18px;border-radius:10px;background:linear-gradient(90deg,#dce5ef 20%,#f4f7fa 50%,#dce5ef 80%);background-size:200% 100%;animation:wp-skeleton 1.6s ease-in-out infinite}.wp-read-skeleton span:nth-child(2),.wp-overlay-skeleton span:nth-child(2){width:82%}.wp-read-skeleton span:nth-child(3),.wp-overlay-skeleton span:nth-child(3){width:62%}.wp-overlay-skeleton{display:none;width:100%}.wp-read-overlay .wp-overlay-skeleton{display:grid}.wp-read-overlay .wp-jelly-orb{display:none}@keyframes wp-skeleton{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media(max-width:900px){
+ select[data-sheet-enhanced]{display:none!important}.wp-sheet-trigger{display:block;min-height:44px;font-size:16px;text-align:left;overflow-wrap:anywhere;position:relative;padding-right:30px}.wp-sheet-trigger:after{content:'⌄';position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#647d8f}
+ .wp-mobile-dock:not([hidden]){display:grid;position:fixed;z-index:25;left:0;right:0;bottom:var(--wp-nav-height,80px);gap:6px;padding:10px max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));background:rgba(239,244,250,.96);backdrop-filter:blur(12px);border-top:1px solid #fff;box-shadow:0 -6px 20px #39566d12}
+ .wp-mobile-dock>span{font-size:12px;color:#526f81;overflow-wrap:anywhere;line-height:1.35}.wp-mobile-dock>div{display:flex;gap:9px}.wp-mobile-dock button{flex:1;min-height:44px;min-width:0;white-space:normal}.wp-mobile-dock [hidden]{display:none!important}
+ .wp-has-dock .shell{padding-bottom:calc(180px + env(safe-area-inset-bottom,0px))}.wp-has-dock .toast-stack{bottom:calc(var(--wp-nav-height,80px) + 104px)}
+ .wp-keyboard-open .mobile-nav,.wp-keyboard-open .wp-mobile-dock{display:none!important}.wp-keyboard-open .shell{padding-bottom:24px}.wp-keyboard-open .toast-stack{bottom:16px}.wp-keyboard-open .main .input{scroll-margin-bottom:20px}
+}
+@media(min-width:700px) and (max-width:900px){.wp-field-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wp-field-home{min-height:calc(100dvh - 150px)}.wp-field-tile{min-height:144px}.entry-grid{grid-template-columns:minmax(0,1fr) minmax(180px,245px);gap:16px}.entry-summary{position:sticky;top:16px}.entry-grid .form-fields{grid-template-columns:1fr}.att-selectors{grid-template-columns:1fr 1fr auto}}
+@media(min-width:901px) and (max-width:1100px){.entry-grid{grid-template-columns:minmax(0,1fr)}.entry-summary{position:static}.shell{grid-template-columns:200px minmax(0,1fr)}.main{padding-left:22px;padding-right:22px}}
+@media(prefers-reduced-motion:reduce){.wp-read-skeleton span,.wp-overlay-skeleton span{animation:none}}

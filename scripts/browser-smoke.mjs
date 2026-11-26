@@ -46,10 +46,10 @@ const probe=`<script>
        const menuButton=document.querySelector('[data-action="person-menu"]');
        const before=menuButton?.textContent.trim();
        menuButton?.click();
-       const option=[...document.querySelectorAll('[data-action="person-select"]')][1];
+       const option=window.innerWidth<=900?[...document.querySelectorAll('.wp-bottom-sheet [data-sheet-value]')][1]:[...document.querySelectorAll('[data-action="person-select"]')][1];
        if(!option)personChoice='missing-option';
        else{
-         const id=option.dataset.id;
+         const id=option.dataset.id||option.dataset.sheetValue;
          option.click();
          const stored=localStorage.getItem('workpulse:selected-person:v1');
          const after=document.querySelector('[data-action="person-menu"]')?.textContent.trim();
@@ -67,6 +67,15 @@ const probe=`<script>
      if(location.hash.includes('/entry')||location.hash.includes('/history')){
        const heading=document.querySelector('.section-head.section-space');
        spacingCheck=heading&&parseFloat(getComputedStyle(heading).marginTop)>=26?'ok':'missing-gap';
+     }
+     let dockCheck='skip',sheetCheck='skip';
+     if(window.innerWidth<=900&&location.hash.includes('/entry')){
+       const dock=document.querySelector('#wp-mobile-dock'),before=document.querySelectorAll('.task-card').length;
+       dock?.querySelector('[data-dock="add"]')?.click();
+       dockCheck=dock&&!dock.hidden&&document.querySelectorAll('.task-card').length===before+1?'ok':'missing-dock';
+       const trigger=document.querySelector('select[data-field="category"] + .wp-sheet-trigger');trigger?.click();
+       const sheet=document.querySelector('.wp-bottom-sheet[open]'),choice=sheet?.querySelector('[data-sheet-value]:not([aria-pressed="true"]):not(:disabled)');
+       if(choice){const value=choice.dataset.sheetValue;choice.click();sheetCheck=!document.querySelector('.wp-bottom-sheet')&&document.querySelector('select[data-field="category"]')?.value===value?'ok':'wrong-option';}else sheetCheck='missing-sheet';
      }
      let exportCheck='skip';
      if(location.hash.includes('/attendance')&&window.innerWidth>900){
@@ -94,7 +103,7 @@ const probe=`<script>
      output.dataset.failed=failed?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
-     output.dataset.calendarCheck=calendarCheck;
+     output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.sheetCheck=sheetCheck;
      output.dataset.spacingCheck=spacingCheck;
      output.dataset.width=String(window.innerWidth);
      output.dataset.errors=window.__wpSmokeErrors.join(' // ').slice(0,250);
@@ -122,7 +131,7 @@ try{
   ['history','歷史工作紀錄'],['insights','統計分析'],['settings','系統設定']];
  let count=0;
  // Chrome clamps its top-level window to 500px. A same-origin iframe gives an exact CSS viewport.
- for(const width of [320,375,390,430,1366]){
+ for(const width of [320,375,390,430,768,820,1024,1366]){
   for(const [route,title] of routes){
    const mobile=width<900;
    if(mobile)await writeFile(frameFile,`<!doctype html><html><body style="margin:0"><iframe title="Exact CSS viewport" style="display:block;border:0;width:${width}px;height:900px" src="/${fileName}#/${route}"></iframe></body></html>`);
@@ -141,6 +150,7 @@ try{
    if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||attrs['mobile-fit']!=='1'||attrs['input-readable']!=='1'||
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
+      (mobile&&route==='entry'&&(attrs['dock-check']!=='ok'||attrs['sheet-check']!=='ok'))||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
