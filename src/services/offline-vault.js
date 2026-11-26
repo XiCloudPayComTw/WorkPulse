@@ -74,7 +74,7 @@ export function createOfflineVault({session=wpVaultSession,preferences=wpVaultPr
   setItem(k,v){if(!wpVaultAllowed(k))throw Error('不允許持久保存此資料');const next=wpVaultSnapshot({...data,[k]:String(v)});data=next;write();},
   removeItem(k){if(!wpVaultAllowed(k))return;const next={...data};delete next[k];data=next;write();}
  };
- async function flush(){return db?Boolean(await chain)&&!failure:phase!=='error'||!preferences()?.getItem(pref());}
+ async function flush(){if(db)return Boolean(await chain)&&!failure;if(phase!=='error')return true;try{return preferences()?.getItem(pref())!=='1';}catch{return false;}}
  function releaseDb(){db?.close();db=null;release?.();release=null;}
  async function enable(){
   if(!scope||busy||db)return false;
