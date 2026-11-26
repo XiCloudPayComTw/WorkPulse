@@ -2,12 +2,12 @@ import {startFieldLoading,stopFieldLoading} from '../app/loading.js';
 /** Apps Script HTMLService provides google.script.run only inside its own web-app origin. */
 const METHODS = new Set([
  'wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
- 'wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
+ 'wpOwnerBootstrap','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
  'wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule','wpAttendanceRange'
 ]);
 const MUTATIONS = new Set([
- 'wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
+ 'wpOwnerBackupWorkbook','wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceSave','wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule'
 ]);
 
