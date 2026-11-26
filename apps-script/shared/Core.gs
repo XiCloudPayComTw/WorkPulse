@@ -22,7 +22,7 @@ var WP_CATEGORIES=['前端開發','展店設計','現場勘查','行政／會議
 var WP_STATUS=['done','doing','blocked'];
 function doGet(){
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('WorkPulse — 工作日誌')
-    .addMetaTag('viewport','width=device-width, initial-scale=1');
+    .addMetaTag('viewport','width=device-width, initial-scale=1, viewport-fit=cover');
 }
 function wpConfig_(){
   var props=PropertiesService.getScriptProperties();

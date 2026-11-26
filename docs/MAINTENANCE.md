@@ -18,3 +18,5 @@
 先停止相關寫入，核對控制表與月份檔的備份時間、MonthIndex、Journals、Tasks、Requests、Audit、Meta、Attendance、AttendanceSettings；複製到獨立測試資料夾與測試部署，不指向正式資料 ID。比對逐筆資料與關聯，測試工作日誌、出勤及版本。禁止直接用副本覆寫正式表。原始控制表的 MonthIndex 仍指向正式檔案，必須在測試副本重新設定索引。單檔列數比對不是完整性驗證；未經實機驗收不視為可災難復原。Google Workspace 版仍須公司授權及實測。
 
 - 響應式：900px 以下出勤明細採逐日卡片，桌面保留完整表格；底部導航均分、44px 以上主要觸控區、16px 表單、safe-area 與浮動提示位置調整；原本手機隱藏會計與法規區的決策維持。Chrome 加驗導航無溢出、觸控高度與輸入字級；iOS/Android 鍵盤、旋轉與觸控仍需實機驗證。
+
+- 備份新增模擬 Drive 複製成功、同 requestId 重試、拒絕額外分享者及正式索引不變測試。GAS viewport 同步 viewport-fit=cover。備份權限驗證不能代替實際 Drive 管理員檢查（含父層分享）。稽核 selected: 人員僅代表選取的姓名，不能當成登入身分證明。
