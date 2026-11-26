@@ -1,6 +1,6 @@
 import {esc} from '../../shared/utils.js';
 import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,TWD_FORMAT,validateAttendanceDraft,payEstimate} from './attendance.js';
-import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage} from './attendance-state.js';
+import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,discardAttendanceDraft} from './attendance-state.js';
 function opts(items,selected){
  return Object.entries(items).map(([key,value])=>'<option value="'+esc(key)+'" '+(selected===key?'selected':'')+'>'+esc(value)+'</option>').join('');
 }
@@ -57,6 +57,7 @@ export function renderAttendance(people,isAdmin=false){
  '<div><span>當日加班／假日出勤時數</span><strong>'+hoursLabel(extra)+'</strong></div>'+
  '<div><span>當日加班費估算</span><strong data-att-preview-pay>'+cost(previewPay)+'</strong></div></div>'+
  (previewError?'<p class="att-error" role="alert">'+esc(previewError)+'</p>':'')+
+ (a.dirty?'<p class="small muted" role="status">'+(a.draftStored?'尚未正式儲存；雲端模式的草稿暫存於本分頁。':'無法暫存草稿，請勿關閉頁面。')+'</p><button class="soft-button sm" data-action="attendance-discard" '+(a.saving?'disabled':'')+'>捨棄未儲存修改</button>':'')+
  '<div class="att-actions"><span class="small muted">例假出勤、國定假日調移、變形工時需另行人工核對。</span>'+
  '<button class="soft-button primary" data-action="attendance-save" '+(a.saving?'disabled':'')+'>'+(a.saving?'儲存中…':'儲存出勤紀錄')+'</button></div></section>';
  const admin=isAdmin&&a.adminConfig?'<section class="soft-card card-pad-lg att-panel"><h3 class="card-title">管理員排班設定</h3>'+
@@ -101,6 +102,7 @@ async function changeAttendanceMonth(month,employee){
 document.addEventListener('click',event=>{
  const el=event.target.closest('[data-action]');
  if(!el||!el.closest('.att-page'))return;
+ if(attendanceState.saving)return;
  const action=el.dataset.action;
  if(action==='attendance-refresh'){
   changeAttendanceMonth(attendanceState.month,attendanceState.employeeId)
@@ -108,6 +110,8 @@ document.addEventListener('click',event=>{
  }else if(action==='attendance-edit'){
   attendanceNotice='';attendanceSelectDate(el.dataset.date);refreshAttendanceDom();
   document.querySelector('.att-layout')?.scrollIntoView({behavior:'smooth',block:'start'});
+ }else if(action==='attendance-discard'){
+  if(!attendanceState.saving&&confirm('確定捨棄未儲存的出勤草稿？待同步請求需另外處理。')){discardAttendanceDraft();refreshAttendanceDom();}
  }else if(action==='attendance-save'){
   attendanceNotice='正在儲存出勤紀錄…';
   submitAttendance().then(()=>attendanceNotice='出勤紀錄已成功儲存至 Google Sheets／本機展示資料。')
@@ -153,6 +157,7 @@ document.addEventListener('input',event=>{
 document.addEventListener('change',event=>{
  const el=event.target;
  if(!el.closest('.att-page'))return;
+ if(attendanceState.saving){refreshAttendanceDom();return;}
  if(el.matches('[data-att-person]')||el.matches('[data-att-month]')){
   if(attendanceState.dirty&&!confirm('出勤資料尚未儲存，確定要切換？')){refreshAttendanceDom();return;}
   const month=el.matches('[data-att-month]')?el.value:attendanceState.month;

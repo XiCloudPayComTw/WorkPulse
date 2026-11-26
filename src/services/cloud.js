@@ -27,7 +27,7 @@ export function cloudCall(method,argument,{timeoutMs}={}){
  const duration=timeoutMs??(MUTATIONS.has(method)?90000:60000);
  if(!Number.isInteger(duration)||duration<1||duration>180000)
   return Promise.reject(new Error('雲端請求逾時設定無效'));
- startFieldLoading(MUTATIONS.has(method)?'正在儲存資料…':'正在讀取資料…');
+ const loadingId=startFieldLoading(MUTATIONS.has(method)?'正在儲存資料…':'正在讀取資料…');
  return new Promise((resolve,reject)=>{
   let completed=false;
   let timer;
@@ -35,7 +35,7 @@ export function cloudCall(method,argument,{timeoutMs}={}){
    if(completed)return;
    completed=true;
    clearTimeout(timer);
-   stopFieldLoading();
+   stopFieldLoading(loadingId);
    handler(value);
   };
   timer=setTimeout(()=>settle(reject,new Error(

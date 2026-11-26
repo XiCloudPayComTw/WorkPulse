@@ -40,8 +40,9 @@ export function readTemplates(storage,account){
 }
 export function addTemplate(storage,account,task){
  const title=plain(task?.title,TITLE_MAX).trim();if(!title)return {ok:false,reason:'請先填寫工作名稱'};
- const rows=readTemplates(storage,account),signature=title.toLocaleLowerCase()+'|'+plain(task.project,100).toLocaleLowerCase();
- if(rows.some(r=>r.title.toLocaleLowerCase()+'|'+r.project.toLocaleLowerCase()===signature))return {ok:false,reason:'這個常用項目已存在'};
+ const signatureOf=row=>JSON.stringify([plain(row.category||row.title,160).trim(),plain(row.project,100).trim(),plain(row.description,2000).trim()].map(x=>x.toLocaleLowerCase()));
+ const rows=readTemplates(storage,account),signature=signatureOf({...task,title});
+ if(rows.some(r=>signatureOf(r)===signature))return {ok:false,reason:'這個常用項目已存在'};
  const item={id:uid(),title,project:plain(task.project,100),category:plain(task.category,100),description:plain(task.description,2000)};
  try{storage?.setItem(templateKey(account),JSON.stringify([item,...rows].slice(0,10)));return {ok:true,item};}catch{return {ok:false,reason:'無法儲存常用項目'};}
 }

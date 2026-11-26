@@ -10,3 +10,5 @@ test('template deduplicates, saves, and removes',()=>{const db=storage();const t
 test('copying a template resets completion, result and hours',()=>{const value=newTaskFromTemplate({title:'舊工作',status:'done',result:'已結案',hours:8});assert.equal(value.title,'舊工作');assert.equal(value.status,'doing');assert.equal(value.result,'');assert.equal(value.hours,0);});
 test('previous tasks only from same employee and earlier date',()=>{const r=recentPriorJournal([{date:'2026-11-23',employeeId:'me',tasks:[]},{date:'2026-11-22',employeeId:'other',tasks:[]},{date:'2026-11-21',employeeId:'me',tasks:[{title:'A'}]}],'2026-11-23','me');assert.equal(r.date,'2026-11-21');});
 test('more than 10 templates capped',()=>{const db=storage();for(let i=0;i<15;i++)addTemplate(db,'a',{title:`工作 ${i}`});assert.equal(readTemplates(db,'a').length,10);});
+
+test('distinct descriptions in same category are distinct templates',()=>{const db=storage();const a={title:'水電',category:'水電',project:'案場',description:'確認排水'};assert.equal(addTemplate(db,'a',a).ok,true);assert.equal(addTemplate(db,'a',{...a,description:'確認電力'}).ok,true);assert.equal(addTemplate(db,'a',a).ok,false);});

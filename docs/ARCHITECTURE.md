@@ -138,3 +138,8 @@ Chrome 執行環境依賴 Ubuntu Runner 預裝的 `google-chrome`；開發者本
 - `apps-script/shared/Core.gs`：公用唯讀工作類型設定查詢；`apps-script/admin/OwnerCategories.gs`：私人管理端動態類型新增／編輯。Google Sheet Meta 記錄 revision 與 JSON 列表，沒有每月資料表結構變更。
 - `styles/field-mobile.css`：外勤功能首頁、人物下拉、果凍載入、行動版薪資區塊隱藏及文字選取限制。
 - `tests/field-mobile.test.mjs`：人員偏好保存、個人輸入建議、類型管理；`tests/monthly.test.mjs`：動態類型的匿名讀取和管理員專屬寫入。
+
+
+## v0.12.0 外勤恢復層
+
+`src/services/field-recovery.js` 在 cloudCall 上方保存原始日誌／出勤寫入請求，僅明確手動重送；`src/features/attendance/attendance-draft.js` 管理分人員日期未提交草稿。兩者加入 Apps Script 前端打包，既有 public/admin 後端 API 與 schema 不變。詳見 [FIELD_RECOVERY_V012.md](FIELD_RECOVERY_V012.md)。
