@@ -10,17 +10,10 @@ import { readQuickDraft, saveQuickDraft, clearQuickDraft, readTemplates, addTemp
 import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig} from '../features/attendance/attendance-state.js';
 import {renderAttendance} from '../features/attendance/attendance-ui.js';
 import {shouldLoadAttendance,activateAttendance} from './attendance-lifecycle.js';
+import {viewFromHash,visibleNavigation,renderNavigationButton} from './navigation.js';
+import {reportDateError as checkReportDates,applyReportPeriod} from '../features/reports/periods.js';
 
 const root = document.querySelector('#app');
-const NAV = [
-  {id:'overview',label:'工作總覽',symbol:'dashboard'},
-  {id:'attendance',label:'出勤表',symbol:'clock'},
-  {id:'entry',label:'填寫日誌',symbol:'pen'},
-  {id:'history',label:'歷史紀錄',symbol:'calendar'},
-  {id:'insights',label:'統計分析',symbol:'chart'},
-  {id:'settings',label:'系統設定',symbol:'settings'},
-  {id:'team',label:'管理員控制台',symbol:'users'}
-];
 const today = localISODate();
 const isCloud = cloudEnabled();
 const isOwnerPortal = isCloud && typeof window!=='undefined' && window.WORKPULSE_ADMIN_PORTAL===true;
@@ -66,8 +59,8 @@ function appendReusableTasks(rows){
   tasks.push(...entries);markDraftDirty();render();notify(`已加入 ${entries.length} 項工作，進度和工時已重設`);
 }
 if(!isCloud)restoreQuickDraft();
-function fromHash(){const key = location.hash.replace(/^#\/?/,'');return NAV.some(n=>n.id===key)?key:'overview';}
-function visibleNav(){return NAV.filter(n=>(n.id!=='team'||(isCloud&&state.cloud.user?.role==='admin')) && (n.id!=='settings'||!isCloud||state.cloud.user?.role==='admin'));}
+function fromHash(){return viewFromHash(location.hash);}
+function visibleNav(){return visibleNavigation(isCloud,state.cloud.user?.role);}
 function makeItem(source={}) {return {id:source.id||uid(),project:source.project||'',category:source.category||'前端開發',title:source.title||'',description:source.description||'',result:source.result||'',status:source.status||'doing',hours:source.hours??0};}
 function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord=null) {
   const record = fromRecord ?? (state.store.mode==='demo'?null:journalFor(state.store,date,employeeId));
@@ -75,7 +68,7 @@ function makeDraft(date=today,employeeId=state.store.employees[0]?.id,fromRecord
 }
 function canEditJournal(employeeId){return !isCloud || Boolean(state.cloud.user?.canWriteIds?.includes(employeeId));}
 function employeeName(id){return state.store.employees.find(e=>e.id===id)?.name || '未指定人員';}
-function navButton(n, mobile=false){return `<button type="button" class="nav-link ${state.view===n.id?'active':''}" data-action="navigate" data-view="${n.id}" aria-current="${state.view===n.id?'page':'false'}">${icon(n.symbol,mobile?18:19)}<span>${n.label}</span></button>`;}
+function navButton(n,mobile=false){return renderNavigationButton(n,state.view,mobile);}
 function renderShell(){
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班費與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
  root.innerHTML = `<div class="shell">
@@ -216,16 +209,7 @@ function renderInsights(){
  return `${syncBanner()}${renderReportWorkspace({filters:state.report.filters,phase:state.report.phase,error:state.report.error,
   report:reportResult(),meta:reportMeta(),cloud:isCloud,stale})}`;
 }
-function validateReportDate(date){
- return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date+'T00:00:00Z')) && new Date(date+'T00:00:00Z').toISOString().slice(0,10)===date;
-}
-function reportDateError(){
- const {startDate,endDate}=state.report.filters;
- if(!validateReportDate(startDate)||!validateReportDate(endDate))return '請填寫正確的起訖日期';
- const days=(Date.parse(endDate+'T00:00:00Z')-Date.parse(startDate+'T00:00:00Z'))/86400000;
- if(days<0||days>365)return '查詢日期須由早到晚，且最多 366 天';
- return '';
-}
+function reportDateError(){return checkReportDates(state.report.filters);}
 async function loadCloudReport(){
  if(!isCloud||state.cloud.phase!=='ready'||state.report.phase==='loading')return;
  const error=reportDateError();if(error){state.report.error=error;state.report.phase='error';render();return;}
@@ -239,13 +223,7 @@ async function loadCloudReport(){
  }catch(e){if(token!==state.report.token)return;state.report.phase='error';state.report.error=e.message||'未知錯誤';}
  finally{if(token===state.report.token)render();}
 }
-function selectReportPeriod(period){
- const d=state.report.filters;const [year,month]=today.slice(0,7).split('-').map(Number);
- if(period==='month'){d.startDate=today.slice(0,7)+'-01';d.endDate=today;}
- else if(period==='previous'){
-  d.startDate=localISODate(new Date(year,month-2,1));d.endDate=localISODate(new Date(year,month-1,0));
- }else if(period==='quarter'){d.startDate=shiftDate(today,-89);d.endDate=today;}
-}
+function selectReportPeriod(period){applyReportPeriod(state.report.filters,period,today);}
 function exportReport(type){
  const error=reportDateError();if(error){notify(error,true);return;}
  const report=reportResult();if(!report){notify('請先完成目前條件的查詢，再匯出報表',true);return;}
