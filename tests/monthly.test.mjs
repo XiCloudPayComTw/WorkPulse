@@ -395,3 +395,10 @@ test('schedule edits are private, revisioned, monthly and do not mutate attendan
  assert.equal(loaded.schedule.days['2026-11-23'],'holiday');assert.equal(loaded.rows.length,0);
  assert.equal(h.files.size,1);
 });
+
+test('attendance export range returns only read-only monthly schedule and no pay',()=>{
+ const h=harness();h.setup();const e=h.employee();
+ h.scope.wpOwnerSaveAttendanceSchedule({employeeId:e.id,month:'2026-11',days:{'2026-11-23':'holiday'},expectedRevision:0,requestId:'export-schedule-0001'});
+ h.as('');const result=h.scope.wpAttendanceRange({employeeId:e.id,startDate:'2026-11-01',endDate:'2026-12-02'});
+ assert.equal(result.scheduleByMonth['2026-11'].days['2026-11-23'],'holiday');assert.equal(result.scheduleByMonth['2026-12'].revision,0);assert.equal(result.rows.length,0);assert.equal(h.files.size,1);
+});

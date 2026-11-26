@@ -63,3 +63,9 @@ test('Apps Script public/private and legacy sources remain physically isolated',
  assert.match(gas,/if\(isOwner\)/);
  assert.doesNotMatch(gas,/readFile\('apps-script\/legacy\/(?:Code|Review)\.gs'/);
 });
+
+
+test('Excel export interaction module is loaded by both browser and GAS entries',()=>{
+ assert.match(read('src/app.js'),/import ['"]\.\/features\/payroll\/payroll-ui\.js['"]/);
+ assert.match(read('scripts/build-gas.mjs'),/src\/features\/payroll\/payroll-ui\.js/);
+});

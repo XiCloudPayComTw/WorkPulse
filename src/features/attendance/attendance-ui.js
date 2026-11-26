@@ -1,12 +1,11 @@
 import {esc,localISODate} from '../../shared/utils.js';
 import {attendanceCalendar,attendancePlannedDay,previousAttendanceTimes} from './calendar.js';
 import {cloudEnabled} from '../../services/cloud.js';
-import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,TWD_FORMAT,validateAttendanceDraft,payEstimate} from './attendance.js';
-import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,discardAttendanceDraft,copyPreviousAttendance,updateAttendanceSchedule,saveAttendanceSchedule} from './attendance-state.js';
+import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,validateAttendanceDraft} from './attendance.js';
+import {attendanceState,loadAttendance,attendanceSelectDate,updateAttendance,submitAttendance,updateAttendanceConfig,saveAttendanceConfig,discardAttendanceDraft,copyPreviousAttendance,updateAttendanceSchedule,saveAttendanceSchedule} from './attendance-state.js';
 function opts(items,selected){
  return Object.entries(items).map(([key,value])=>'<option value="'+esc(key)+'" '+(selected===key?'selected':'')+'>'+esc(value)+'</option>').join('');
 }
-const cost=n=>n==null?'待設定／人工核對':TWD_FORMAT.format(Number(n));
 let knownPeople=[],knownAdmin=false,attendanceNotice='';
 export function renderAttendance(people,isAdmin=false){
  knownPeople=people||[];knownAdmin=isAdmin;
@@ -20,31 +19,22 @@ export function renderAttendance(people,isAdmin=false){
  '<button class="soft-button sm" data-action="attendance-refresh">重新讀取</button></div></section>';
  if(a.phase==='idle'||a.phase==='loading')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="status">正在讀取出勤資料…</section></div>';
  if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'</section></div>';
- const wage=currentTemporaryWage();
  const days=attendanceCalendar(a.month,a.rows,a.confirmedSchedule.days,localISODate(),a.date,a.dirty?a.draft:null);
  const expected=a.expectedDays??(Object.keys(a.confirmedSchedule.days).length?days.filter(x=>x.planned==='workday').length:null);
- const info=attendanceSummary(a.rows,a.month,expected,wage);
- const salaryPanel='<section class="soft-card card-pad-lg att-salary-panel" aria-label="本次臨時薪資試算">'+
-  '<div><h3 class="card-title">薪資基準 · 即時計算</h3>'+
-  '<p class="card-sub">會計輸入選定人員月薪，立即試算當月所有加班費。切換人員、月份或離開出勤頁後即清除。</p></div>'+
-  '<div class="att-salary-tools"><label class="form-group"><span class="field-label">月薪工資總額（NT$）</span>'+
-  '<input class="input" data-att-salary type="number" min="1" max="10000000" step="1" inputmode="numeric" autocomplete="off" placeholder="待設定 · 輸入月薪開始試算" value="'+esc(a.temporarySalary)+'"></label>'+
-  '<button class="soft-button primary sm" type="button" data-action="payroll-start">開始試算／匯出 Excel</button>'+
-  '<button class="soft-button sm" type="button" data-action="attendance-salary-clear">清除試算</button></div>'+
-  '<p class="small muted">薪資基準與試算金額不會送至伺服器、寫入 Google Sheets 或儲存在瀏覽器。僅目前畫面可見；共用電腦請使用完畢後清除。</p></section>';
+ const info=attendanceSummary(a.rows,a.month,expected);
+ const exportPanel='<section class="soft-card card-pad-lg att-panel att-export-panel"><div class="card-head"><div><h3 class="card-title">出勤紀錄 · Excel 匯出</h3><p class="card-sub">選擇人員及結算期間，下載含公式的 Excel。月薪請在電腦 Excel 輸入，網站不試算金額，也不自動上傳 Google Drive。</p></div></div>'+
+  '<button class="soft-button primary" type="button" data-action="payroll-start">匯出出勤 Excel</button></section>';
  const pairs=[
  ['當月總上班時數',hoursLabel(info.workedMinutes)],
  ['當月總加班時數',hoursLabel(info.overtimeMinutes)],
- ['當月總加班費',cost(info.totalPay)],
  ['當月應上班天數',info.expectedDays+' 天'+(info.expectedIsEstimate?'（估）':'')],
  ['當月請假天數',Number(info.leaveDays.toFixed(2))+' 天'],
  ['當月請假時數',hoursLabel(info.leaveMinutes)]
  ];
- const metrics='<div class="att-metrics">'+pairs.map((pair,index)=>'<div class="soft-card att-metric"><span>'+esc(pair[0])+'</span><strong '+(index===2?'data-att-monthly-pay':'')+'>'+esc(pair[1])+'</strong></div>').join('')+'</div>';
+ const metrics='<div class="att-metrics">'+pairs.map(pair=>'<div class="soft-card att-metric"><span>'+esc(pair[0])+'</span><strong>'+esc(pair[1])+'</strong></div>').join('')+'</div>';
  const d=a.draft||{date:a.date,dayType:'workday',startTime:'',endTime:'',breakMinutes:0,leaveType:'none',leaveMinutes:0,notes:''};
- let worked=0,extra=0,previewError='',previewPay=null;
+ let worked=0,extra=0,previewError='';
  try{const checked=validateAttendanceDraft(d);worked=checked.workedMinutes;extra=checked.overtimeMinutes;
-  previewPay=payEstimate(d.dayType,worked,wage);
  }catch(e){previewError=e.message;}
  const field=(label,key,type='text',extraProps='')=>'<label class="form-group"><span class="field-label">'+label+'</span><input class="input" type="'+type+'" data-att-field="'+key+'" value="'+esc(String(d[key]??''))+'" '+extraProps+'></label>';
  const previous=previousAttendanceTimes(a.rows,a.date,a.employeeId);
@@ -60,26 +50,25 @@ export function renderAttendance(people,isAdmin=false){
  field('請假分鐘數','leaveMinutes','number','min="0" max="480" step="1" '+(d.leaveType==='none'?'disabled':''))+
  '<label class="form-group att-full"><span class="field-label">備註</span><textarea class="input" maxlength="1000" data-att-field="notes" placeholder="例：出差、加班事項、補登說明…">'+esc(d.notes)+'</textarea></label></div>'+
  '<div class="att-preview"><div><span>當日上班時數</span><strong>'+hoursLabel(worked)+'</strong></div>'+
- '<div><span>當日加班／假日出勤時數</span><strong>'+hoursLabel(extra)+'</strong></div>'+
- '<div><span>當日加班費估算</span><strong data-att-preview-pay>'+cost(previewPay)+'</strong></div></div>'+
+ '<div><span>當日加班／假日出勤時數</span><strong>'+hoursLabel(extra)+'</strong></div></div>'+
  (previewError?'<p class="att-error" role="alert">'+esc(previewError)+'</p>':'')+
  (a.dirty?'<p class="small muted" role="status">'+(!cloudEnabled()?'尚未正式儲存。':a.draftStored?'尚未正式儲存；草稿暫存於本分頁。':'無法暫存草稿，請勿關閉頁面。')+'</p><button class="soft-button sm" data-action="attendance-discard" '+(a.saving?'disabled':'')+'>捨棄未儲存修改</button>':'')+
  '<div class="att-actions"><span class="small muted">例假出勤、國定假日調移、變形工時需另行人工核對。</span>'+
  '<button class="soft-button primary" data-action="attendance-save" '+(a.saving?'disabled':'')+'>'+(a.saving?'儲存中…':'儲存出勤紀錄')+'</button></div></section>';
  const admin=isAdmin&&a.adminConfig?'<section class="soft-card card-pad-lg att-panel"><h3 class="card-title">管理員排班設定</h3>'+
- '<p class="card-sub">可設定當月應上班天數。月薪基準改在頁面下方的臨時輸入框試算，不儲存。</p>'+
+ '<p class="card-sub">可設定當月應上班天數。薪資一律在匯出的 Excel 處理。</p>'+
  '<div class="att-fields">'+
  '<label class="form-group"><span class="field-label">當月應上班天數</span><input class="input" type="number" min="0" max="31" data-att-config="expectedDays" value="'+esc(String(a.adminConfig.expectedDays??''))+'" placeholder="不填則為週一～五估計"></label></div>'+
- '<div class="att-actions"><span class="small muted">應上班天數會儲存。臨時月薪和試算加班費不儲存。</span>'+
+ '<div class="att-actions"><span class="small muted">只儲存應上班天數，不儲存薪資。</span>'+
  '<button class="soft-button" data-action="attendance-config-save" '+(a.configSaving?'disabled':'')+'>儲存設定</button></div></section>':'';
  const calendar=renderAttendanceCalendar(days);
  const scheduleEditor=isAdmin&&a.adminConfig?renderAttendanceSchedule(a):'';
  const table='<section class="soft-card card-pad-lg att-panel"><div class="card-head"><div><h3 class="card-title">本月出勤明細</h3>'+
  '<p class="card-sub">點選日期可編輯既有紀錄。表格可橫向捲動，不會撐開網站版型。</p></div><span class="tag">'+a.rows.length+' 筆</span></div>'+
- (a.rows.length?'<div class="att-scroll"><table class="att-table"><thead><tr><th>日期</th><th>星期</th><th>出勤日別</th><th>上班</th><th>下班</th><th>當日上班時數</th><th>當日加班時數</th><th>加班費（估）</th><th>請假</th><th>備註</th><th>操作</th></tr></thead><tbody>'+
+ (a.rows.length?'<div class="att-scroll"><table class="att-table"><thead><tr><th>日期</th><th>星期</th><th>出勤日別</th><th>上班</th><th>下班</th><th>當日上班時數</th><th>當日加班時數</th><th>請假</th><th>備註</th><th>操作</th></tr></thead><tbody>'+
  a.rows.map(r=>'<tr><td>'+esc(r.date)+'</td><td>週'+weekdayLabel(r.date)+'</td><td>'+esc(DAY_TYPES[r.dayType]||r.dayType)+'</td>'+
  '<td>'+esc(r.startTime||'—')+'</td><td>'+esc(r.endTime||'—')+'</td><td>'+hoursLabel(r.workedMinutes)+'</td><td>'+hoursLabel(r.overtimeMinutes)+'</td>'+
- '<td data-att-row-pay="'+esc(r.date)+'">'+esc(cost(payEstimate(r.dayType||'workday',r.workedMinutes,wage)))+'</td><td>'+(r.leaveMinutes?esc(LEAVE_TYPES[r.leaveType]||r.leaveType)+' '+hoursLabel(r.leaveMinutes):'—')+'</td>'+
+ '<td>'+(r.leaveMinutes?esc(LEAVE_TYPES[r.leaveType]||r.leaveType)+' '+hoursLabel(r.leaveMinutes):'—')+'</td>'+
  '<td><span class="att-note" title="'+esc(r.notes||'')+'">'+esc(r.notes||'—')+'</span></td>'+
  '<td><button class="soft-button mini" data-action="attendance-edit" data-date="'+esc(r.date)+'">編輯</button></td></tr>').join('')+
  '</tbody></table></div>':'<p class="small muted">尚無本月出勤紀錄。</p>')+'</section>';
@@ -92,7 +81,7 @@ export function renderAttendance(people,isAdmin=false){
  '<a href="https://calcr2.mol.gov.tw/Index" target="_blank" rel="noopener noreferrer">勞動部加班費試算</a></p></section>';
  return '<div class="att-page">'+toolbar+(attendanceNotice?'<div class="notice att-notice" role="status">'+esc(attendanceNotice)+'</div>':'')+metrics+
  (info.expectedIsEstimate?'<p class="small muted att-estimate">應上班天數暫用週一至週五推估，未扣除國定假日與調班，管理員可設定確切天數。</p>':'')+
- calendar+'<div class="att-layout">'+editor+admin+scheduleEditor+'</div>'+table+salaryPanel+law+'</div>';
+ calendar+'<div class="att-layout">'+editor+admin+scheduleEditor+'</div>'+table+exportPanel+law+'</div>';
 }
 
 /** Attendance interactions are delegated here to avoid coupling the journal editor. */
@@ -148,10 +137,7 @@ document.addEventListener('click',event=>{
   submitAttendance().then(()=>attendanceNotice='出勤紀錄已成功儲存至 Google Sheets／本機展示資料。')
    .catch(e=>attendanceNotice='無法儲存：'+e.message).finally(refreshAttendanceDom);
   refreshAttendanceDom();
- }else if(action==='attendance-salary-clear'){
-  clearTemporarySalary();
-  attendanceNotice='臨時薪資基準已清除';
-  refreshAttendanceDom();
+
  }else if(action==='attendance-config-save'){
   attendanceNotice='正在儲存計薪設定…';
   saveAttendanceConfig().then(()=>attendanceNotice='計薪與應上班天數設定已儲存')
@@ -162,27 +148,6 @@ document.addEventListener('click',event=>{
 document.addEventListener('input',event=>{
  const el=event.target;
  if(!el.closest('.att-page'))return;
- if(el.matches('[data-att-salary]')){
-  updateTemporarySalary(el.value);
-  // Update monetary cells in place; never rebuild the input during typing.
-  const panel=el.closest('.att-page'),wage=currentTemporaryWage(),a=attendanceState;
-  const expected=a.expectedDays??(Object.keys(a.confirmedSchedule.days).length?attendanceCalendar(a.month,[],a.confirmedSchedule.days,localISODate()).filter(x=>x.planned==='workday').length:null);
-  const sum=attendanceSummary(a.rows,a.month,expected,wage);
-  const total=panel.querySelector('[data-att-monthly-pay]');
-  if(total)total.textContent=cost(sum.totalPay);
-  const preview=panel.querySelector('[data-att-preview-pay]');
-  if(preview){
-   try{
-    const draft=validateAttendanceDraft(a.draft);
-    preview.textContent=cost(payEstimate(draft.dayType,draft.workedMinutes,wage));
-   }catch{preview.textContent='待設定／人工核對';}
-  }
-  for(const cell of panel.querySelectorAll('[data-att-row-pay]')){
-   const row=a.rows.find(r=>r.date===cell.dataset.attRowPay);
-   if(row)cell.textContent=cost(payEstimate(row.dayType||'workday',row.workedMinutes,wage));
-  }
-  return;
- }
  if(el.matches('[data-att-field]'))updateAttendance(el.dataset.attField,el.value);
  if(el.matches('[data-att-config]'))updateAttendanceConfig(el.dataset.attConfig,el.value);
 });
@@ -219,7 +184,3 @@ document.addEventListener('change',event=>{
  }
 });
 
-// The temporary wage must not survive navigation away from the attendance page.
-window.addEventListener('hashchange',()=>{
- if(location.hash.replace('#/','').replace('#','')!=='attendance')clearTemporarySalary();
-});

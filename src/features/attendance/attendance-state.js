@@ -7,7 +7,7 @@ import {attendancePlannedDay,previousAttendanceTimes,attendanceMonthDates} from 
 const KEY='workpulse-attendance-v1';
 export const attendanceState={month:currentMonth(),employeeId:'',date:localISODate(),rows:[],
   draft:null,phase:'idle',error:'',saving:false,requestId:null,expectedDays:null,
-  temporarySalary:'',adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true,schedule:{days:{},revision:0},scheduleDirty:false,scheduleSaving:false,scheduleRequest:null,confirmedSchedule:{days:{},revision:0}};
+  adminConfig:null,configSaving:false,configRequest:null,dirty:false,draftStored:true,schedule:{days:{},revision:0},scheduleDirty:false,scheduleSaving:false,scheduleRequest:null,confirmedSchedule:{days:{},revision:0}};
 export function newAttendanceDraft(date=attendanceState.date,source=null){
  return {date,employeeId:attendanceState.employeeId,dayType:source?.dayType||attendancePlannedDay(date,attendanceState.confirmedSchedule.days),
    startTime:source?.startTime||'',endTime:source?.endTime||'',breakMinutes:source?.breakMinutes||0,
@@ -29,17 +29,6 @@ export function readLocalAttendanceRange(employeeId,startDate,endDate){
  return localRows().filter(r=>r.employeeId===employeeId&&r.date>=startDate&&r.date<=endDate)
   .map(({overtimePay,monthlyWage,...r})=>r);
 }
-export function updateTemporarySalary(value){
- // Memory-only. Never included in a draft, request, localStorage or Google Sheets.
- attendanceState.temporarySalary=String(value??'').slice(0,16);
-}
-export function clearTemporarySalary(){attendanceState.temporarySalary='';}
-export function currentTemporaryWage(){
- const raw=attendanceState.temporarySalary;
- if(raw.trim()==='')return null;
- const value=Number(raw);
- return Number.isFinite(value)&&value>0&&value<=10000000?value:null;
-}
 export function attendanceSelectDate(date){
  attendanceState.date=date;
  attendanceState.draft=newAttendanceDraft(date,attendanceState.rows.find(r=>r.date===date));
@@ -55,7 +44,6 @@ let attendanceLoadSequence=0;
 export async function loadAttendance(people,admin=false,month=attendanceState.month,employeeId=attendanceState.employeeId){
  const seq=++attendanceLoadSequence;
  if(!people?.length){
-  clearTemporarySalary();
   attendanceState.month=month;attendanceState.phase='ready';
   attendanceState.employeeId='';attendanceState.rows=[];
   attendanceState.expectedDays=null;attendanceState.adminConfig=null;attendanceState.schedule={days:{},revision:0};attendanceState.confirmedSchedule={days:{},revision:0};attendanceState.scheduleDirty=false;
@@ -63,7 +51,6 @@ export async function loadAttendance(people,admin=false,month=attendanceState.mo
   return true;
  }
  if(!people.some(p=>p.id===employeeId))employeeId=people[0].id;
- if(attendanceState.employeeId!==employeeId||attendanceState.month!==month)clearTemporarySalary();
  attendanceState.month=month;
  attendanceState.employeeId=employeeId;
  attendanceState.phase='loading';attendanceState.error='';

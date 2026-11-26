@@ -1,5 +1,6 @@
 import {payEstimate,weekdayLabel,DAY_TYPES,LEAVE_TYPES} from '../attendance/attendance.js';
 import {localISODate} from '../../shared/utils.js';
+import {attendancePlannedDay} from '../attendance/calendar.js';
 const DAY_MS=86400000;
 const DATE_RE=/^(\d{4})-(\d{2})-(\d{2})$/;
 const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
@@ -45,8 +46,9 @@ function validateWage(value){
  * in the current browser tab until dismissed or a different employee is selected.
  */
 export function buildPayrollReport({employeeId,employeeName,startDate,endDate,monthlyWage,rows,
- generatedAt=new Date(),today=new Date()}){
- const period=payrollPeriod(startDate,endDate,today),wage=validateWage(monthlyWage);
+ generatedAt=new Date(),today=new Date(),exportOnly=false,payDate='',scheduleByMonth={}}){
+ const period=payrollPeriod(startDate,endDate,today),wage=exportOnly?null:validateWage(monthlyWage);
+ if(payDate&&parsePayrollDate(payDate)<parsePayrollDate(endDate))throw Error('發薪日期不可早於結算結束日');
  const ids=new Map();
  for(const source of rows||[]){
   if(source.employeeId!==employeeId||source.date<startDate||source.date>endDate)continue;
@@ -54,22 +56,25 @@ export function buildPayrollReport({employeeId,employeeName,startDate,endDate,mo
   ids.set(source.date,source);
  }
  const days=payrollDays(startDate,endDate).map(date=>{
-  const source=ids.get(date),weekday=weekdayLabel(date);
+  const source=ids.get(date),weekday=weekdayLabel(date),planned=attendancePlannedDay(date,scheduleByMonth[date.slice(0,7)]?.days||{});
   if(!source)return {date,weekday,dayType:'',dayTypeLabel:'',startTime:'',endTime:'',
     breakMinutes:null,workedMinutes:null,overtimeMinutes:null,leaveType:'',leaveLabel:'',
-    leaveMinutes:null,notes:'',revision:null,status:'未登記',pay:null};
+    leaveMinutes:null,notes:'',revision:null,status:'未登記',pay:null,planned,issues:[]};
   const worked=Number(source.workedMinutes)||0,ot=Number(source.overtimeMinutes)||0;
   const leave=Number(source.leaveMinutes)||0,dayType=String(source.dayType||'workday');
-  const pay=payEstimate(dayType,worked,wage);
+  const issues=[];
+  if(exportOnly){if(dayType!==planned)issues.push('日別與班表不符');if(!Object.hasOwn(DAY_TYPES,dayType)||worked<0||worked>720||ot<0||ot>worked||(!worked&&!leave)||Boolean(source.startTime)!==Boolean(source.endTime))issues.push('工時或紀錄異常');if(worked&&source.endTime<=source.startTime)issues.push('跨午夜需核對');if(dayType==='weekly'&&worked)issues.push('例假出勤需人工核算');if(dayType==='workday'&&worked+leave<480)issues.push('未達八小時，請核對');}
+  const pay=exportOnly?null:payEstimate(dayType,worked,wage);
   return {date,weekday,dayType,dayTypeLabel:DAY_TYPES[dayType]||dayType,
     startTime:String(source.startTime||''),endTime:String(source.endTime||''),
     breakMinutes:Number(source.breakMinutes)||0,workedMinutes:worked,
     overtimeMinutes:ot,leaveType:String(source.leaveType||'none'),
     leaveLabel:leave?LEAVE_TYPES[source.leaveType]||String(source.leaveType||''): '',
     leaveMinutes:leave,notes:String(source.notes||''),revision:Number(source.revision)||0,
-    status:pay===null?'需人工核對':'已登記',pay};
+    status:(exportOnly?issues.length>0:pay===null)?'需人工核對':'已登記',pay,planned,issues};
  });
- const estimatedWorkingDays=days.filter(d=>d.weekday!=='六'&&d.weekday!=='日').length;
+ const estimatedWorkingDays=days.filter(d=>d.planned==='workday').length;
+ const missingWorkDays=days.filter(d=>d.status==='未登記'&&d.planned==='workday'&&d.date<localISODate(today)).length;
  const recorded=days.filter(d=>d.status!=='未登記'),missing=days.length-recorded.length;
  const manual=recorded.filter(d=>d.status==='需人工核對').length;
  const totalWorkMinutes=recorded.reduce((n,d)=>n+d.workedMinutes,0);
@@ -79,14 +84,16 @@ export function buildPayrollReport({employeeId,employeeName,startDate,endDate,mo
  const generatedISO=generatedAt instanceof Date?generatedAt.toISOString():new Date(generatedAt).toISOString();
  return {
   employeeId,employeeName:String(employeeName||employeeId),...period,
-  generatedAt:generatedISO,monthlyWage:wage,hourlyWage:wage/240,
+  generatedAt:generatedISO,monthlyWage:wage,hourlyWage:exportOnly?null:wage/240,exportOnly,payDate,missingWorkDays,
   rows:days,recordedDays:recorded.length,missingDays:missing,manualReviewDays:manual,
   estimatedWorkingDays,expectedIsEstimate:true,
   workHours:round2(totalWorkMinutes/60),overtimeHours:round2(totalOvertimeMinutes/60),
   leaveHours:round2(totalLeaveMinutes/60),leaveDays:round2(totalLeaveMinutes/480),
-  knownPaySubtotal:subtotal,totalPay:manual?null:subtotal,
+  knownPaySubtotal:exportOnly?null:subtotal,totalPay:exportOnly||manual?null:subtotal,
   isPartialMonth:startDate.slice(0,7)===localISODate(today).slice(0,7)||
     endDate.slice(0,7)===localISODate(today).slice(0,7),
   hasUnrecordedDates:missing>0
  };
 }
+
+export function buildAttendanceExportReport(options){return buildPayrollReport({...options,monthlyWage:null,exportOnly:true});}

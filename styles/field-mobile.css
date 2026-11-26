@@ -58,7 +58,7 @@ input,textarea,select,[contenteditable="true"]{user-select:text;-webkit-user-sel
  .wp-field-tile-body{flex:1;min-width:0;display:grid;gap:7px}
  .wp-field-tile-body strong{font-size:20px;font-weight:650}
  .wp-field-tile-body small{color:#688193;font-size:14px}
- .att-page .att-salary-panel,.att-page .att-law-panel{display:none!important}
+ .att-page .att-export-panel,.att-page .att-law-panel{display:none!important}
  .wp-description-field{position:relative}
  .wp-description-suggestions:not([hidden]){display:grid;gap:7px;padding:10px;margin-top:7px;
   border:1px solid #d9e8f2;border-radius:15px;max-height:230px;overflow:auto;background:#e9f0f6;box-shadow:var(--inset)}

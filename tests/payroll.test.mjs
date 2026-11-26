@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {previousCompletedMonth,payrollPeriod,payrollDays,buildPayrollReport} from '../src/features/payroll/payroll.js';
+import {previousCompletedMonth,payrollPeriod,payrollDays,buildPayrollReport,buildAttendanceExportReport} from '../src/features/payroll/payroll.js';
 import {payrollWorkbookSheets,createPayrollXlsx} from '../src/features/payroll/payroll-xlsx.js';
 
 function sampleRows(){
@@ -114,4 +114,19 @@ test('formula-injection-like remarks export as literal strings, never Excel form
  assert.equal(day[11].f,undefined);
  const xlsx=await createPayrollXlsx(report).arrayBuffer();
  assert.ok(xlsx.byteLength>10000);
+});
+
+test('Excel-only export leaves wages and cached amounts blank and marks scheduled missing days',async()=>{
+ const report=buildAttendanceExportReport({employeeId:'E1',employeeName:'小明',startDate:'2026-11-01',endDate:'2026-11-30',payDate:'2026-12-10',rows:sampleRows(),today:new Date(2027,0,9),scheduleByMonth:{'2026-11':{days:{'2026-11-03':'holiday'}}}});
+ assert.equal(report.monthlyWage,null);assert.equal(report.knownPaySubtotal,null);assert.equal(report.missingWorkDays,19);
+ assert.equal(report.rows[1].pay,null);
+ const sheets=payrollWorkbookSheets(report);assert.equal(sheets[0].rows[5][1].v,'');assert.equal(sheets[0].rows[5][4].cached,null);
+ assert.equal(sheets[1].rows[9][8].cached,null);assert.ok(sheets.every(s=>s.protect));
+ const xml=new TextDecoder().decode(await createPayrollXlsx(report).arrayBuffer());
+ assert.match(xml,/sheetProtection sheet="1"/);assert.match(xml,/protection locked="0"/);assert.match(xml,/r="B6" t="inlineStr" s="16"/);assert.doesNotMatch(xml,/9999999/);
+ assert.match(xml,/ISNUMBER/);
+});
+test('export excludes abnormal dates from automated Excel formulas',()=>{
+ const report=buildAttendanceExportReport({employeeId:'E1',startDate:'2026-12-01',endDate:'2026-12-01',rows:sampleRows(),today:new Date(2027,0,9)});
+ assert.equal(report.manualReviewDays,1);assert.equal(payrollWorkbookSheets(report)[1].rows[8][8].f,undefined);
 });
