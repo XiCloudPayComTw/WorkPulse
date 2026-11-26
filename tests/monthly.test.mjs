@@ -578,3 +578,10 @@ test('deployment check verifies real visible trigger UID and recent non-future s
  h.props.WORKPULSE_BACKUP_LAST_RUN=JSON.stringify({ok:true,completedAt:new Date(Date.now()+3600000).toISOString()});
  assert.equal(check().ok,false);
 });
+
+test('clean first run creates one private control and folder and reuses both',()=>{
+ const h=harness();delete h.props.WORKPULSE_SHEET_ID;
+ const before=h.files.size,first=h.scope.workPulseInitialize(),again=h.scope.workPulseInitialize();
+ assert.equal(h.files.size,before+1);assert.equal(first.controlId,again.controlId);assert.equal(first.folderId,again.folderId);
+ assert.equal(h.scope.workPulseInitializationCheck().canInitialize,true);
+});
