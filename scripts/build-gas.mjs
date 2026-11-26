@@ -1,7 +1,7 @@
 import {readFile,mkdir,writeFile,rm} from 'node:fs/promises';
 // WorkPulse v0.8: produce physically separate public and administrator Apps Script projects.
 // The public deployment MUST NOT include Owner.gs or the old Code.gs / Review.gs.
-const ordered=['src/shared/utils.js','src/features/journals/data.js','src/features/journals/categories.js','src/shared/icons.js','src/app/navigation.js','src/app/person.js','src/app/loading.js','src/services/cloud.js','src/services/field-recovery.js','src/features/admin/rename.js','src/features/admin/admin.js',
+const ordered=['src/shared/utils.js','src/features/journals/data.js','src/features/journals/categories.js','src/shared/icons.js','src/app/navigation.js','src/app/person.js','src/app/mobile-workflow.js','src/app/loading.js','src/services/cloud.js','src/services/field-recovery.js','src/features/admin/rename.js','src/features/admin/admin.js',
  'src/features/reports/reports.js','src/features/reports/periods.js','src/shared/xlsx.js','src/features/reports/report-ui.js','src/features/journals/quick-entry.js','src/features/journals/description-memory.js','src/features/attendance/attendance.js','src/features/attendance/calendar.js','src/features/payroll/payroll.js','src/features/payroll/payroll-xlsx.js','src/features/attendance/attendance-draft.js','src/features/attendance/attendance-state.js','src/features/attendance/attendance-ui.js','src/features/payroll/payroll-ui.js','src/app/attendance-lifecycle.js','src/app/main.js'];
 let js='';
 for(const name of ordered){

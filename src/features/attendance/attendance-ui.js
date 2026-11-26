@@ -1,4 +1,5 @@
 import {esc,localISODate} from '../../shared/utils.js';
+import {enhanceMobileSelects,syncMobileDock,mobileSkeleton,closeMobileSheet} from '../../app/mobile-workflow.js';
 import {attendanceCalendar,attendancePlannedDay,previousAttendanceTimes} from './calendar.js';
 import {cloudEnabled} from '../../services/cloud.js';
 import {DAY_TYPES,LEAVE_TYPES,attendanceSummary,weekdayLabel,hoursLabel,validateAttendanceDraft} from './attendance.js';
@@ -17,8 +18,8 @@ export function renderAttendance(people,isAdmin=false){
  people.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===person?'selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
  '<label class="form-group"><span class="field-label">月份</span><input class="input" type="month" data-att-month value="'+esc(a.month)+'"></label>'+
  '<button class="soft-button sm" data-action="attendance-refresh">重新讀取</button></div></section>';
- if(a.phase==='idle'||a.phase==='loading')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="status">正在讀取出勤資料…</section></div>';
- if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'</section></div>';
+ if(a.phase==='idle'||a.phase==='loading')return '<div class="att-page">'+toolbar+mobileSkeleton('正在讀取出勤資料…')+'</div>';
+ if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'<div><button type="button" class="soft-button" data-action="attendance-refresh">重新讀取出勤</button></div></section></div>';
  const days=attendanceCalendar(a.month,a.rows,a.confirmedSchedule.days,localISODate(),a.date,a.dirty?a.draft:null);
  const expected=a.expectedDays??(Object.keys(a.confirmedSchedule.days).length?days.filter(x=>x.planned==='workday').length:null);
  const info=attendanceSummary(a.rows,a.month,expected);
@@ -111,7 +112,7 @@ function renderAttendanceSchedule(a){
 }
 function refreshAttendanceDom(){
  const element=document.querySelector('.att-page');
- if(element){element.outerHTML=renderAttendance(knownPeople,knownAdmin);if(attendanceState.saving)for(const input of document.querySelectorAll('.att-page input,.att-page select,.att-page textarea'))input.disabled=true;}
+ if(element){closeMobileSheet(false);element.outerHTML=renderAttendance(knownPeople,knownAdmin);if(attendanceState.saving)for(const input of document.querySelectorAll('.att-page input,.att-page select,.att-page textarea'))input.disabled=true;enhanceMobileSelects();syncMobileDock();}
 }
 async function changeAttendanceMonth(month,employee){
  attendanceNotice='';
@@ -155,7 +156,7 @@ document.addEventListener('click',event=>{
 document.addEventListener('input',event=>{
  const el=event.target;
  if(!el.closest('.att-page'))return;
- if(el.matches('[data-att-field]'))updateAttendance(el.dataset.attField,el.value);
+ if(el.matches('[data-att-field]')){updateAttendance(el.dataset.attField,el.value);const status=document.querySelector('#wp-mobile-dock [data-dock-status]');if(status)status.textContent=attendanceState.draftStored?'未正式提交 · 請儲存出勤':'暫存受限 · 請儲存出勤';}
  if(el.matches('[data-att-config]'))updateAttendanceConfig(el.dataset.attConfig,el.value);
 });
 document.addEventListener('change',event=>{
