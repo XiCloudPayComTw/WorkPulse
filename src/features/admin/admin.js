@@ -4,6 +4,20 @@ import { icon } from '../../shared/icons.js';
 import {addWorkCategory,renameWorkCategory} from '../journals/categories.js';
 
 export const adminState={phase:'idle',data:null,tab:'employees',draft:null,dirty:false,saving:false,error:'',requestId:null};
+export const deploymentCheckState={busy:false,data:null,error:''};
+const wpDeploymentLabels={domainMode:'公司網域存取',dataFolder:'日常資料夾',controller:'控制試算表',headers:'控制表結構',monthIndex:'分月索引',backupFolder:'獨立備份資料夾',backupRegistration:'備份觸發器與執行紀錄'};
+export async function loadDeploymentCheck(){
+ const a=deploymentCheckState;if(a.busy)return;a.busy=true;a.error='';a.data=null;
+ try{const d=await cloudCall('workPulseDeploymentCheck');if(d?.readOnly!==true||d.productionVerified!==false||typeof d.configurationPassed!=='boolean'||!Array.isArray(d.checks)||!d.checks.length||d.checks.some(x=>typeof x.key!=='string'||typeof x.ok!=='boolean'||typeof x.detail!=='string'))throw Error('部署檢查回應格式異常，請確認私人發布包版本');a.data=d;}
+ catch(e){a.error=e.message||'部署檢查失敗';}finally{a.busy=false;}
+}
+export function renderDeploymentCheck(){
+ const a=deploymentCheckState,d=a.data;
+ return '<section class="soft-card card-pad-lg section-space wp-deployment-check"><div class="card-head"><div><h2 class="card-title">正式部署準備度</h2><p class="card-sub">資料持有者專用唯讀檢查；不會建立檔案、修改權限或啟用排程。</p></div><button type="button" class="soft-button" data-action="deployment-check" '+(a.busy?'disabled':'')+'>'+(a.busy?'檢查中…':'執行檢查')+'</button></div>'+
+ (a.error?'<p role="alert" class="small">'+esc(a.error)+'</p>':'')+
+ (d?'<p role="status"><strong>'+ (d.configurationPassed?'設定檢查通過':'仍有設定需要處理')+'</strong> · '+d.checks.filter(x=>x.ok).length+'/'+d.checks.length+' 項 · '+esc(d.checkedAt||'')+'</p><div class="maintenance-list">'+d.checks.map(x=>'<div><strong>'+esc(wpDeploymentLabels[x.key]||x.key)+' · '+(x.ok?'通過':'待處理')+'</strong><span>'+esc(x.detail)+'</span></div>').join('')+'</div>':'')+
+ '<div class="notice"><div><strong>正式營運尚須人工驗收</strong><p>兩套專案屬性一致、實際登入與外部帳號拒絕、個別員工存取需求、跨裝置寫入、實際備份還原、手機及 Excel 驗收。即使設定全部通過，仍不代表正式上線。</p></div></div></section>';
+}
 export const maintenanceState={month:'',data:null,error:'',backup:null,backupRequest:null,backupTarget:'',busy:false,recovery:null};
 export async function loadAdmin(){
  if(adminState.phase==='loading')return;

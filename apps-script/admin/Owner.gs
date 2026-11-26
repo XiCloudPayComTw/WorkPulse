@@ -70,6 +70,8 @@ function wpOwnerDeleteJournal(payload){
  * For initial setup, configure WORKPULSE_ADMIN_EMAIL and WORKPULSE_ALLOWED_DOMAIN first.
  */
 function workPulseInitialize(){
+  var preflight=workPulseInitializationCheck();
+  if(!preflight.canInitialize)throw Error('初始化已停止：'+preflight.checks.filter(function(c){return c.required&&!c.ok;}).map(function(c){return c.detail;}).join('；'));
   return wpPrivateCreateWorkspace_();
 }
 function workPulseMigrateLegacy(){
@@ -255,7 +257,7 @@ function workPulseDeploymentCheck(){
  check('monthIndex',function(){
   if(!control)throw Error('控制表尚未驗證');index=wpMonthIndex_(control);
   var keys=Object.keys(index);if(new Set(Object.values(index)).size!==keys.length)throw Error('多個月份指向同一份試算表');
-  if(keys.length>120)throw Error('歷史月份超過單次檢查上限，請分批人工核對');
+  
   keys.forEach(function(m){if(index[m]===cfg.sheetId)throw Error('月份索引指向控制表');});
   return keys.length+' 個月份索引（未逐檔核對）';
  });
@@ -265,12 +267,14 @@ function workPulseDeploymentCheck(){
   wpBackupAssertPrivate_(DriveApp.getFolderById(id),cfg.adminEmail);return '私人備份資料夾權限初步通過';
  });
  check('backupRegistration',function(){
-  if(!props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID'))throw Error('尚未登記每日備份觸發器');
-  var result=JSON.parse(props.getProperty('WORKPULSE_BACKUP_LAST_RUN')||'null');
-  if(!result||!result.ok||!Number.isFinite(Date.parse(result.completedAt))||Date.now()-Date.parse(result.completedAt)>48*3600000)throw Error('未有最近 48 小時成功的備份結果');
-  return '最近一次備份有成功紀錄，須核對實際觸發器與副本';
+  var uid=String(props.getProperty('WORKPULSE_BACKUP_TRIGGER_UID')||'');if(!uid)throw Error('尚未登記每日備份觸發器');
+  var triggers=ScriptApp.getProjectTriggers().filter(function(t){return t.getHandlerFunction()==='wpDailyBackup_';});
+  if(triggers.length!==1||String(triggers[0].getUniqueId())!==uid)throw Error('實際可見的備份觸發器與登記不符，請至 Apps Script 核對');
+  var result=JSON.parse(props.getProperty('WORKPULSE_BACKUP_LAST_RUN')||'null'),age=result?Date.now()-Date.parse(result.completedAt):NaN;
+  if(!result||!result.ok||!Number.isFinite(age)||age<0||age>48*3600000)throw Error('未有最近 48 小時成功的備份結果');
+  return '觸發器識別及最近一次成功紀錄通過，仍須核對排程時間及實際副本';
  });
- return {configurationPassed:checks.every(function(x){return x.ok;}),productionVerified:false,checks:checks,pausedAt:control?wpFieldPause_(control):'',checkedAt:new Date().toISOString()};
+ return {readOnly:true,configurationPassed:checks.every(function(x){return x.ok;}),productionVerified:false,checks:checks,pausedAt:control?wpFieldPause_(control):'',checkedAt:new Date().toISOString()};
 }
 
 
@@ -331,4 +335,45 @@ function wpOwnerMigrationPreflight(input){
  return {readOnly:true,month:month,checkedAt:new Date().toISOString(),results:keys.map(function(k){
   return {kind:k.kind,date:k.date,employeeId:k.employeeId,status:active.has(k.key)?'exists':deletedKeys.has(k.key)?'deleted-history':'not-found'};
  })};
+}
+
+
+/** First-run diagnostic. No spreadsheet, folder, trigger or property is created or modified. */
+function workPulseInitializationCheck(){
+ var props=PropertiesService.getScriptProperties(),email=String(props.getProperty('WORKPULSE_ADMIN_EMAIL')||'').trim().toLowerCase(),
+ domain=String(props.getProperty('WORKPULSE_ALLOWED_DOMAIN')||'').trim().toLowerCase().replace(/^@/,''),
+ operator=String(props.getProperty('WORKPULSE_OPERATOR_EMAIL')||'').trim().toLowerCase(),
+ active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase(),effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
+ if(!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)||! /^[^\s@]+@[^\s@]+$/.test(email)||!email.endsWith('@'+domain)||active!==email||effective!==email)
+  throw Error('請先設定有效公司網域與管理員，並使用指定資料持有帳號執行');
+ var checks=[],folderId=String(props.getProperty('WORKPULSE_FOLDER_ID')||'').trim(),sheetId=String(props.getProperty('WORKPULSE_SHEET_ID')||'').trim(),
+ backupId=String(props.getProperty('WORKPULSE_BACKUP_FOLDER_ID')||'').trim(),scope=String(props.getProperty('WORKPULSE_OFFLINE_SCOPE')||'');
+ function check(key,required,fn){try{checks.push({key:key,required:required,ok:true,detail:fn()});}catch(e){checks.push({key:key,required:required,ok:false,detail:String(e.message||e).slice(0,240)});}}
+ check('operator',true,function(){if(operator&&(!/^[^\s@]+@[^\s@]+$/.test(operator)||!operator.endsWith('@'+domain)))throw Error('維護帳號須屬公司網域');return operator?'已設定維護帳號':'未設定選用維護帳號';});
+ check('accessMode',true,function(){wpFieldMode_();return '存取模式格式有效';});
+ check('domainMode',false,function(){if(wpFieldMode_()!=='domain')throw Error('正式部署前須設定 domain 並驗證登入');return '已設定 domain，仍須實際驗證';});
+ check('dataFolder',true,function(){if(!folderId)return '尚未設定，初始化將建立新資料夾';wpBackupAssertPrivate_(DriveApp.getFolderById(folderId),email);return '既有資料夾持有者與私人權限初步通過';});
+ check('control',true,function(){
+  if(!sheetId)return '尚未設定，初始化將建立新控制表';
+  wpBackupAssertPrivate_(DriveApp.getFileById(sheetId),email);
+  var book=SpreadsheetApp.openById(sheetId),allowed=['Employees','Departments','Projects','Journals','Tasks','Requests','Audit','Reviews','Meta','MonthIndex','AttendanceSettings'];
+  book.getSheets().forEach(function(s){
+   var name=s.getName();if(!s.getLastRow())return;
+   if(allowed.indexOf(name)<0)throw Error('控制表含非預期且非空白分頁：'+name);
+   if(JSON.stringify(s.getRange(1,1,1,WP_HEADERS[name].length).getValues()[0])!==JSON.stringify(WP_HEADERS[name]))throw Error(name+' 表頭不符，初始化前請先備份及核對');
+  });
+  var meta=book.getSheetByName('Meta'),rows=meta&&meta.getLastRow()?wpRows_(meta):[];
+  var schema=rows.filter(function(x){return x.key==='schemaVersion';}),enabled=rows.filter(function(x){return x.key==='monthlyStorage';});
+  if(schema.length>1||enabled.length>1||schema.length&&String(schema[0].value)!=='4')throw Error('控制表版本或 Meta 設定不相容');
+  var journals=book.getSheetByName('Journals');
+  if(journals&&journals.getLastRow()>1&&!(enabled.length&&enabled[0].value==='enabled'))throw Error('控制表已有舊日誌，須先備份並依舊資料遷移程序處理');
+  return '既有控制表權限及非空白分頁結構初步通過';
+ });
+ check('backupFolder',!!backupId,function(){
+  if(!backupId)throw Error('尚未設定獨立私人備份資料夾；正式上線前必須完成');
+  if(backupId===folderId)throw Error('備份與日常資料夾不可相同');
+  wpBackupAssertPrivate_(DriveApp.getFolderById(backupId),email);return '備份資料夾權限初步通過';
+ });
+ check('offlineScope',true,function(){if(scope&&!/^[A-Za-z0-9_-]{16,80}$/.test(scope))throw Error('離線範圍必須為 16–80 位英數、底線或連字號');return scope?'已設定，須確認與其他環境不同':'未啟用選用持久暫存範圍';});
+ return {readOnly:true,canInitialize:checks.every(function(x){return !x.required||x.ok;}),productionVerified:false,checks:checks,checkedAt:new Date().toISOString()};
 }
