@@ -540,3 +540,48 @@ test('offline scope is only advertised with verified domain identity and explici
  assert.equal(h.scope.wpSharedBootstrap('2026-11').offlineScope,'company_offline_2026_v1');
  h.props.WORKPULSE_OFFLINE_SCOPE='short';assert.equal(h.scope.wpSharedBootstrap('2026-11').offlineScope,'');
 });
+
+test('initialization preflight is read-only before configuration and rejects non-owner',()=>{
+ const h=harness();delete h.props.WORKPULSE_SHEET_ID;
+ const before=JSON.stringify(h.props),files=h.files.size;
+ const report=h.scope.workPulseInitializationCheck();
+ assert.equal(report.readOnly,true);assert.equal(report.canInitialize,true);assert.equal(report.productionVerified,false);
+ assert.equal(JSON.stringify(h.props),before);assert.equal(h.files.size,files);
+ h.as('staff@example.com');assert.throws(()=>h.scope.workPulseInitializationCheck(),/持有帳號/);
+});
+test('first-run initialization blocks shared folder and malformed control before writes',()=>{
+ const h=harness(),folder=h.scope.DriveApp.createFolder('shared');
+ h.props.WORKPULSE_FOLDER_ID=folder.getId();folder.getEditors=()=>[{getEmail:()=> 'staff@example.com'}];
+ assert.equal(h.scope.workPulseInitializationCheck().canInitialize,false);
+ assert.throws(()=>h.scope.workPulseInitialize(),/初始化已停止/);
+ assert.equal(h.control.getSheets().length,1);
+ folder.getEditors=()=>[];h.control.getSheets()[0].appendRow(['unrelated content']);
+ assert.throws(()=>h.scope.workPulseInitialize(),/非預期/);
+ assert.equal(h.control.getSheets().length,1);assert.equal(h.files.size,1);
+});
+test('initialization remains idempotent for clean and existing workspaces',()=>{
+ const h=harness(),first=h.scope.workPulseInitialize(),second=h.scope.workPulseInitialize();
+ assert.equal(first.controlId,second.controlId);assert.equal(first.folderId,second.folderId);
+ assert.equal(h.files.size,1);assert.equal(h.scope.workPulseInitializationCheck().canInitialize,true);
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=first.folderId;assert.equal(h.scope.workPulseInitializationCheck().canInitialize,false);
+});
+test('deployment check verifies real visible trigger UID and recent non-future success',()=>{
+ const h=harness();h.setup();h.props.WORKPULSE_ACCESS_MODE='domain';
+ h.props.WORKPULSE_BACKUP_FOLDER_ID=h.scope.DriveApp.createFolder('backup').getId();
+ h.props.WORKPULSE_BACKUP_TRIGGER_UID='trigger-1';
+ h.props.WORKPULSE_BACKUP_LAST_RUN=JSON.stringify({ok:true,completedAt:new Date().toISOString()});
+ h.scope.ScriptApp={getProjectTriggers:()=>[]};
+ const check=()=>h.scope.workPulseDeploymentCheck().checks.find(x=>x.key==='backupRegistration');
+ assert.equal(check().ok,false);
+ h.scope.ScriptApp.getProjectTriggers=()=>[{getHandlerFunction:()=> 'wpDailyBackup_',getUniqueId:()=> 'trigger-1'}];
+ assert.equal(check().ok,true);assert.equal(h.scope.workPulseDeploymentCheck().productionVerified,false);
+ h.props.WORKPULSE_BACKUP_LAST_RUN=JSON.stringify({ok:true,completedAt:new Date(Date.now()+3600000).toISOString()});
+ assert.equal(check().ok,false);
+});
+
+test('clean first run creates one private control and folder and reuses both',()=>{
+ const h=harness();delete h.props.WORKPULSE_SHEET_ID;
+ const before=h.files.size,first=h.scope.workPulseInitialize(),again=h.scope.workPulseInitialize();
+ assert.equal(h.files.size,before+1);assert.equal(first.controlId,again.controlId);assert.equal(first.folderId,again.folderId);
+ assert.equal(h.scope.workPulseInitializationCheck().canInitialize,true);
+});
