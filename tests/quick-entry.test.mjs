@@ -12,3 +12,14 @@ test('previous tasks only from same employee and earlier date',()=>{const r=rece
 test('more than 10 templates capped',()=>{const db=storage();for(let i=0;i<15;i++)addTemplate(db,'a',{title:`工作 ${i}`});assert.equal(readTemplates(db,'a').length,10);});
 
 test('distinct descriptions in same category are distinct templates',()=>{const db=storage();const a={title:'水電',category:'水電',project:'案場',description:'確認排水'};assert.equal(addTemplate(db,'a',a).ok,true);assert.equal(addTemplate(db,'a',{...a,description:'確認電力'}).ok,true);assert.equal(addTemplate(db,'a',a).ok,false);});
+
+test('multiple dates and employees retain separate drafts and clearing one preserves others',()=>{
+ const db=storage();saveQuickDraft(db,'local',draft());saveQuickDraft(db,'local',{...draft(),date:'2026-11-24',note:'第二天'});saveQuickDraft(db,'local',{...draft(),employeeId:'other',note:'另一人'});
+ assert.equal(readQuickDraft(db,'local',86400000,'2026-11-24','me').note,'第二天');
+ clearQuickDraft(db,'local','2026-11-23','me');assert.equal(readQuickDraft(db,'local',86400000,'2026-11-23','me'),null);assert.equal(readQuickDraft(db,'local',86400000,'2026-11-23','other').note,'另一人');
+});
+test('legacy draft upgrades without losing original day; cap does not evict',()=>{
+ const db=storage();db.setItem('workpulse:v0.5:draft:local',JSON.stringify({account:'local',savedAt:Date.now(),draft:draft()}));
+ for(let day=1;day<=31;day++){if(day===23)continue;assert.equal(saveQuickDraft(db,'local',{...draft(),date:'2026-12-'+String(day).padStart(2,'0')}),true);}
+ assert.equal(saveQuickDraft(db,'local',{...draft(),date:'2027-01-01'}),false);assert.ok(readQuickDraft(db,'local',86400000,'2026-11-23','me'));
+});
