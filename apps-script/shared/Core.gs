@@ -88,3 +88,21 @@ function wpPrimaryOwnerAssert_(){
   throw Error('首次建檔與資料遷移雙重身分驗證失敗：只能由公司資料持有帳號執行');
  return cfg;
 }
+
+/** Public read-only category access from Meta; writes require private owner deployment. */
+/** Dynamic work types live in controller Meta, avoiding destructive schema migrations. */
+function wsCategories_(book){
+ var record=wpRows_(wpSheet_(book,'Meta')).find(function(row){return row.key==='workCategories';});
+ if(!record||!record.value)return WP_CATEGORIES.slice();
+ try{
+  var values=JSON.parse(String(record.value));
+  if(!Array.isArray(values)||!values.length||values.length>60||
+    values.some(function(value){return typeof value!=='string'||!value.trim()||value.length>100;}))
+   throw Error('工作類型設定格式無效');
+  return values;
+ }catch(error){throw Error('工作類型設定損毀，請由管理員檢查：'+error.message);}
+}
+function wsCategoryRevision_(book){
+ var row=wpRows_(wpSheet_(book,'Meta')).find(function(item){return item.key==='workCategoriesRevision';});
+ return row?Number(row.value)||0:0;
+}
