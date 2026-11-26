@@ -198,3 +198,12 @@
 - CSS 拆分為 styles/index.css 加 8 個功能 CSS layer，瀏覽器透過 @import 依順序載入，GAS builder 依相同順序直接拼接 CSS 到 Index.html。
 - Apps Script 原始檔移入 `shared`、`journals`、`attendance`、`admin`、`legacy` 資料夾；發布時仍產生 public／admin 分離且檔案平面化的 dist-gas，不混入舊版管理員 API。歷史測試與部署建置腳本均已更新路徑。
 - 新增直接 deep link 本機／雲端回歸與資料夾結構測試。詳細架構 docs/ARCHITECTURE.md。未操作 Google Drive 公司正式資料。
+
+## v0.10.2 — 路由模組與雲端載入穩定性（PR #14）
+
+- main 已包含 v0.10.1 PR #13，並已成功完成 GitHub Pages 部署；本批分支 feat/workpulse-v0.10.2-stability。
+- 將原本 `src/app/main.js` 的路由清單、Hash 解析與管理員導覽可見性抽至 `src/app/navigation.js`；報表日期驗證與期間快捷邏輯抽至 `src/features/reports/periods.js`。Apps Script 打包順序已加入新的前端模組，維持原有兩個獨立發行包。
+- `src/services/cloud.js` 為 Google Apps Script 呼叫設置讀取 60 秒、寫入 90 秒的等待期限與回應去重。載入失敗會顯示可手動重試的錯誤狀態，絕不自動重送寫入 API。
+- `src/app/main.js` 加上 bootstrap 重試請求序號以及月份讀取最後請求保護，避免網路回應順序顛倒造成過時資料覆蓋。出勤 loader 額外在未預期拋錯時進入 error 畫面。
+- 增加路由／報表日期／雲端讀寫逾時／Bootstrap 重試的 Node 回歸測試；GitHub Actions 額外增加 Headless Chrome 的窄螢幕、桌面路由煙霧測試，成功才建 Pages artifact。
+- 不調整既有 Google Sheets Schema、薪資暫時試算、權限架構與 UI 主題。正式 Workspace 部署仍待公司帳號驗收。
