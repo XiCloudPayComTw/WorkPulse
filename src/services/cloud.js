@@ -2,12 +2,12 @@ import {startFieldLoading,stopFieldLoading} from '../app/loading.js';
 /** Apps Script HTMLService provides google.script.run only inside its own web-app origin. */
 const METHODS = new Set([
  'wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
- 'wpOwnerBootstrap','workPulseDeploymentCheck','wpOwnerMonthIntegrity','wpOwnerMaintenance','wpOwnerMigrationPreflight','wpOwnerRecoveryPreview','wpOwnerBackupWorkbook','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
+ 'wpOwnerBootstrap','wpOwnerBackupPlan','wpOwnerPrepareBackupFolder','wpOwnerExportBackupJson','wpOwnerCompareBackupCopies','workPulseDeploymentCheck','wpOwnerMonthIntegrity','wpOwnerMaintenance','wpOwnerMigrationPreflight','wpOwnerRecoveryPreview','wpOwnerBackupWorkbook','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
  'wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule','wpAttendanceRange'
 ]);
 const MUTATIONS = new Set([
- 'wpOwnerBackupWorkbook','wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
+ 'wpOwnerPrepareBackupFolder','wpOwnerBackupWorkbook','wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceSave','wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule'
 ]);
 
