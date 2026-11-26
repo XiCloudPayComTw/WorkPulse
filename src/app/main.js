@@ -610,16 +610,25 @@ root.addEventListener('input',event=>{
 root.addEventListener('change',event=>{
  const el=event.target;
  if(el.matches('[data-admin-field]')){updateAdminDraft(el.dataset.adminField,el.value);return;}
- if(el.matches('[data-report-filter]')){state.report.filters[el.dataset.reportFilter]=el.value;render();return;}
+ if(el.matches('[data-report-filter]')){
+  if(el.dataset.reportFilter==='employeeId'&&el.value!=='all'&&
+     !changeSelectedPerson(el.value)){render();return;}
+  state.report.filters[el.dataset.reportFilter]=el.value;render();return;
+ }
  if(el.matches('[data-identity]')){
    const field=el.dataset.identity;const value=el.value;
    if(state.dirty&&!confirm('切換日期或人員會放棄尚未儲存的內容，確定繼續嗎？')){el.value=state.draft[field];return;}
    flushQuickDraft();const date=field==='date'?value:state.draft.date;const employee=field==='employeeId'?value:state.draft.employeeId;
    state.saveRequestId=null;
    if(isCloud && date.slice(0,7)!==state.month){loadCloudMonth(date.slice(0,7),date,employee);return;}
+   if(field==='employeeId')selectPersonId(employee);
    state.draft=makeDraft(date,employee);state.templates=readTemplates(draftStorage(),draftAccount());state.dirty=false;render();return;
  }
- if(el.matches('[data-filter]')){state.filters[el.dataset.filter]=el.value;render();return;}
+ if(el.matches('[data-filter]')){
+  if(el.dataset.filter==='employee'&&el.value!=='all'&&
+     !changeSelectedPerson(el.value)){render();return;}
+  state.filters[el.dataset.filter]=el.value;render();return;
+ }
  if(el.matches('[data-month]')){const month=el.value||currentMonth();if(isCloud){loadCloudMonth(month);return;}state.month=month;render();return;}
 });
 window.addEventListener('keydown',event=>{
@@ -647,6 +656,26 @@ root.addEventListener('change',async event=>{
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
 window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
+document.addEventListener('workpulse:select-person',event=>{
+ if(!changeSelectedPerson(event.detail?.id,{fromAttendance:true}))event.preventDefault();
+});
+document.addEventListener('click',event=>{
+ if(event.target.closest?.('.wp-person-picker'))return;
+ const menu=document.querySelector('.wp-person-menu:not([hidden])');
+ if(menu){
+  menu.hidden=true;
+  menu.closest('.wp-person-picker')?.querySelector('[data-action="person-menu"]')
+   ?.setAttribute('aria-expanded','false');
+ }
+});
+root.addEventListener('focusin',event=>{
+ if(event.target.matches?.('[data-field="description"][data-task]'))
+  updateDescriptionSuggestions(event.target);
+});
+document.addEventListener('copy',event=>{
+ if(event.target.closest?.('input,textarea,[contenteditable="true"]'))return;
+ event.preventDefault();
+});
 window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty){event.preventDefault();event.returnValue='';}});
 render();
 if(isCloud)initCloud();
