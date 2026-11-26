@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {minutesBetween,overtimeMinutes,payEstimate,validateAttendanceDraft,weekdayLabel,
  weekdayCount,attendanceSummary} from '../src/features/attendance/attendance.js';
-import {attendanceState,updateTemporarySalary,clearTemporarySalary,currentTemporaryWage,loadAttendance} from '../src/features/attendance/attendance-state.js';
+import {attendanceState,loadAttendance} from '../src/features/attendance/attendance-state.js';
 const draft=(overrides={})=>({date:'2026-11-25',dayType:'workday',startTime:'09:00',endTime:'18:00',
  breakMinutes:60,leaveType:'none',leaveMinutes:0,notes:'',...overrides});
 test('workday records exact minutes, subtracts break and computes standard overtime',()=>{
@@ -78,26 +78,4 @@ test('zero overtime means zero pay without salary input, not a fabricated debt',
  assert.equal(attendanceSummary(rows,'2026-11',21,null).totalPay,0);
 });
 
-test('temporary salary is valid only in memory and can be cleared immediately',()=>{
- updateTemporarySalary('36000');
- assert.equal(currentTemporaryWage(),36000);
- assert.equal(attendanceState.temporarySalary,'36000');
- updateTemporarySalary('0');
- assert.equal(currentTemporaryWage(),null);
- updateTemporarySalary('80000000');
- assert.equal(currentTemporaryWage(),null);
- clearTemporarySalary();
- assert.equal(currentTemporaryWage(),null);
-});
-test('switching employee or month clears transient wage but refreshing same scope preserves it',async()=>{
- const people=[{id:'a',name:'甲'},{id:'b',name:'乙'}];
- attendanceState.employeeId='a';attendanceState.month='2026-11';
- updateTemporarySalary('30000');
- await loadAttendance(people,false,'2026-11','a');
- assert.equal(currentTemporaryWage(),30000);
- await loadAttendance(people,false,'2026-11','b');
- assert.equal(currentTemporaryWage(),null);
- updateTemporarySalary('40000');
- await loadAttendance(people,false,'2026-12','b');
- assert.equal(currentTemporaryWage(),null);
-});
+test('attendance state no longer includes website salary input',()=>{assert.equal(Object.hasOwn(attendanceState,'temporarySalary'),false);});
