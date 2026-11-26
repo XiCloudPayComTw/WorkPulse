@@ -503,3 +503,17 @@ test('deployment check is read-only and never reports formal verification',()=>{
  assert.equal(result.checks.find(x=>x.key==='backupFolder').ok,false);assert.equal(h.files.size,before);
  h.as('');assert.throws(()=>h.scope.workPulseDeploymentCheck(),/持有帳號/);
 });
+
+test('month file verification detects malformed header and leaves source untouched',()=>{
+ const h=harness();h.setup();const p=h.employee();
+ h.scope.wpSharedSaveJournal(h.entry(p,'2026-11',0,'verify-month-001'));
+ h.scope.wpSharedSaveJournal(h.entry(p,'2026-12',0,'verify-month-002'));
+ const index=h.scope.wpMonthIndex_(h.control),before=h.files.size;
+ const first=h.scope.workPulseVerifyMonthFiles();
+ assert.equal(first.ok,true);assert.equal(first.checked,2);assert.equal(first.results[0].month,'2026-12');assert.equal(first.productionVerified,false);
+ h.books.get(index['2026-11']).getSheetByName('Tasks').rows[0][0]='bad header';
+ const broken=h.scope.workPulseVerifyMonthFiles();
+ assert.equal(broken.ok,false);assert.match(broken.results[1].error,/表頭/);
+ h.props.WORKPULSE_VERIFY_FROM_MONTH='2026-11';assert.equal(h.scope.workPulseVerifyMonthFiles().checked,1);
+ assert.equal(h.files.size,before);h.as('');assert.throws(()=>h.scope.workPulseVerifyMonthFiles(),/持有帳號/);
+});

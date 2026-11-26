@@ -272,3 +272,34 @@ function workPulseDeploymentCheck(){
  });
  return {configurationPassed:checks.every(function(x){return x.ok;}),productionVerified:false,checks:checks,pausedAt:control?wpFieldPause_(control):'',checkedAt:new Date().toISOString()};
 }
+
+
+/** Read-only, bounded verification of indexed live monthly workbooks.
+ * Run from the private editor. Optional start month via Script Properties for older batches.
+ * A successful result is not a restore test or an ACL/atomicity guarantee.
+ */
+function workPulseVerifyMonthFiles(){
+ var cfg=wpPrimaryOwnerAssert_(),control=wsBook_(),index=wpMonthIndex_(control);
+ var from=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_VERIFY_FROM_MONTH')||'').trim();
+ if(from)wpMonth_(from);
+ var all=Object.keys(index).sort().reverse(),months=all.filter(function(m){return !from||m<=from;}).slice(0,12);
+ var expected=['Journals','Tasks','Requests','Audit','Meta','Attendance'];
+ var results=months.map(function(month){
+  try{
+   if(index[month]===cfg.sheetId||all.filter(function(m){return index[m]===index[month];}).length!==1)throw Error('索引指向控制表或重複月份文件');
+   wpBackupAssertPrivate_(DriveApp.getFileById(index[month]),cfg.adminEmail);
+   var book=wpMonthFile_(control,month,false),sheets=book.getSheets();
+   if(sheets.length!==expected.length)throw Error('月份工作表數量不符');
+   var counts={};
+   expected.forEach(function(name){
+    var s=wpSheet_(book,name);
+    if(JSON.stringify(s.getRange(1,1,1,WP_HEADERS[name].length).getValues()[0])!==JSON.stringify(WP_HEADERS[name]))throw Error(name+' 表頭不符');
+    counts[name]=Math.max(0,s.getLastRow()-1);
+   });
+   return {month:month,ok:true,counts:counts};
+  }catch(e){return {month:month,ok:false,error:String(e.message||e).slice(0,240)};}
+ });
+ var older=months.length?all.filter(function(m){return m<months[months.length-1];}):[];
+ return {readOnly:true,productionVerified:false,checkedAt:new Date().toISOString(),totalIndexed:all.length,checked:results.length,
+  ok:results.every(function(x){return x.ok;}),nextFromMonth:older[0]||'',results:results};
+}
