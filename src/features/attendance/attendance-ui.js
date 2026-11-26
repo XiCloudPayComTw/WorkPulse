@@ -19,7 +19,7 @@ export function renderAttendance(people,isAdmin=false){
  '<label class="form-group"><span class="field-label">月份</span><input class="input" type="month" data-att-month value="'+esc(a.month)+'"></label>'+
  '<button class="soft-button sm" data-action="attendance-refresh">重新讀取</button></div></section>';
  if(a.phase==='idle'||a.phase==='loading')return '<div class="att-page">'+toolbar+mobileSkeleton('正在讀取出勤資料…')+'</div>';
- if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'</section></div>';
+ if(a.phase==='error')return '<div class="att-page">'+toolbar+'<section class="soft-card card-pad-lg" role="alert">出勤資料讀取失敗：'+esc(a.error)+'<div><button type="button" class="soft-button" data-action="attendance-refresh">重新讀取出勤</button></div></section></div>';
  const days=attendanceCalendar(a.month,a.rows,a.confirmedSchedule.days,localISODate(),a.date,a.dirty?a.draft:null);
  const expected=a.expectedDays??(Object.keys(a.confirmedSchedule.days).length?days.filter(x=>x.planned==='workday').length:null);
  const info=attendanceSummary(a.rows,a.month,expected);

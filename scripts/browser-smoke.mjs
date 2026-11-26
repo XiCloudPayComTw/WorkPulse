@@ -40,7 +40,7 @@ const probe=`<script>
      const mobileFit=window.innerWidth>900||Boolean(nav&&nav.scrollWidth<=nav.clientWidth+2&&[...nav.querySelectorAll('.nav-link')].every(n=>n.getBoundingClientRect().height>=44));
      const field=document.querySelector('.main .input');
      const inputReadable=window.innerWidth>900||!field||parseFloat(getComputedStyle(field).fontSize)>=16;
-     const failed=window.__wpSmokeErrors.length>0;
+     const failed=()=>window.__wpSmokeErrors.length>0;
      let personChoice='skip';
      if(location.hash.includes('/overview')){
        const menuButton=document.querySelector('[data-action="person-menu"]');
@@ -100,7 +100,7 @@ const probe=`<script>
      output.dataset.noAdminTabs=noAdminTabs?'1':'0';
      output.dataset.loading=loading?'1':'0';
      output.dataset.overflow=overflow?'1':'0';output.dataset.mobileFit=mobileFit?'1':'0';output.dataset.inputReadable=inputReadable?'1':'0';
-     output.dataset.failed=failed?'1':'0';
+     output.dataset.failed=failed()?'1':'0';
      output.dataset.personChoice=personChoice;
      output.dataset.copyBlocked=copyBlocked?'1':'0';
      output.dataset.calendarCheck=calendarCheck;output.dataset.dockCheck=dockCheck;output.dataset.sheetCheck=sheetCheck;

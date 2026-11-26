@@ -85,7 +85,7 @@ function selectPersonId(id){
 }
 function changeSelectedPerson(id,{fromAttendance=false}={}){
  if(id===state.selectedPersonId)return true;
- if(state.cloud.saving||attendanceState.saving||attendanceState.scheduleSaving)return false;
+ if(state.cloud.saving||state.cloud.loadingMonth||(isCloud&&state.cloud.phase!=='ready')||attendanceState.saving||attendanceState.scheduleSaving)return false;
  if(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定切換人員？'))return false;
  if(!state.store.employees.some(p=>p.id===id))return false;
  if(state.dirty&&!confirm('切換人員後，未提交的工作內容會先暫存，確定切換？'))return false;
@@ -380,7 +380,7 @@ function showToast(text,error=false,preserve=false){const container=document.que
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;flushQuickDraft();return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
 function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;selectPersonId(record.employeeId);state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;changeView('entry');}
-function openNew(){if(!requireDiscard())return;state.saveRequestId=null;const target=state.selectedPersonId;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
+function openNew(){if(state.cloud.saving||state.cloud.loadingMonth||(isCloud&&state.cloud.phase!=='ready'))return;if(!requireDiscard())return;state.saveRequestId=null;const target=state.selectedPersonId;if(isCloud&&state.month!==today.slice(0,7)){state.view='entry';location.hash='/entry';loadCloudMonth(today.slice(0,7),today,target);return;}state.draft=makeDraft(today,target);state.dirty=false;changeView('entry');}
 function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringify({...state.store,mode:'local'},null,2));}
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
 
@@ -423,7 +423,7 @@ async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  finally{if(token===state.cloud.monthToken){state.cloud.loadingMonth=false;render();}}
 }
 async function saveCloudJournal(){
- if(state.cloud.saving || state.cloud.phase!=='ready')return;
+ if(state.cloud.saving||state.cloud.loadingMonth||state.cloud.phase!=='ready')return;
  const d=state.draft;
  if(!d.date || !d.employeeId || !d.tasks.some(t=>String(t.category||'').trim())){notify('請選日期、人員並至少選擇一個工作類型',true);return;}
  const hours=d.tasks.reduce((sum,t)=>sum+(Number(t.hours)||0),0);
@@ -463,6 +463,7 @@ root.addEventListener('click', event=>{
   return;
  }
  if(action==='person-menu'){
+  if(isCloud&&(state.cloud.phase!=='ready'||state.cloud.loadingMonth||state.cloud.saving))return;
   if(openMobileSheet(button,'目前操作人員',state.store.employees.map(p=>({value:p.id,label:p.name,selected:p.id===state.selectedPersonId})),id=>changeSelectedPerson(id)))return;
   const box=button.closest('.wp-person-picker'),menu=box?.querySelector('.wp-person-menu');
   if(menu){menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));}

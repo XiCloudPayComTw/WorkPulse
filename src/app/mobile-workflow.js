@@ -51,7 +51,7 @@ export function enhanceMobileSelects(){
 export function syncMobileDock(){
  const dock=document.querySelector('#wp-mobile-dock');if(!dock)return;
  const nav=document.querySelector('.mobile-nav');
- if(nav?.getBoundingClientRect&&document.documentElement?.style)document.documentElement.style.setProperty('--wp-nav-height',Math.max(0,nav.getBoundingClientRect().height)+'px');
+ const navHeight=nav?.getBoundingClientRect?.().height||0;if(navHeight>0&&document.documentElement?.style)document.documentElement.style.setProperty('--wp-nav-height',navHeight+'px');
  const entry=document.querySelector('.entry-actions [data-action="save-journal"]'),attendance=document.querySelector('.att-page [data-action="attendance-save"]'),source=entry||attendance;
  dock.hidden=!source;
  if(document.documentElement?.classList)document.documentElement.classList.toggle('wp-has-dock',!!source);
@@ -72,6 +72,7 @@ export function initMobileWorkflow(){
   if(wpViewportWidth!==width){wpViewportMax=height;wpViewportWidth=width;}else if(!focused)wpViewportMax=Math.max(wpViewportMax,height);
   const visible=vv?.height??height,keyboard=media.matches&&keyboardObscures(Math.max(height,wpViewportMax),visible,focused);
   document.documentElement.classList.toggle('wp-keyboard-open',keyboard);
+  if(!keyboard)syncMobileDock();
   if(!media.matches&&wpSheet)closeMobileSheet();
   if(keyboard&&document.activeElement?.getBoundingClientRect){const rect=document.activeElement.getBoundingClientRect(),bottom=(vv?.offsetTop||0)+visible;if(rect.bottom>bottom-20||rect.top<(vv?.offsetTop||0))document.activeElement.scrollIntoView({block:'center',behavior:'instant'});}
  };
