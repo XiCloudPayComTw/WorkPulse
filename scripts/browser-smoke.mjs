@@ -82,7 +82,7 @@ try{
    const mobile=width===390;
    const expected=mobile&&['insights','settings'].includes(route)?'工作總覽':title;
    if(attrs.title!==expected||attrs.overflow==='1'||attrs.failed==='1'||
-      (mobile&&(attrs.noAdminTabs!=='1'||(expected==='工作總覽'&&attrs.mobileLauncher!=='1')))||
+      (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
       (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0')))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}px, no page overflow`);
