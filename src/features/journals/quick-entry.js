@@ -49,6 +49,18 @@ export function removeTemplate(storage,account,id){
  const rows=readTemplates(storage,account).filter(r=>r.id!==id);
  try{storage?.setItem(templateKey(account),JSON.stringify(rows));return true;}catch{return false;}
 }
+/** Update saved local shortcuts to follow a local project rename. */
+export function renameTemplatesProject(storage,account,oldName,newName){
+ const rows=readTemplates(storage,account);
+ const updated=rows.map(row=>row.project===oldName?{...row,project:newName}:row);
+ try{
+  if(rows.some(row=>row.project===oldName))
+   storage?.setItem(templateKey(account),JSON.stringify(updated));
+  return updated;
+ }catch{
+  return rows;
+ }
+}
 // Only reuse the work definition; never copy yesterday's completion status, result or logged hours.
 export function newTaskFromTemplate(task){const row=normalizeTask(task);return {...row,id:uid(),result:'',status:'doing',hours:0};}
 export function recentPriorJournal(journals,date,employeeId){
