@@ -402,3 +402,19 @@ test('attendance export range returns only read-only monthly schedule and no pay
  h.as('');const result=h.scope.wpAttendanceRange({employeeId:e.id,startDate:'2026-11-01',endDate:'2026-12-02'});
  assert.equal(result.scheduleByMonth['2026-11'].days['2026-11-23'],'holiday');assert.equal(result.scheduleByMonth['2026-12'].revision,0);assert.equal(result.rows.length,0);assert.equal(h.files.size,1);
 });
+
+test('maintenance is owner-only and lists soft-deleted journals',()=>{
+ const h=harness();h.setup();const p=h.employee();h.as('');
+ const row=h.scope.wpSharedSaveJournal(h.entry(p)).journal;
+ assert.throws(()=>h.scope.wpOwnerMaintenance({month:'2026-11'}),/管理帳號/);
+ h.as('admin@example.com');h.scope.wpOwnerDeleteJournal({journalId:row.id,date:row.date,expectedRevision:1,requestId:'maintenance-delete-001'});
+ const data=h.scope.wpOwnerMaintenance({month:'2026-11'});
+ assert.equal(data.deletedCount,1);assert.equal(data.deleted[0].id,row.id);
+ assert.equal(h.scope.wpSharedLoadMonth('2026-11').journals.length,0);
+});
+test('backup rejects unverified account and missing private destination',()=>{
+ const h=harness();h.setup();h.as('');
+ assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'backup-test-001'}),/持有帳號/);
+ h.as('admin@example.com');assert.throws(()=>h.scope.wpOwnerBackupWorkbook({target:'control',requestId:'backup-test-001'}),/備份資料夾/);
+ assert.equal(h.files.size,1);
+});
