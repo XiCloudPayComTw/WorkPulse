@@ -64,6 +64,13 @@ const probe=`<script>
        const heading=document.querySelector('.section-head.section-space');
        spacingCheck=heading&&parseFloat(getComputedStyle(heading).marginTop)>=26?'ok':'missing-gap';
      }
+     let exportCheck='skip';
+     if(location.hash.includes('/attendance')&&window.innerWidth>900){
+       document.querySelector('[data-action="payroll-start"]')?.click();
+       const modal=document.querySelector('.payroll-modal');
+       exportCheck=modal&&modal.querySelector('[data-payroll-person]')&&modal.querySelector('[data-payroll-start]')&&modal.querySelector('[data-payroll-pay-date]')&&!modal.querySelector('input[type="number"]')?'ok':'missing-export';
+       modal?.querySelector('[data-action="payroll-close"]')?.click();
+     }
      const copyCheck=new Event('copy',{bubbles:true,cancelable:true});
      const titleElement=document.querySelector('h1.page-title');
      titleElement?.dispatchEvent(copyCheck);
@@ -71,7 +78,7 @@ const probe=`<script>
      const output=document.createElement('output');
      output.id='workpulse-smoke-result';
      output.dataset.title=title;
-     output.dataset.attendance=attendance?'1':'0';output.dataset.noSalary=noSalary?'1':'0';output.dataset.exportButton=exportButton?'1':'0';
+     output.dataset.attendance=attendance?'1':'0';output.dataset.noSalary=noSalary?'1':'0';output.dataset.exportButton=exportButton?'1':'0';output.dataset.exportCheck=exportCheck;
      output.dataset.mobileLauncher=mobileLauncher?'1':'0';
      output.dataset.noAdminTabs=noAdminTabs?'1':'0';
      output.dataset.loading=loading?'1':'0';
@@ -127,7 +134,7 @@ try{
       attrs['copy-blocked']!=='1'||
       (route==='overview'&&attrs['person-choice']!=='ok')||
       (mobile&&(attrs['no-admin-tabs']!=='1'||(expected==='工作總覽'&&attrs['mobile-launcher']!=='1')))||
-      (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'))||
+      (route==='attendance'&&(attrs.attendance!=='1'||attrs.loading!=='0'||attrs['calendar-check']!=='ok'||attrs['no-salary']!=='1'||attrs['export-button']!=='1'||(!mobile&&attrs['export-check']!=='ok')))||
       (['entry','history'].includes(route)&&attrs['spacing-check']!=='ok'))
     throw new Error(`${route}@${width}: ${JSON.stringify(attrs)}`);
    console.log(`PASS ${route}, requested ${width}px, actual ${attrs.width}px, no page overflow`);
