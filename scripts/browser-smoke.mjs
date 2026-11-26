@@ -11,6 +11,7 @@ import {randomUUID} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
+import {nativePwaSmoke} from './pwa-smoke.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const browser=['google-chrome','google-chrome-stable','chromium','chromium-browser']
@@ -175,6 +176,8 @@ try{
  }
  if(!available)throw new Error('WorkPulse 本機伺服器無法啟動');
  await nativeVaultSmoke();
+ execFileSync(process.execPath,['scripts/build.mjs'],{cwd:root,stdio:'inherit',timeout:30000});
+ await nativePwaSmoke(browser,root);
  const routes=[
   ['overview','工作總覽'],['attendance','出勤表'],['entry','填寫工作日誌'],
   ['history','歷史工作紀錄'],['insights','統計分析'],['settings','系統設定']];

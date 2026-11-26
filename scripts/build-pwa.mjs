@@ -31,8 +31,8 @@ export async function buildPwa(out){
  await writeFile(join(out,'index.html'),html.replace(marker,'<meta name="workpulse-pwa-build" content="static" />\n  <link rel="manifest" href="./manifest.webmanifest" />\n  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />'));
  // Exact static allowlist only; no arbitrary request caching, API responses or storage.
  const paths=(await list(out)).filter(p=>p==='index.html'||p==='favicon.svg'||p==='manifest.webmanifest'||/^(src\/.*\.js|styles\/.*\.css|icons\/.*\.png)$/.test(p));
- const hash=createHash('sha256').update(template);for(const p of paths)hash.update(p).update(await readFile(join(out,p)));
+ const hash=createHash('sha256').update(template),digests={};for(const p of paths){const data=await readFile(join(out,p));hash.update(p).update(data);digests[p]=createHash('sha256').update(data).digest('hex');}
  const release=hash.digest('hex').slice(0,20);
- await writeFile(join(out,'sw.js'),template.replace('__WP_RELEASE__',JSON.stringify(release)).replace('__WP_STATIC_PATHS__',JSON.stringify(paths)));
+ await writeFile(join(out,'sw.js'),template.replace('__WP_RELEASE__',JSON.stringify(release)).replace('__WP_STATIC_PATHS__',JSON.stringify(digests)));
  return {release,paths};
 }

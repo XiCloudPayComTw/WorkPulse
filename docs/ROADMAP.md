@@ -62,3 +62,13 @@
 - 歷史日期定位支援跨月份載入，保留搜尋、人員與狀態篩選；找不到符合紀錄時提示。搜尋防抖 180ms，單次計算分組，減少重複渲染。
 - 日誌草稿改同一 storage key 的 v2 rows，依人員／日期分開，兼容 v0.16.0 單筆格式；每個 account key 最多 31 筆，滿額拒絕新存不自動淘汰，依既有 24 小時／7 天讀取期限。正式儲存及單筆捨棄只清除當前人員日期；日期切換前若暫存失敗不離開。未提交草稿列表與跨月份定位。過期草稿不自動清除，仍占額度，可透過清除持久副本等人工處理。IndexedDB 既有 4MB 與 250 鍵上限仍適用。
 - 保留公司 Google Drive／Sheets 唯一雲端架構、手動重送、原版本防護；未操作正式公司資料。真實 GAS、iOS/Android 實機仍待驗收。下一批 v0.17.0 PWA 可行性，再 v0.18.0 效能及穩定性，v1.0.0 正式驗收。
+
+
+## v0.17.0 — PWA 外殼與安裝體驗
+
+- 基於 PR #27 已合併且完整 CI 通過的 main d1fd260164a6d42b18895dbb4cc329eaae06bcc1，分支 feat/workpulse-v0.17.0-pwa-shell；不自動 Merge。
+- 僅 GitHub Pages 靜態 build 生成 relative manifest、192/512 PNG、maskable 512、Apple 180 圖示及 Service Worker，支援 /WorkPulse/ 子目錄。來源開發頁面及兩套 GAS 不註冊 Service Worker；GAS 只顯示瀏覽器捷徑說明。
+- 首次連線預載固定靜態清單，依內容雜湊版本及 SHA-256 驗證，安裝失敗不啟用部分快取。只攔截同 origin、固定清單 GET／根或 index 導覽；不快取 API、登入回應、公司資料、查詢參數或任意請求。舊 worker 仍服務舊版；不 skipWaiting、不強制重整，待所有舊視窗關閉後新 worker 接管，清除同 scope 舊快取。離線重新啟動僅展示版，既有本機資料仍依瀏覽器儲存規則。
+- 安裝提示使用 beforeinstallprompt（若支援），其餘提供 Safari/Chrome/Edge 手動說明；standalone 模式，非原生 App，實際安裝按鈕與啟動畫面由 OS/browser 決定。保留 safe-area 與手機功能限制。新版下載提示不強制刷新。
+- 增加建置與原生 Chrome 子目錄測試：快取完整、未知路徑不寫入、來源伺服器回 503 時重新載入日誌表單。這是模擬來源不可用，不是實機飛航模式或 OS 安裝驗收。保留 60 項響應式及 IndexedDB 原生測試。
+- 正式 Apps Script iframe 無本專案控制的同 origin worker URL／scope，不能直接套用 Pages worker；仍須雲端驗證，已開啟頁面的 opt-in IndexedDB 草稿與手動重送不變。不自動改為匿名代理、外部 API 或雙主庫。公司正式 Google Drive 未操作，Firebase 取消。下一批 v0.18.0 全站效能穩定性，v1.0.0 正式部署與驗收。

@@ -1,18 +1,21 @@
 /* Generated only for the static GitHub Pages build. No company responses are cached. */
 const release=__WP_RELEASE__;
-const paths=__WP_STATIC_PATHS__;
+const digests=__WP_STATIC_PATHS__;
 const root=new URL(self.registration.scope);
 const prefix='workpulse-static:'+root.href+':';
 const cacheName=prefix+release;
-const allowed=new Set(paths.map(path=>new URL(path,root).href));
+const allowed=new Map(Object.entries(digests).map(([path,digest])=>[new URL(path,root).href,digest]));
 const index=new URL('index.html',root).href;
 self.addEventListener('install',event=>{
  event.waitUntil((async()=>{
   const cache=await caches.open(cacheName);
   try{
-   for(const url of allowed){
+   for(const [url,digest] of allowed){
     const response=await fetch(url,{cache:'reload',credentials:'same-origin',redirect:'error'});
     if(!response.ok||response.type!=='basic')throw Error('Static asset unavailable: '+url);
+    const bytes=await response.clone().arrayBuffer();
+    const actual=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+    if(actual!==digest)throw Error('Static asset integrity mismatch: '+url);
     await cache.put(url,response);
    }
   }catch(e){await caches.delete(cacheName);throw e;}
