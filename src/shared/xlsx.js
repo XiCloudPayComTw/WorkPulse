@@ -63,7 +63,7 @@ export function buildXlsx(sheets){
 const richXml=(s)=>xml(s);
 const richFont=(body)=>'<font>'+body+'<name val="Aptos"/></font>';
 const richFill=(hex)=>'<fill><patternFill patternType="solid"><fgColor rgb="FF'+hex+'"/><bgColor indexed="64"/></patternFill></fill>';
-const xf=(font,fill,numFmt=0,border=0)=>'<xf numFmtId="'+numFmt+'" fontId="'+font+'" fillId="'+fill+'" borderId="'+border+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1"'+(numFmt?' applyNumberFormat="1"':'')+'/>';
+const xf=(font,fill,numFmt=0,border=0,unlocked=false)=>'<xf numFmtId="'+numFmt+'" fontId="'+font+'" fillId="'+fill+'" borderId="'+border+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1"'+(numFmt?' applyNumberFormat="1"':'')+(unlocked?' applyProtection="1"><protection locked="0"/></xf>':'/>');
 function richStyles(){
  const fonts=[
   richFont('<sz val="11"/><color rgb="FF344D60"/>'),
@@ -84,7 +84,7 @@ function richStyles(){
   xf(0,4,0,1),xf(0,5,0,1),xf(0,4,164,1),xf(0,5,164,1),
   xf(3,4,165,1),xf(3,5,165,1),xf(5,6,0,1),
   xf(4,4),xf(7,4,164),xf(7,7,165),xf(6,4),
-  xf(7,7,165,1),xf(3,7,165,1),xf(3,7,164,1),xf(6,5,0,1)
+  xf(7,7,165,1,true),xf(3,7,165,1),xf(3,7,164,1),xf(6,5,0,1)
  ];
  return '<?xml version="1.0" encoding="UTF-8"?>'+
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
@@ -115,8 +115,9 @@ function richWorksheet(sheet){
     const formula=String(cell.f||'').replace(/^=/,'');
     if(!formula||/[<>]/.test(formula))throw Error('Excel 公式格式無效');
     const cached=Number(cell.cached);
-    const v=Number.isFinite(cached)?'<v>'+cached+'</v>':'<v/>';
-    return '<c r="'+ref+'"'+style+'><f>'+richXml(formula)+'</f>'+v+'</c>';
+    const empty=cell.cached===null||cell.cached===undefined;
+    const v=!empty&&Number.isFinite(cached)?'<v>'+cached+'</v>':'<v/>';
+    return '<c r="'+ref+'"'+(empty?' t="str"':'')+style+'><f>'+richXml(formula)+'</f>'+v+'</c>';
    }
    const v=cell.v;
    if(v===null||v===undefined)return '';
@@ -140,7 +141,7 @@ function richWorksheet(sheet){
   '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+print+
   '<sheetViews><sheetView workbookViewId="0" showGridLines="0">'+views+'</sheetView></sheetViews>'+
   '<sheetFormatPr defaultRowHeight="20"/>'+cols+'<sheetData>'+body+'</sheetData>'+
-  mergeXml+autoFilter+'<printOptions horizontalCentered="1"/>'+landscape+'</worksheet>';
+  (sheet.protect?'<sheetProtection sheet="1" objects="1" scenarios="1" autoFilter="0"/>':'')+autoFilter+mergeXml+'<printOptions horizontalCentered="1"/>'+landscape+'</worksheet>';
 }
 export function buildStyledXlsx(sheets){
  if(!Array.isArray(sheets)||sheets.length<1||sheets.length>8)

@@ -15,9 +15,10 @@ function wpAttendanceRange(input){
  if(span<1||span>366)throw Error('單次查詢範圍不得超過 366 天');
  var id=String(input.employeeId||''),control=wsBook_();
  wpAttEmployee_(control,id);
- var months=wpMonthRange_(a,b),output=[];
+ var months=wpMonthRange_(a,b),output=[],scheduleByMonth={};
  months.forEach(function(month){
-  var file=wpMonthFile_(control,month,false);
+  var file=wpMonthFile_(control,month,false),schedule=wpAttSchedule_(control,id,month);
+  scheduleByMonth[month]={days:schedule.days,revision:schedule.revision};
   wpAttRows_(file,id).forEach(function(row){
    if(row.date>=a&&row.date<=b){
     if(Object.prototype.hasOwnProperty.call(row,'overtimePay')||
@@ -28,5 +29,5 @@ function wpAttendanceRange(input){
   });
  });
  output.sort(function(x,y){return x.date.localeCompare(y.date);});
- return {employeeId:id,startDate:a,endDate:b,rows:output,recordCount:output.length};
+ return {employeeId:id,startDate:a,endDate:b,rows:output,recordCount:output.length,scheduleByMonth:scheduleByMonth};
 }
