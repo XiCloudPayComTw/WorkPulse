@@ -155,7 +155,7 @@ function offlineVaultMarkup(){
 }
 function updateFieldRecovery(){const panel=document.querySelector('#wp-field-recovery');if(panel)panel.innerHTML=fieldRecoveryMarkup();const banner=document.querySelector('.sync-banner');if(banner)banner.outerHTML=syncBanner();}
 let wpToastTimer=null;
-function dismissToast(){clearTimeout(wpToastTimer);wpToastTimer=null;state.toast=null;document.querySelector('#toast-stack')?.replaceChildren();}
+function dismissToast(){clearTimeout(wpToastTimer);wpToastTimer=null;state.toast=null;const stack=document.querySelector('#toast-stack'),focused=stack?.contains(document.activeElement);stack?.replaceChildren();if(focused)focusPageContent();}
 function focusPageContent(){const title=document.querySelector('.main .page-title');const target=title&&title.getClientRects().length?title:document.querySelector('.wp-field-hero h2')||document.querySelector('#page-content');target?.focus({preventScroll:true});}
 function renderShell(){
  closeMobileSheet(false);
@@ -173,7 +173,7 @@ function renderShell(){
   </div>`;
  if(state.cloud.saving)for(const element of document.querySelectorAll('#page-content input,#page-content textarea,#page-content select'))element.disabled=true;
  enhanceMobileSelects();syncMobileDock();
- if(state.toast) showToast(state.toast.text,state.toast.error,true);
+ if(state.toast) showToast(state.toast.text,state.toast.error);
 }
 function renderCloudWaiting(){return mobileSkeleton('正在連接工作日誌資料庫，讀取人員與本月資料…');}
 function renderCloudError(){return `<section class="soft-card card-pad-lg sync-stage" role="alert"><span class="sync-dot failed"></span><h2>無法連接雲端工作日誌</h2><p>${esc(state.cloud.error)}</p><button class="soft-button" data-action="retry-cloud">${icon('arrowRight',16)} 重新驗證與載入</button><p class="xs muted">存取失敗時不會自動切換為本機資料，避免誤以為已同步。</p></section>`;}
@@ -408,7 +408,7 @@ function activateAttendancePage(){
 function changeView(view){if(state.view==='attendance'&&view!=='attendance'&&(attendanceState.scheduleSaving||(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定離開？'))))return;if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;if(!maintenanceState.month)maintenanceState.month=state.month;const promise=loadAdmin();render();await promise;render();}
 function notify(text,error=false){clearTimeout(wpToastTimer);state.toast={text,error};showToast(text,error);if(!error)wpToastTimer=setTimeout(dismissToast,6000);}
-function showToast(text,error=false,preserve=false){const container=document.querySelector('#toast-stack');if(!container)return;container.innerHTML=`<div class="toast ${error?'error':'wp-toast-success'}">${icon(error?'alert':'checkCircle',18)}<span class="wp-toast-text" role="${error?'alert':'status'}" aria-atomic="true">${esc(text)}</span><button type="button" class="wp-toast-close" data-action="dismiss-toast" aria-label="關閉通知">×</button></div>`;}
+function showToast(text,error=false){const container=document.querySelector('#toast-stack');if(!container)return;container.innerHTML=`<div class="toast ${error?'error':'wp-toast-success'}">${icon(error?'alert':'checkCircle',18)}<span class="wp-toast-text" role="${error?'alert':'status'}" aria-atomic="true">${esc(text)}</span><button type="button" class="wp-toast-close" data-action="dismiss-toast" aria-label="關閉通知">×</button></div>`;}
 function saveStore(next){if(isCloud){notify('雲端版禁止使用本機儲存通道',true);return false;}try {if(state.store.mode==='demo'){next={...next,journals:next.journals.filter(j=>!String(j.id).startsWith('demo-'))};}writeState(next);state.store={...next,mode:'local'};return true;}catch(e){notify('儲存失敗：請確認瀏覽器儲存空間與隱私模式設定',true);console.error(e);return false;}}
 function requireDiscard(){if(!state.dirty)return true;if(!flushQuickDraft()){notify('草稿暫存失敗，請先正式儲存或捨棄目前草稿',true);return false;}return confirm('目前內容尚未正式提交，已暫存為本機草稿。確定要離開目前的填寫畫面嗎？');}
 function openRecord(record){if(!requireDiscard())return;state.saveRequestId=null;selectPersonId(record.employeeId);state.draft=makeDraft(record.date,record.employeeId,record);state.dirty=false;restoreQuickDraft(record.date);changeView('entry');}
