@@ -450,7 +450,7 @@ function lockSharedAccess(message=''){
  const forgotten=forgetAccessSession(rawLocalStorage(),wpAccess.scope);
  if(wpAccess.remembered&&!forgotten)message+=' 瀏覽器無法確認清除登入記憶，請在共用裝置清除網站資料。';
  setCloudCredential(null);wpAccess.session=null;wpAccess.phase='locked';wpAccess.error=message;wpAccess.busy=false;
- cloudBootstrapSequence++;state.cloud.monthToken++;state.report.token++;state.cloud.phase='locked';state.cloud.user=null;isOwnerPortal=false;
+ cloudBootstrapSequence++;state.cloud.monthToken++;state.report.token++;state.cloud.loadingMonth=false;state.cloud.phase='locked';state.cloud.user=null;isOwnerPortal=false;
  render();
 }
 function useAccessSession(session){
@@ -521,6 +521,7 @@ root.addEventListener('submit',event=>{
 async function initCloud(preferredPerson=''){
  if(!isCloud)return;
  const sequence=++cloudBootstrapSequence;
+ if(isUnifiedPortal&&wpAccess.mode==='shared-code'&&!wpAccess.session&&wpAccess.phase!=='ready')return;
  if(wpSharedGuest())wpAccess.phase='checking';
  state.cloud.phase='loading';state.cloud.error='';if(isUnifiedPortal){isOwnerPortal=false;state.cloud.user=null;}state.report.payload=null;state.report.applied=null;state.report.phase='idle';render();
  try{

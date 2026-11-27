@@ -5,7 +5,7 @@
 - 儲存庫現為 [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse)。移轉修正前 main `1a414b1a49f6d3a38ab6f8cf2740d813dbf88397`（#36 已合併），[CI #45932211369](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45932211369) 全數成功；本批僅文件修正，維持 v0.24.0、不改資料。
 - PR #37 已合併，main `a41a3adf5b0cb4b528ccc229756bd9f3e246d8f3`，[CI #45936946089](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45936946089) 成功。使用者回報 TEST 已部署 /exec，但 v0.24.0 停在 Logo，Console 出現 document.write SyntaxError。
 - v0.24.1 PR #38 已合併，[CI #45946301184](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45946301184) 188/188、60/60、GAS 4/4 全綠；使用者回報 TEST 啟動成功。
-- 新需求已確認：v0.25.0 [方案 A](ACCESS_V025.md)，員工免 Google 登入＋共用存取碼、自助新增及記憶姓名、持有者唯一管理。先私有安全基礎，再全 RPC、前端、TEST。第一批 #39 已合併，main CI #45960253370 成功（194/194）；第二批後端 RPC 與自助人員候選，CI 待確認；下一批前端接入及版本提升，現有 TEST 保持 v0.24.1/domain，禁止提前開匿名。完成後修訂 A01–A17 並逐項實測。
+- 新需求已確認：v0.25.0 [方案 A](ACCESS_V025.md)，員工免 Google 登入＋共用存取碼、自助新增及記憶姓名、持有者唯一管理。先私有安全基礎，再全 RPC、前端、TEST。第一批 #39 已合併，main CI #45960253370 成功（194/194）；第二批 #40 已合併，main CI #45963121694 成功；第三批前端整合及 v0.25.0 候選，CI 待確認。現有 TEST 保持 v0.24.1/domain，合併後依新版安裝驗收才開匿名。完成後修訂 A01–A17 並逐項實測。
 - 測試驗收後獨立正式部署、實測與公司簽認；完成才發布 v1.0.0。不自動 Merge，不操作公司私有資料。詳見 [目前交接入口](PROJECT_HANDOFF.md)。
 
 ---
