@@ -1,5 +1,83 @@
 # WorkPulse — 開發交接與批次紀錄
 
+## 目前唯一有效的接手入口｜2026-11-27
+
+> 以下是 v0.24.0 目前進度及待辦，優先於本文件下方歷史紀錄與舊版架構說明。歷史段落完整保留，不能把其中過時的規則、未合併狀態或待辦當作現況。接手時仍須重新查最新 main、PR、CI 及使用者實際環境。
+
+### 1. 可核對的基準與實際進度
+
+| 項目 | 最新確認 |
+|---|---|
+| Repository | [shinkureru/WorkPulse](https://github.com/shinkureru/WorkPulse) |
+| 應用程式版本 | v0.24.0 |
+| 本交接文件修改前的 main | `b35095e94e2d438a04981593957ae49621395cf6` |
+| 功能 PR | #35 已合併（#32、#33、#34 也已合併）；檢查當下無開啟 PR |
+| CI | [main run 45783913278](https://github.com/shinkureru/WorkPulse/actions/runs/45783913278) 全數成功；186/186 Node 測試、Chrome smoke、Pages 建置及部署；三檔案驗證通過 |
+| 已驗證發布包 | [workpulse-gas-unified-45783913278-1](https://github.com/shinkureru/WorkPulse/actions/runs/45783913278/artifacts/15098434968)，三檔，127345 bytes，2026-12-26 16:31 台北時間到期；過期查最新成功 main run 或本機 gas:build |
+| GitHub Pages | 本機展示版，非正式雲端資料來源 |
+
+**使用者已回報完成（未由 AI 直接登入查核）**：指定公司資料持有帳號已建立 `WorkPulse — Admin TEST`，Asia/Taipei、V8、顯示 manifest，已填入三項 Script Properties，已匯入 v0.24.0 unified 三檔並儲存。已依授權、唯讀檢查及初始化步驟操作；使用者起初看不到自動新增的兩項屬性，重新整理後回報「好，完成了」。以 TEST 初始化完成作為接手起點；部署前請其核對初始化成功記錄、兩個 ID 已存在且指向同一公司持有者的私人 WorkPulse 資料夾及 WorkPulse_Control，勿再次初始化或刪除/重填 ID。未取得實際 ID、登入或 Drive 證據；不將使用者回報等同獨立驗收。
+
+**下一步是 TEST 網頁應用程式部署**。目前沒有使用者回報已部署 /exec、真實員工登入或跨裝置寫入；備份與還原、iOS/Android、Excel、正式環境及 A01–A17 都未完成可核實驗收。尚未發布 v1.0.0。沒有要接著做 v0.25.0 的固定新功能；若驗收發現問題，以獨立小批次修正（例如 v0.24.1），不為湊版本而開發。
+
+### 2. 現行產品決策（不能被早期文件覆蓋）
+
+- 內部工作日誌及出勤工具；一名員工一天一筆日誌，可含多項工作。人員由管理員建立及停用，無主管審核，保留歷史與稽核；不要重加審核工作流程。Google Drive/Sheets 是唯一正式雲端，Firebase 已取消；不用額外付費資料庫。
+- 原生 HTML/CSS/ES modules（非 React 或 Vite）；Node >=20，CI Node 22，無外部 runtime 依賴。柔和灰藍 Neumorphism、原風格果凍寫入浮層及骨架讀取、動畫 transform/opacity、減少動態支援。手機優先功能首頁，隱藏統計分析與系統設定，保留日誌/出勤/歷史及符合權限的管理入口；右上姓名最後兩字選單跨頁持續選擇，日期/人員草稿分開。保留鍵盤避讓、底部固定動作區、Bottom Sheet、日期欄位不溢出。
+- v0.22 起正式推薦單一 Apps Script unified 三檔（Code.gs、Index.html、appsscript.json），透過 HTMLService 的 google.script.run。舊 public/admin 兩包及 legacy 原始碼僅回退/歷史，不混裝或同時寫入同一資料庫。GitHub Pages 仍是 localStorage 展示版、PWA 靜態外殼；正式 GAS 無離線冷啟動或 Service Worker 保證。
+- 正式模式強制 domain，公司網域帳號、執行身分為指定持有者；active email 空白、外部帳號、錯誤 effective identity 均拒絕。不降級匿名/legacy。主資料持有者 active/effective 雙驗證才允許管理 RPC，無委派管理員。一般已驗證公司同仁目前可選其他員工姓名及查閱相應工作/出勤，這是共用姓名流程而非個人資料隔離，**須公司明確接受**，若不接受先另行設計伺服器授權，不直接上線。UI 角色或隱藏按鈕不可作為安全邊界。
+- schema 4 控制表、month-1 分月檔，由 My Drive 持有者持有，首次寫入按月建檔；Shared Drive 未支援。控制表含 Employees、Departments、Projects、Journals、Tasks、Requests、Audit、Reviews、Meta、MonthIndex、AttendanceSettings，月檔含 Journals、Tasks、Requests、Audit、Meta、Attendance。不得自行重設、刪除歷史或任意重建索引。
+- 寫入 LockService、expectedRevision、requestId 去重、舊版本 Tasks append-only，日誌邏輯刪除；正式刪除須停寫至少 10 分鐘並人工確認進行中寫入停止。停寫非跨專案/手動 Sheets 交易鎖。網路結果未確認需保留原始請求、人工核對後同 ID 手動重送，版本衝突不可直接覆蓋，不自動重試。
+- 離線：先驗證登入，分頁暫存；可選獨立環境 scope 的 IndexedDB 自願啟用、未加密、同 scope 跨分頁鎖、無自動合併、關閉瀏覽器/清除資料仍有風險。不是正式備份。歷史日期展開分頁及單次分組 memo selector 保留。
+- 出勤 Excel 本機匯出，月薪在 Excel B6 輸入，網站不儲存/上傳薪資；行政核對特殊工時、公式與法規，不把系統估算當成最終薪資。避免 JSON/CSV 公式注入。
+- 手動備份為預設可接受方式，自動排程選用且 manifest 仍保留 scope。備份中心建立獨立私人 WorkPulse_Backups、控制表/單月/全部逐檔複製、停寫/恢復、比對及報告。全部備份非原子快照，暫停期間禁止其他管理資料變更及手動修改 Sheets；進度僅頁面記憶，失敗後人工核對同 requestId 繼續，不背景執行。JSON 資料值逐檔匯出有 250000 cells/150萬字元限制、薪資欄位清空、仍有私人資料，不可直接匯入。復原預檢只讀非現行正式索引的兩份月檔，比對值非格式/公式；整庫必須隔離演練與重對應控制表 MonthIndex，禁止覆寫正式資料。
+
+### 3. 程式碼定位與測試
+
+| 路徑 | 功能 |
+|---|---|
+| src/app/main.js、navigation.js、person.js、mobile-workflow.js、loading.js | SPA 狀態、路由、人員、行動版及載入回饋 |
+| src/features/journals/ | 日誌模型、快速填寫、描述建議、歷史查詢、移轉封包 |
+| src/features/attendance/、src/features/payroll/ | 出勤、班表、草稿、Excel |
+| src/features/admin/admin.js、backup-center.js、migration-review.js | 管理台、完整性/維護、手動備份、唯讀移轉 |
+| src/services/cloud.js、field-recovery.js、offline-vault.js | RPC allowlist/timeout、未確認寫入、暫存隔離 |
+| apps-script/shared/Core.gs、Monthly.gs | 驗證、schema、停寫、月索引 |
+| apps-script/journals/Simple.gs、attendance/*.gs | 員工讀寫與出勤 |
+| apps-script/admin/*.gs | 特權 RPC、初始化、維護、備份/復原 |
+| scripts/build-gas.mjs、verify-gas-package.mjs | 三套發布包及 unified 三檔/語法/manifest/版本驗證 |
+| scripts/build.mjs、build-pwa.mjs、browser-smoke.mjs、pwa-smoke.mjs | Pages、靜態 PWA、瀏覽器測試 |
+| .github/workflows/deploy.yml | main/PR CI、artifact、Pages 發布 |
+
+指令：`npm run dev`、`npm run verify`（語法、node:test、Pages、GAS）、`npm run smoke:browser`（Chrome）、`npm run gas:build`。GAS 建置依固定模組順序串接 ESM 去除 import/export，新增模組須同步順序及避免重名；unified 公開函式清單必須與伺服端守衛及測試同步，尾端底線為私有函式。勿提交 dist 或真實資料。每批檢查 package/畫面版本、測試、README、ROADMAP、PROJECT_HANDOFF。查閱 [架構](ARCHITECTURE.md) 時注意歷史與現況差異。
+
+### 4. 接手後按順序執行
+
+1. **TEST 部署（目前）**：確認現有專案五項屬性及私人控制表。沿用 v0.24.0，不重新匯入、不重跑初始化。部署 → 新增部署 → 網頁應用程式 → 描述 WorkPulse v0.24.0 TEST → 執行身分「我」(指定持有者) → 存取公司網域 → 部署，私下保留 /exec URL。沒有網域選項或 Workspace 政策阻擋時停止，找公司管理員，不選任何人。只用合成測試資料。
+2. **身份與資料驗收**：以持有者登入應有管理台；另一公司帳號登入應無管理功能，直接 RPC 測試拒絕；外部與未登入拒絕。公司確認共用姓名政策。建立測試人員，雙裝置實際日誌/出勤新增、查詢、版本衝突、原請求去重、月份索引及私人 ACL 核對。
+3. **維護與還原**：備份中心建立資料夾、停寫、全部備份、核對逐檔結果、恢復、獨立副本比對、獨立整庫還原演練；月檔完整性檢查及舊展示資料移轉唯讀預檢。不要使用真實員工資料做測試。
+4. **手機、Excel、回退**：iOS Safari/Android Chrome 日期、鍵盤、橫向、弱網及持久暫存，桌面 Excel 開啟/重算、薪資不回傳、舊版相容回退與交接。逐項記錄 A01–A17 結果（未測、失敗或通過，證據私下留存）。詳見 [驗收矩陣](ACCEPTANCE_V021.md)。
+5. **修正及正式發布**：實測缺陷開獨立修正 PR，由使用者合併。完成 TEST 驗收及公司確認政策後，另建隔離正式專案和資料庫，使用經驗證的三檔與不同離線 scope，再逐項核對正式環境；不得把 TEST ID 指向正式、不得把測試資料搬進正式。正式上線須公司持有者簽認、所有必要驗收通過，才規劃 v1.0.0 PR/發布。之後更新同一部署版本，保留網址，先備份停寫再驗收/恢復。
+
+優先文件：[安裝](INSTALL_V024.md)、[員工](EMPLOYEE_GUIDE_V024.md)、[管理與交接](ADMIN_GUIDE_V024.md)、[手動備份](BACKUP_V023.md)、[驗收](ACCEPTANCE_V021.md)、[路線](ROADMAP.md)。
+
+### 5. 跨 ChatGPT 帳號接手規則
+
+新使用者使用自己的 GitHub 帳號與授權；GitHub 儲存庫擁有者可依公司政策邀請協作者、授予必要寫入權限（僅讀取不夠建立 PR），勿分享密碼、token、Google Drive 全域存取或公司個資。一般 ChatGPT GitHub 連接器可能僅能讀取；使用有 Git 寫入與 PR 能力的 Codex 或其他已授權開發環境，依實際能力核對。若無寫入能力，提供 patch 及操作指令，由人員提交，不宣稱已建立 PR。官方指引：[GitHub 連接](https://help.openai.com/zh-hant/articles/11145903-connecting-github-to-chatgpt)、[Codex](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)。不需要繼承舊聊天記憶；本文件與 repo 才是持久來源。
+
+每輪先讀本文件頂部及最新 main、所有開啟 PR、CI、相關程式與文件。每次只做一個版本批次，使用獨立分支/PR，禁止自動 Merge、強推、直接寫 main 或擅自操作公司 GAS/Drive。遇到尚未合併 PR 先確認狀態，不盲目重開；失敗先修原 PR。CI 未回傳要明確標記未確認。使用者手動合併且告知後才開始下批。每批回報實際修改、測試數量、PR URL、CI、已知限制及下一步，更新永久文件。使用繁體中文台灣用語。
+
+**新對話第一則可直接貼上：**
+
+```text
+請接手 GitHub 專案 shinkureru/WorkPulse。先讀取最新 main 的 docs/PROJECT_HANDOFF.md（尤其頂部目前唯一有效的接手入口）、docs/ROADMAP.md、docs/INSTALL_V024.md 與 docs/ACCEPTANCE_V021.md，再核對 main SHA、開啟 PR、最新 CI 和相關原始碼。請以實際 repo 為準，不要憑歷史版本猜測。
+
+我已完成 WorkPulse v0.24.0 三檔匯入、Google 授權及 TEST 資料庫初始化；重新整理後已確認自動新增的兩項指令碼屬性。尚未回報網頁部署或正式驗收。先引導我完成現有 TEST 專案的單一網頁應用程式部署，不重新初始化，之後逐項完成真實環境驗收。遇到缺陷再按獨立小批次開發、測試、提交 PR；不要新增未要求功能，不要替我 Merge。v1.0.0 只在正式環境與公司驗收完成後發布。
+
+保留 Google Drive/Sheets、單一 GAS 三檔、手動備份、現有 UI/UX、響應式、共用姓名規則（須公司同意）、後端權限、版本衝突與原請求手動重送。不要使用 Firebase，不自動覆寫資料、不存薪資、不要求分享公司密碼、token 或私人 ID。每批更新永久交接文件及路線圖，回報真實測試/PR/CI 狀態。以繁體中文回答。
+```
+
+---
+
 ## 協作規則
 
 - 每一批變更由獨立 Pull Request 提交。使用者合併、測試後再進行下一批。
