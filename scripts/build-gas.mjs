@@ -1,4 +1,5 @@
 import {readFile,mkdir,writeFile,rm} from 'node:fs/promises';
+import {gasInlineScript} from './gas-inline.mjs';
 // WorkPulse v0.8: produce physically separate public and administrator Apps Script projects.
 // The public deployment MUST NOT include Owner.gs or the old Code.gs / Review.gs.
 const ordered=['src/shared/utils.js','src/features/journals/data.js','src/features/journals/history-query.js','src/features/journals/migration-package.js','src/features/journals/categories.js','src/shared/icons.js','src/app/navigation.js','src/app/person.js','src/app/mobile-workflow.js','src/app/pwa-ui.js','src/app/loading.js','src/services/cloud.js','src/services/offline-vault.js','src/services/field-recovery.js','src/features/admin/rename.js','src/features/admin/admin.js','src/features/admin/backup-center.js','src/features/admin/migration-review.js',
@@ -14,6 +15,7 @@ for(const name of ordered){
 }
 if(/<\/script\s*>/i.test(js))throw Error('Unexpected script terminator');
 const html=await readFile('index.html','utf8');
+const version=JSON.parse(await readFile('package.json','utf8')).version;
 // HTMLService embeds the same CSS layers in browser cascade order; no @import at runtime.
 const styleFiles=["styles/base.css","styles/cloud.css","styles/admin.css","styles/reports.css","styles/stability.css","styles/legacy-review.css","styles/attendance.css","styles/payroll.css","styles/field-mobile.css"];
 const css=(await Promise.all(styleFiles.map(path=>readFile(path,'utf8')))).join('\n');
@@ -42,7 +44,7 @@ for(const [portal,isOwner] of [['public',false],['admin',true],['unified',false]
    .replace(/<script type="module"[^>]*><\/script>/,'');
  output=output.replace('</body>',()=>{
    const guard=unified?'<script>window.WORKPULSE_UNIFIED_PORTAL=true;</script>\n':isOwner?'<script>window.WORKPULSE_ADMIN_PORTAL=true;</script>\n':'';
-   return guard+'<script>\n'+js+'\n</script>\n</body>';
+   return guard+(unified?gasInlineScript(js,'v'+version):'<script>\n'+js+'\n</script>\n')+'</body>';
  });
  if(output===html||output.includes('type="module"'))throw Error('HTMLService transformation failed');
  if(unified){

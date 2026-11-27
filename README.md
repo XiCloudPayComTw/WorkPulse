@@ -7,16 +7,16 @@
 ## 開發接手（2026-11-27）
 
 - [完整開發交接與最新實際進度](docs/PROJECT_HANDOFF.md) — 跨 ChatGPT 帳號接手請先閱讀頂部現行規則與可直接貼上的開發指令。
-- 使用者已回報 TEST 授權與初始化完成；接下來是單入口測試部署及實際驗收，尚未正式營運。
+- 使用者已回報 TEST 授權、初始化及 /exec 部署；v0.24.0 實機停在 Logo，Console 顯示 HTMLService document.write SyntaxError。v0.24.1 為候選修正，須重新部署原 TEST 入口驗證，尚未正式營運。
 
-## 開始使用（v0.24.0）
+## 開始使用（v0.24.1）
 
 - [三檔案安裝快速手冊](docs/INSTALL_V024.md) — 不需要本機 Node.js，即可從已驗證 GitHub Actions 發布包安裝。
 - [員工操作手冊](docs/EMPLOYEE_GUIDE_V024.md) — 日誌、出勤、歷史及弱網處理。
 - [管理員操作及交接手冊](docs/ADMIN_GUIDE_V024.md) — 備份、更新、故障排除及公司交接。
 - [實際營運驗收](docs/ACCEPTANCE_V021.md) — 尚待公司實際驗收；不能以 CI 取代。
 
-## 功能（v0.24.0）
+## 功能（v0.24.1）
 
 - **手動備份中心**：私人資料夾、全量逐檔與指定月份、JSON 資料值匯出、唯讀復原副本比對；詳見 [備份中心](docs/BACKUP_V023.md)。
 

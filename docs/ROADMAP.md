@@ -3,8 +3,8 @@
 ## 現行路線｜2026-11-27（優先於歷史版本）
 
 - 儲存庫現為 [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse)。移轉修正前 main `1a414b1a49f6d3a38ab6f8cf2740d813dbf88397`（#36 已合併），[CI #45932211369](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45932211369) 全數成功；本批僅文件修正，維持 v0.24.0、不改資料。
-- v0.24.0 已合併，完整 main CI 186/186、Chrome、建置及 Pages 部署通過。使用者回報 TEST 三檔匯入、Google 授權與初始化完成，待核對實際私人檔案；未回報網站已部署。
-- 下一步：沿用現有 TEST 專案部署單一 domain 網頁應用程式，測試 /exec 與管理員／一般員工／外部及匿名存取。勿重初始化。
+- PR #37 已合併，main `a41a3adf5b0cb4b528ccc229756bd9f3e246d8f3`，[CI #45936946089](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45936946089) 成功。使用者回報 TEST 已部署 /exec，但 v0.24.0 停在 Logo，Console 出現 document.write SyntaxError。
+- v0.24.1 候選修正：GAS unified 前端採 UTF-8/Base64 ASCII 傳輸、啟動失敗提示及缺少 bridge 時拒絕，新增封包語法與 iframe/document.write Chrome 測試。根因及 Workspace 實機仍待驗證；CI 通過及使用者合併後更新原 TEST Index.html，保留 /exec。勿重初始化。
 - 依 A01–A17 逐項完成真實環境登入、共用姓名規則公司確認、跨裝置、弱網/衝突、備份/還原、手機、Excel、回退及交接。發現問題以小批次修正 PR（如 v0.24.1），不新增固定 v0.25.0 功能。
 - 測試驗收後獨立正式部署、實測與公司簽認；完成才發布 v1.0.0。不自動 Merge，不操作公司私有資料。詳見 [目前交接入口](PROJECT_HANDOFF.md)。
 
