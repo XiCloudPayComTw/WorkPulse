@@ -1,0 +1,70 @@
+name: WorkPulse GAS TEST release
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Preflight (read-only) or release existing TEST deployment'
+        type: choice
+        options: [preflight, release]
+        default: preflight
+      expected_version:
+        description: 'Existing Apps Script deployment version number'
+        type: number
+        required: true
+      confirmation:
+        description: 'Release only: type RELEASE TEST after backup/pause and checking no in-flight writes'
+        type: string
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: gas-test-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run verify
+      - run: npm run smoke:browser
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gas-test-build
+          path: dist-gas/unified/
+          if-no-files-found: error
+          retention-days: 1
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.operation == 'preflight' || (inputs.operation == 'release' && inputs.confirmation == 'RELEASE TEST'))
+    environment: gas-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: gas-test-build
+          path: dist-gas/unified
+      - run: node scripts/verify-gas-package.mjs
+      - name: Check or update existing TEST deployment
+        env:
+          GAS_ACTION: ${{ inputs.operation }}
+          GAS_EXPECTED_VERSION: ${{ inputs.expected_version }}
+          GAS_SCRIPT_ID: ${{ secrets.GAS_SCRIPT_ID }}
+          GAS_DEPLOYMENT_ID: ${{ secrets.GAS_DEPLOYMENT_ID }}
+          GAS_PROJECT_TITLE: ${{ vars.GAS_PROJECT_TITLE }}
+          GAS_EXPECTED_ACCESS: ${{ vars.GAS_EXPECTED_ACCESS }}
+          GAS_OAUTH_CLIENT_ID: ${{ secrets.GAS_OAUTH_CLIENT_ID }}
+          GAS_OAUTH_CLIENT_SECRET: ${{ secrets.GAS_OAUTH_CLIENT_SECRET }}
+          GAS_OAUTH_REFRESH_TOKEN: ${{ secrets.GAS_OAUTH_REFRESH_TOKEN }}
+        run: node scripts/deploy-gas.mjs
