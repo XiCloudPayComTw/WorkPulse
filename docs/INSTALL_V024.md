@@ -18,7 +18,7 @@ flowchart LR
 
 ## 1｜下載發布包
 
-1. 開啟 [GitHub Actions](https://github.com/shinkureru/WorkPulse/actions)，選擇已合併版本在 main 的完整成功 run；確認版本、commit 及執行分支。
+1. 開啟 [GitHub Actions](https://github.com/XiCloudPayComTw/WorkPulse/actions)，選擇已合併版本在 main 的完整成功 run；確認版本、commit 及執行分支。
 2. 在 run 頁面下方 Artifacts 點擊 workpulse-gas-unified-<run_id>-<run_attempt>，登入 GitHub 後下載 ZIP 並解壓。這是程式包，絕不包含公司資料或憑證。
 3. 確認只有 Code.gs、Index.html、appsscript.json 三個檔案。不要使用 Pages artifact 或 GitHub 原始碼 ZIP。保留下載日期、版本、run 與 commit。
 4. Artifact 保存 30 天，過期可在已核對的 commit 本機執行 npm run gas:build（Node.js >=20），使用 dist-gas/unified；不要執行任意分支的程式。
