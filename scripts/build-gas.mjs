@@ -21,6 +21,7 @@ const styleFiles=["styles/base.css","styles/cloud.css","styles/admin.css","style
 const css=(await Promise.all(styleFiles.map(path=>readFile(path,'utf8')))).join('\n');
 const manifest=await readFile('apps-script/appsscript.json','utf8');
 const core=await readFile('apps-script/shared/Core.gs','utf8');
+const sharedAccess=await readFile('apps-script/shared/SharedAccess.gs','utf8');
 const monthly=await readFile('apps-script/shared/Monthly.gs','utf8');
 const simple=await readFile('apps-script/journals/Simple.gs','utf8');
 const owner=await readFile('apps-script/admin/Owner.gs','utf8');
@@ -48,7 +49,7 @@ for(const [portal,isOwner] of [['public',false],['admin',true],['unified',false]
  });
  if(output===html||output.includes('type="module"'))throw Error('HTMLService transformation failed');
  if(unified){
-  const code="var WP_PORTAL_KIND='unified';\n"+[core,monthly,simple,attendance,attendanceSave,attendanceRange,owner,ownerCategories,ownerProjects,attendanceOwner].join('\n\n');
+  const code="var WP_PORTAL_KIND='unified';\n"+[core,sharedAccess,monthly,simple,attendance,attendanceSave,attendanceRange,owner,ownerCategories,ownerProjects,attendanceOwner].join('\n\n');
   // Any newly exposed RPC must be deliberately audited. Trailing underscore functions are private.
   const names=[...code.matchAll(/^function\s+(\w+)\s*\(/gm)].map(x=>x[1]);
   const expected=['doGet','wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange','wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','workPulseInitialize','workPulseMigrateLegacy','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerBackupPlan','wpOwnerPrepareBackupFolder','wpOwnerExportBackupJson','wpOwnerCompareBackupCopies','wpOwnerRecoveryPreview','workPulseInstallDailyBackup','workPulseRemoveDailyBackup','workPulsePauseFieldWrites','workPulseResumeFieldWrites','workPulseDeploymentCheck','workPulseVerifyMonthFiles','wpOwnerMigrationPreflight','workPulseInitializationCheck','wpOwnerMonthIntegrity','workPulseCompareRestoredMonth','wpOwnerSaveCategories','wpOwnerSaveProject','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','workPulseUpgradeAttendance','wpOwnerSaveAttendanceSchedule'];
