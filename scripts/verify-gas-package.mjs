@@ -1,6 +1,7 @@
 import {readFile,readdir} from 'node:fs/promises';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import {decodeGasInlineScript} from './gas-inline.mjs';
 const dir='dist-gas/unified/';
 const expected=['Code.gs','Index.html','appsscript.json'];
 const files=await readdir(dir,{withFileTypes:true});
@@ -18,7 +19,12 @@ assert.doesNotMatch(html,/window\.WORKPULSE_ADMIN_PORTAL=true;|WORKPULSE_PWA_BUI
 const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(x=>x[1]);
 assert.ok(scripts.length>=2,'missing embedded scripts');
 for(let i=0;i<scripts.length;i++)new vm.Script(scripts[i],{filename:'Index.html script '+i});
+const app=decodeGasInlineScript(html);
+new vm.Script(app,{filename:'Decoded Index.html application'});
+assert.match(app,/initMobileWorkflow\(\);initPwa\(isCloud\);render\(\);/);
+assert.ok(scripts.every(x=>/^[\x00-\x7f]*$/.test(x)),'GAS loader scripts must be ASCII');
 const pkg=JSON.parse(await readFile('package.json','utf8'));
+assert.ok(app.includes('v'+pkg.version),'Decoded application version differs from package version');
 assert.ok(html.includes('v'+pkg.version),'HTML version differs from package version');
 const manifest=JSON.parse(manifestText);
 assert.equal(manifest.timeZone,'Asia/Taipei');assert.equal(manifest.runtimeVersion,'V8');

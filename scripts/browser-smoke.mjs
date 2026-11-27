@@ -12,6 +12,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
 import {nativePwaSmoke} from './pwa-smoke.mjs';
+import {gasBrowserSmoke} from './gas-browser-smoke.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const browser=['google-chrome','google-chrome-stable','chromium','chromium-browser']
@@ -182,6 +183,7 @@ try{
   await delay(100);
  }
  if(!available)throw new Error('WorkPulse 本機伺服器無法啟動');
+ await gasBrowserSmoke(browser,root,port);
  await nativeVaultSmoke();
  execFileSync(process.execPath,['scripts/build.mjs'],{cwd:root,stdio:'inherit',timeout:30000});
  await nativePwaSmoke(browser,root);
