@@ -1,18 +1,18 @@
 import {startFieldLoading,stopFieldLoading} from '../app/loading.js';
 /** Apps Script HTMLService provides google.script.run only inside its own web-app origin. */
 const METHODS = new Set([
- 'wpAccessStatus','wpAccessUnlock','wpSelfCreateEmployee','wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
+ 'wpAccessStatus','wpAccessUnlock','wpAccessBind','wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport',
  'wpOwnerBootstrap','wpOwnerBackupPlan','wpOwnerPrepareBackupFolder','workPulsePauseFieldWrites','workPulseResumeFieldWrites','wpOwnerExportBackupJson','wpOwnerCompareBackupCopies','workPulseDeploymentCheck','wpOwnerMonthIntegrity','wpOwnerMaintenance','wpOwnerMigrationPreflight','wpOwnerRecoveryPreview','wpOwnerBackupWorkbook','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceLoad','wpAttendanceSave','wpOwnerAttendanceConfig',
  'wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule','wpAttendanceRange'
 ]);
 const MUTATIONS = new Set([
- 'wpSelfCreateEmployee',
+ 'wpAccessBind',
  'workPulsePauseFieldWrites','workPulseResumeFieldWrites','wpOwnerPrepareBackupFolder','wpOwnerBackupWorkbook','wpSharedSaveJournal','wpOwnerSaveEmployee','wpOwnerSaveProject','wpOwnerSaveCategories','wpOwnerDeleteJournal',
  'wpAttendanceSave','wpOwnerSaveAttendanceConfig','wpOwnerSaveAttendanceSchedule'
 ]);
 
-const WP_TOKEN_METHODS=new Set(['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange','wpSelfCreateEmployee']);
+const WP_TOKEN_METHODS=new Set(['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange','wpAccessBind']);
 let wpCloudCredential=null;
 export function setCloudCredential(value){wpCloudCredential=value||null;}
 function wpCredentialExpired(credential){if(credential&&wpCloudCredential===credential&&typeof document!=='undefined'&&typeof Event==='function')document.dispatchEvent(new Event('workpulse:access-expired'));}
@@ -34,7 +34,7 @@ export function cloudCall(method,argument,{timeoutMs}={}){
   return Promise.reject(new Error('雲端請求逾時設定無效'));
  const credential=WP_TOKEN_METHODS.has(method)?wpCloudCredential:null;
  if(credential&&credential.expiresAt<=Date.now()){wpCredentialExpired(credential);return Promise.reject(Error('公司存取工作階段已到期，請重新輸入存取碼'));}
- const inlineRead=['wpAccessStatus','wpAccessUnlock','wpSelfCreateEmployee','wpSharedBootstrap','wpSharedLoadMonth','wpAttendanceLoad'].includes(method);
+ const inlineRead=['wpAccessStatus','wpAccessUnlock','wpAccessBind','wpSharedBootstrap','wpSharedLoadMonth','wpAttendanceLoad'].includes(method);
  const loadingId=inlineRead?null:startFieldLoading(MUTATIONS.has(method)?'正在儲存資料…':'正在讀取資料…');
  return new Promise((resolve,reject)=>{
   let completed=false;

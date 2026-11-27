@@ -4,15 +4,19 @@
 
 > 以下是 v0.24.1 TEST 與 v0.25.0 方案 A 目前進度及待辦，優先於本文件下方歷史紀錄與舊版架構說明。歷史段落完整保留，不能把其中過時的規則、未合併狀態或待辦當作現況。接手時仍須重新查最新 main、PR、CI 及使用者實際環境。
 
+### 0. 最新需求（優先於下方歷史方案 A）
+
+2026-11-27 使用者取消員工自助新增及自由切換。v0.25.1 候選：管理員透過 WORKPULSE_ADMIN_EMAIL 與 active/effective 雙驗證，統一建立人員；shared-code 員工首次從名單選擇、伺服器簽章固定人員、只回傳該人員日誌/出勤/報表，禁止自行新增及切換。舊 v0.25.0 憑證失效，重新輸入碼；正常瀏覽器保留原選擇。共用碼並非本人驗證，清除網站資料或新瀏覽器仍可重新選擇。管理員保留跨人員管理操作，domain 為舊相容/回退模式。實際 TEST 狀態尚待確認，不重初始化、不提前開放舊版。詳見 [固定人員規格](ACCESS_V0251.md)。
+
 ### 1. 可核對的基準與實際進度
 
 | 項目 | 最新確認 |
 |---|---|
 | Repository | [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse) |
 | 應用程式版本 | v0.24.1 TEST 啟動成功（使用者回報）；v0.25.0 前後端候選（第三批），現有 TEST 尚未更新 |
-| 本批開發基準 main | `8db7899c74c8ef170ebc5b0c9615b1e2881c9b95`（PR #40 已合併） |
+| 本批開發基準 main | `935c3c291a45969991f9390eded86c448c0801fe`（PR #41 已合併） |
 | 功能與交接 PR | #35 功能與 #36 交接已合併（#32、#33、#34 也已合併）；移轉修正前無開啟 PR |
-| CI | [main run 45963121694](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45963121694) 全數成功；第三批 CI 待確認 |
+| CI | [main run 45966520654](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45966520654) 全數成功；206/206 Node、60/60 Chrome、7/7 GAS；v0.25.1 候選 CI 待確認 |
 | 已驗證發布包 | [v0.24.1 workpulse-gas-unified-45946301184-1](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45946301184/artifacts/15174414393)，2026-12-27 13:31 台北時間到期；過期查最新成功 main run 或本機 gas:build |
 | GitHub Pages | 本機展示版，非正式雲端資料來源 |
 

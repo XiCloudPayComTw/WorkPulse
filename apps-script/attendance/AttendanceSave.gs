@@ -15,7 +15,7 @@ function wpAttendanceSave(input,token){
  if(!worked&&!leaveMinutes)throw Error('請填寫出勤時間或請假');
  var lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
-  var verified=wpFieldAccess_(token),control=wsBook_();wpFieldWriteGuard_(control,token);wpAttEmployee_(control,id);
+  var verified=wpFieldAccess_(token),control=wsBook_();wpFieldWriteGuard_(control,token);wpFixedTarget_(token,control,id);wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,month,true);wpInitializeSheet_(file,'Attendance');
   var sheet=wpSheet_(file,'Attendance'),rows=wpRows_(sheet);
   var oldRequest=wpRows_(wpSheet_(file,'Requests')).find(function(x){return x.requestId===request;});

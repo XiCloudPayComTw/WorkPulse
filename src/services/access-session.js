@@ -2,7 +2,7 @@
 const WP_ACCESS_PREFIX='workpulse:shared-access:v1:';
 export function validAccessScope(scope){return typeof scope==='string'&&/^[A-Za-z0-9_-]{43}$/.test(scope);}
 export function accessSessionValid(value,now=Date.now()){
- return !!value&&typeof value.token==='string'&&/^v1\.\d{13}\.[a-f0-9]{32}\.[A-Za-z0-9_-]{43}$/.test(value.token)&&
+ return !!value&&typeof value.token==='string'&&/^v2\.\d{13}\.[a-f0-9]{32}\.[^.]{1,360}\.[A-Za-z0-9_-]{43}$/.test(value.token)&&
  Number.isSafeInteger(value.expiresAt)&&Number(value.token.split('.')[1])===value.expiresAt&&value.expiresAt>now&&value.expiresAt<=now+30*86400000+60000;
 }
 export function accessStorage(storage,scope,kind){
@@ -22,4 +22,10 @@ export function rememberAccessSession(storage,scope,value){
 }
 export function forgetAccessSession(storage,scope){
  try{const s=accessStorage(storage,scope,'session');if(!s)return false;s.removeItem('credential');return !s.getItem('credential');}catch{return false;}
+}
+
+export function validAccessGrant(value,now=Date.now()){
+ return !!value&&typeof value.token==='string'&&/^v1\.\d{13}\.[a-f0-9]{32}\.[A-Za-z0-9_-]{43}$/.test(value.token)&&
+ Number.isSafeInteger(value.expiresAt)&&Number(value.token.split('.')[1])===value.expiresAt&&value.expiresAt>now&&value.expiresAt<=now+360000&&
+ Array.isArray(value.people)&&value.people.every(p=>typeof p.id==='string'&&p.id&&typeof p.name==='string');
 }

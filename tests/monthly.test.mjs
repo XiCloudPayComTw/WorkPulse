@@ -716,9 +716,9 @@ function sharedCodeHarness(){
  h.scope.WP_PORTAL_KIND='unified';Object.assign(h.props,{WORKPULSE_ACCESS_MODE:'shared-code',WORKPULSE_SHARED_ACCESS_CODE:'fixture-shared-code-123456789',WORKPULSE_SESSION_SIGNING_KEY:'fixture-signing-key-123456789012345678901234567890'});
  h.scope.Utilities.getUuid=randomUUID;
  h.as('');
- return {h,p,token:()=>h.scope.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE).token};
+ return {h,p,token:()=>h.scope.wpAccessBind(p.id,h.scope.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE).token).token};
 }
-const sharedReadsAndWrites=['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange','wpSelfCreateEmployee'];
+const sharedReadsAndWrites=['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange'];
 test('shared-code shell and status expose no data; every employee endpoint denies absent or forged sessions before opening Sheets',()=>{
  const {h}=sharedCodeHarness(),s=h.scope;
  s.SpreadsheetApp.openById=()=>{throw Error('UNEXPECTED SHEETS READ');};
@@ -759,14 +759,27 @@ test('shared-code cannot invoke any privileged endpoint even with a valid token 
  s.SpreadsheetApp.openById=()=>{throw Error('UNEXPECTED SHEETS READ');};
  for(const email of ['','staff@example.com','external@elsewhere.com']){h.as(email);for(const name of ownerMethods)assert.throws(()=>s[name]({email:'admin@example.com',role:'admin',token:t},t),/持有帳號/,name);}
 });
-test('self-service creates ordinary active people, normalizes names, deduplicates and rejects privileged or duplicate input',()=>{
- const {h,token}=sharedCodeHarness(),s=h.scope,t=token(),input={name:'  Ａlice   Chen ',requestId:'self-create-00001'};
- const created=s.wpSelfCreateEmployee(input,t);assert.equal(created.person.name,'Alice Chen');assert.equal(created.deduplicated,false);
- assert.equal(s.wpSelfCreateEmployee(input,t).person.id,created.person.id);assert.equal(s.wpSelfCreateEmployee(input,t).deduplicated,true);
- for(const bad of [{...input,name:'other'},{name:'alice chen',requestId:'self-create-00002'},{name:'=SUM(1)',requestId:'self-create-00003'},{name:'New',requestId:'self-create-00004',role:'admin'},{name:'New',requestId:'self-create-00005',id:'admin'}])assert.throws(()=>s.wpSelfCreateEmployee(bad,t));
- const row=h.control.getSheetByName('Employees').rows.find(r=>r[0]===created.person.id);
- assert.equal(row[1],'');assert.equal(row[3],'staff');assert.equal(row[5],true);
- assert.equal(s.wpSharedBootstrap('2026-11',t).store.employees.length,2);
+test('fixed grant binds once; self creation removed; other employee records never leave backend',()=>{
+ const {h,p}=sharedCodeHarness(),s=h.scope;
+ h.as('admin@example.com');const second=s.wpOwnerSaveEmployee({name:'另一人',active:true,expectedRevision:0,requestId:'employee-add-00002'}).employees.find(x=>x.id!==p.id);
+ s.wpSharedSaveJournal(h.entry(second,'2026-11',0,'other-journal-1234'));h.as('');
+ const grant=s.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE);
+ assert.equal(grant.people.length,2);assert.equal(typeof s.wpSelfCreateEmployee,'undefined');
+ assert.throws(()=>s.wpSharedBootstrap('2026-11',grant.token),/固定操作人員/);
+ const t=s.wpAccessBind(p.id,grant.token).token;
+ assert.equal(s.wpAccessBind(p.id,grant.token).token,t);
+ assert.throws(()=>s.wpAccessBind(second.id,grant.token),/不能切換/);
+ assert.throws(()=>s.wpAccessBind(second.id,t),/不能切換/);
+ assert.equal(s.wpSharedBootstrap('2026-11',t).store.employees.length,1);
+ assert.equal(s.wpSharedLoadMonth('2026-11',t).journals.length,0);
+ assert.equal(s.wpSharedQueryReport({startDate:'2026-11-01',endDate:'2026-11-30'},t).journals.length,0);
+ assert.throws(()=>s.wpSharedQueryReport({startDate:'2026-11-01',endDate:'2026-11-30',employeeId:second.id},t),/固定人員/);
+ assert.throws(()=>s.wpSharedSaveJournal(h.entry(second),t),/固定人員/);
+ assert.throws(()=>s.wpAttendanceLoad({month:'2026-11',employeeId:second.id},t),/固定人員/);
+ assert.throws(()=>s.wpAttendanceRange({startDate:'2026-11-01',endDate:'2026-11-30',employeeId:second.id},t),/固定人員/);
+ const att={date:'2026-11-23',employeeId:second.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,expectedRevision:0,requestId:'other-attendance-123'};
+ assert.throws(()=>s.wpAttendanceSave(att,t),/固定人員/);
+ h.as('admin@example.com');assert.equal(s.wpSharedLoadMonth('2026-11').journals.length,1);
 });
 test('shared-code pause blocks every write and rotating the code revokes sessions; delete still requires maintenance window',()=>{
  const {h,p,token}=sharedCodeHarness(),s=h.scope,t=token(),j=h.entry(p);
@@ -775,7 +788,6 @@ test('shared-code pause blocks every write and rotating the code revokes session
  s.workPulsePauseFieldWrites();h.as('');
  assert.throws(()=>s.wpSharedSaveJournal({...j,requestId:'paused-journal-123'},t),/暫停/);
  assert.throws(()=>s.wpAttendanceSave({date:j.date,employeeId:p.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,expectedRevision:0,requestId:'paused-attendance-123'},t),/暫停/);
- assert.throws(()=>s.wpSelfCreateEmployee({name:'New',requestId:'paused-person-123'},t),/暫停/);
  h.as('admin@example.com');s.workPulseResumeFieldWrites();h.as('');
  h.props.WORKPULSE_SHARED_ACCESS_CODE+='x';for(const name of sharedReadsAndWrites)assert.throws(()=>s[name]({},t),/工作階段/,name);
 });
@@ -783,6 +795,6 @@ test('domain remains compatible and new self-service endpoints cannot activate a
  const {h,token}=sharedCodeHarness(),s=h.scope,t=token();h.props.WORKPULSE_ACCESS_MODE='domain';h.as('staff@example.com');
  assert.equal(s.wpSharedBootstrap('2026-11').user.role,'guest');assert.equal(s.wpAccessStatus().mode,'domain');
  assert.throws(()=>s.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE),/未啟用/);
- assert.throws(()=>s.wpSelfCreateEmployee({name:'New',requestId:'self-create-12345'},t),/未啟用/);
+ assert.throws(()=>s.wpAccessBind('other',t),/未啟用/);
  h.as('');assert.throws(()=>s.wpSharedBootstrap('2026-11',t),/公司網域/);
 });

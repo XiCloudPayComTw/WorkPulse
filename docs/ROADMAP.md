@@ -2,6 +2,8 @@
 
 ## 現行路線｜2026-11-27（優先於歷史版本）
 
+- PR #41 已合併，main CI #45966520654 全綠。新需求 v0.25.1 固定人員模式：[規格](ACCESS_V0251.md)，取消員工自助新增及切換，管理員建立名單。候選 PR 待 CI，完成後更新原 TEST 三檔，保留 ID。
+
 - 儲存庫現為 [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse)。移轉修正前 main `1a414b1a49f6d3a38ab6f8cf2740d813dbf88397`（#36 已合併），[CI #45932211369](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45932211369) 全數成功；本批僅文件修正，維持 v0.24.0、不改資料。
 - PR #37 已合併，main `a41a3adf5b0cb4b528ccc229756bd9f3e246d8f3`，[CI #45936946089](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45936946089) 成功。使用者回報 TEST 已部署 /exec，但 v0.24.0 停在 Logo，Console 出現 document.write SyntaxError。
 - v0.24.1 PR #38 已合併，[CI #45946301184](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45946301184) 188/188、60/60、GAS 4/4 全綠；使用者回報 TEST 啟動成功。
