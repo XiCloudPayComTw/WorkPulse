@@ -249,7 +249,7 @@ function workPulseDeploymentCheck(){
  var cfg=wpPrimaryOwnerAssert_(),props=PropertiesService.getScriptProperties(),checks=[];
  function check(key,fn){try{var detail=fn();checks.push({key:key,ok:true,detail:String(detail||'通過')});}catch(e){checks.push({key:key,ok:false,detail:String(e.message||e).slice(0,240)});}}
  var control=null,index=null;
- check('domainMode',function(){if(wpFieldMode_()!=='domain')throw Error('正式員工入口建議使用 domain 模式；仍須以實際員工帳號驗證');return '已設定公司網域存取';});
+ check('domainMode',function(){var mode=wpFieldMode_();if(mode==='shared-code'){wpCodeConfig_();return '已設定公司共用存取碼；仍須實測匿名及管理員驗證';}if(mode!=='domain')throw Error('正式員工入口須使用驗證模式');return '已設定公司網域存取';});
  check('dataFolder',function(){wpBackupAssertPrivate_(wpMonthFolder_(),cfg.adminEmail);return '持有者私人資料夾';});
  check('controller',function(){control=wsBook_();wpBackupAssertPrivate_(DriveApp.getFileById(control.getId()),cfg.adminEmail);return '控制表版本與持有者通過';});
  check('headers',function(){
@@ -357,7 +357,7 @@ function workPulseInitializationCheck(){
  function check(key,required,fn){try{checks.push({key:key,required:required,ok:true,detail:fn()});}catch(e){checks.push({key:key,required:required,ok:false,detail:String(e.message||e).slice(0,240)});}}
  check('operator',true,function(){if(wpUnified_()&&operator)throw Error('單一入口僅主資料持有者管理，請勿設定 WORKPULSE_OPERATOR_EMAIL');if(operator&&(!/^[^\s@]+@[^\s@]+$/.test(operator)||!operator.endsWith('@'+domain)))throw Error('維護帳號須屬公司網域');return operator?'已設定維護帳號':'未設定選用維護帳號';});
  check('accessMode',true,function(){wpFieldMode_();return '存取模式格式有效';});
- check('domainMode',false,function(){if(wpFieldMode_()!=='domain')throw Error('正式部署前須設定 domain 並驗證登入');return '已設定 domain，仍須實際驗證';});
+ check('domainMode',false,function(){var mode=wpFieldMode_();if(mode==='shared-code'){wpCodeConfig_();return '已設定共用存取碼，仍須實際驗證';}if(mode!=='domain')throw Error('正式部署前須設定驗證模式');return '已設定 domain，仍須實際驗證';});
  check('dataFolder',true,function(){if(!folderId)return '尚未設定，初始化將建立新資料夾';wpBackupAssertPrivate_(DriveApp.getFolderById(folderId),email);return '既有資料夾持有者與私人權限初步通過';});
  check('control',true,function(){
   if(!sheetId)return '尚未設定，初始化將建立新控制表';

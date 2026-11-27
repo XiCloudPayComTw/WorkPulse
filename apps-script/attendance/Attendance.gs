@@ -58,8 +58,8 @@ function wpAttEmployee_(control,id){
   if(!person)throw Error('請選擇有效的出勤人員');
   return person;
 }
-function wpAttendanceLoad(payload){
-  wpFieldAccess_();
+function wpAttendanceLoad(payload,token){
+  wpFieldAccess_(token);
   var m=wpMonth_(payload&&payload.month),control=wsBook_(),id=String(payload&&payload.employeeId||'');
   wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,m,false),settings=wpAttConfig_(control,id,m);

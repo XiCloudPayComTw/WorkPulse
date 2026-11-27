@@ -2,8 +2,8 @@
  * Range reading for one selected employee. Salary inputs and computed money are
  * NEVER accepted, stored, or returned by this endpoint.
  */
-function wpAttendanceRange(input){
- wpFieldAccess_();
+function wpAttendanceRange(input,token){
+ wpFieldAccess_(token);
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('試算期間查詢格式錯誤');
  if(Object.prototype.hasOwnProperty.call(input,'monthlyWage')||
     Object.prototype.hasOwnProperty.call(input,'salary')||
