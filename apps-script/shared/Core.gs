@@ -164,3 +164,17 @@ function wpRequireMaintenanceWindow_(control,now){
 
 /** Preserve old request actor format for integrity checks; anonymous audit label is not a verified person. */
 function wpFieldAuditActor_(verified,selected){return /^shared:[a-f0-9]{32}$/.test(verified)?verified:selected;}
+
+function wpFixedPerson_(token,control){
+ if(!wpUnified_()||wpFieldMode_()!=='shared-code'||!token)return '';
+ var session=wpCodeSessionVerify_(token);
+ if(!session.personId)throw Error('請先確認固定操作人員');
+ if(control&&!wsPeople_(control,false).some(function(p){return p.id===session.personId;}))
+  throw Error('固定操作人員已停用，請聯絡管理員');
+ return session.personId;
+}
+function wpFixedTarget_(token,control,id){
+ var fixed=wpFixedPerson_(token,control);
+ if(fixed&&fixed!==String(id||''))throw Error('只能操作固定人員的資料');
+ return fixed;
+}

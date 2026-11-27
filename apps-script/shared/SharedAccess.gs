@@ -59,19 +59,6 @@ function wpCodeSessionVerify_(token){
  }
  return {actor:'shared:'+parts[2],expiresAt:exp,personId:id,nonce:parts[2]};
 }
-function wpFixedPerson_(token,control){
- if(wpFieldMode_()!=='shared-code'||!token)return '';
- var session=wpCodeSessionVerify_(token);
- if(!session.personId)throw Error('請先確認固定操作人員');
- if(control&&!wsPeople_(control,false).some(function(p){return p.id===session.personId;}))
-  throw Error('固定操作人員已停用，請聯絡管理員');
- return session.personId;
-}
-function wpFixedTarget_(token,control,id){
- var fixed=wpFixedPerson_(token,control);
- if(fixed&&fixed!==String(id||''))throw Error('只能操作固定人員的資料');
- return fixed;
-}
 /** Returns no company data, secrets, token or email. */
 function wpAccessStatus(){
  if(!wpUnified_())throw Error('僅支援單一入口');
@@ -107,7 +94,7 @@ function wpAccessBind(id,token){
   var previous=records[grant.nonce];
   if(previous&&previous.personId!==id)throw Error('固定操作人員不能切換');
   if(!previous){
-   if(Object.keys(records).length>=40)throw Error('目前登入人數較多，請稍後再試');
+   if(Object.keys(records).length>=25)throw Error('目前登入人數較多，請稍後再試');
    previous={personId:id,until:grant.expiresAt,expiresAt:now+30*24*60*60*1000};records[grant.nonce]=previous;
    cfg.props.setProperty(key,JSON.stringify(records));
   }

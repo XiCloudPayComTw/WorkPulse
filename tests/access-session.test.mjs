@@ -6,7 +6,7 @@ import {cloudCall,setCloudCredential} from '../src/services/cloud.js';
 import {offlineDraftStorage,setSharedTabStorage} from '../src/services/offline-vault.js';
 function storage(){const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k),m};}
 const scope='a'.repeat(43),other='b'.repeat(43);
-function credential(){const expiresAt=Date.now()+86400000;return {expiresAt,token:'v1.'+expiresAt+'.'+'c'.repeat(32)+'.'+'D'.repeat(43)};}
+function credential(){const expiresAt=Date.now()+86400000;return {expiresAt,token:'v2.'+expiresAt+'.'+'c'.repeat(32)+'.two.'+'D'.repeat(43)};}
 test('session remembers only valid token and expiry in the correct database namespace',()=>{
  const s=storage(),c=credential();assert.equal(rememberAccessSession(s,scope,{...c,code:'must-not-store'}),true);assert.deepEqual(loadAccessSession(s,scope),c);assert.equal(loadAccessSession(s,other),null);assert.ok(!JSON.stringify([...s.m]).includes('must-not-store'));assert.equal(loadAccessSession(s,scope,c.expiresAt),null);assert.equal(s.m.size,0);
 });
@@ -23,9 +23,9 @@ test('forget session preserves scoped tab draft and person; no legacy draft acce
 test('cloud call passes session only to employee methods as separate argument, never privileged methods',async()=>{
  const old=globalThis.google,c=credential(),calls=[];
  const runner={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.bad=fn;return this;}};
- for(const name of ['wpSharedBootstrap','wpSelfCreateEmployee','wpOwnerBootstrap','wpAccessUnlock','wpAccessStatus'])runner[name]=function(...args){calls.push([name,args]);this.ok({ok:true});};
+ for(const name of ['wpSharedBootstrap','wpAccessBind','wpOwnerBootstrap','wpAccessUnlock','wpAccessStatus'])runner[name]=function(...args){calls.push([name,args]);this.ok({ok:true});};
  globalThis.google={script:{run:runner}};
- try{setCloudCredential(c);const payload={name:'test',requestId:'request123456'};await cloudCall('wpSharedBootstrap','2026-11');await cloudCall('wpSelfCreateEmployee',payload);await cloudCall('wpOwnerBootstrap');await cloudCall('wpAccessUnlock','code');await cloudCall('wpAccessStatus');assert.deepEqual(calls,[['wpSharedBootstrap',['2026-11',c.token]],['wpSelfCreateEmployee',[payload,c.token]],['wpOwnerBootstrap',[undefined]],['wpAccessUnlock',['code']],['wpAccessStatus',[]]]);assert.ok(!JSON.stringify(payload).includes(c.token));}
+ try{setCloudCredential(c);const payload={name:'test',requestId:'request123456'};await cloudCall('wpSharedBootstrap','2026-11');await cloudCall('wpAccessBind',payload);await cloudCall('wpOwnerBootstrap');await cloudCall('wpAccessUnlock','code');await cloudCall('wpAccessStatus');assert.deepEqual(calls,[['wpSharedBootstrap',['2026-11',c.token]],['wpAccessBind',[payload,c.token]],['wpOwnerBootstrap',[undefined]],['wpAccessUnlock',['code']],['wpAccessStatus',[]]]);assert.ok(!JSON.stringify(payload).includes(c.token));}
  finally{setCloudCredential(null);if(old===undefined)delete globalThis.google;else globalThis.google=old;}
 });
 test('late read after logout does not deliver data; locally expired credential cannot send request',async()=>{
