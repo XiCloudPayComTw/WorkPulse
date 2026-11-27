@@ -117,6 +117,8 @@ export function createOfflineVault({session=wpVaultSession,preferences=wpVaultPr
  return {status,configure,enable,disable,flush,storage:()=>scope?adapter:session(),snapshot:()=>wpVaultSnapshot(data)};
 }
 export const offlineVault=createOfflineVault();
-export function offlineDraftStorage(){return offlineVault.storage();}
+let wpSharedTabStorage=null,wpSharedTabActive=false;
+export function setSharedTabStorage(active,storage=null){wpSharedTabActive=Boolean(active);wpSharedTabStorage=storage;}
+export function offlineDraftStorage(){return wpSharedTabActive?wpSharedTabStorage:offlineVault.storage();}
 export function offlineVaultStatus(){return offlineVault.status();}
 export async function flushOfflineVault(){return offlineVault.flush();}
