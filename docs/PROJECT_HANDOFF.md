@@ -8,13 +8,15 @@
 
 | 項目 | 最新確認 |
 |---|---|
-| Repository | [shinkureru/WorkPulse](https://github.com/shinkureru/WorkPulse) |
+| Repository | [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse) |
 | 應用程式版本 | v0.24.0 |
-| 本交接文件修改前的 main | `b35095e94e2d438a04981593957ae49621395cf6` |
-| 功能 PR | #35 已合併（#32、#33、#34 也已合併）；檢查當下無開啟 PR |
-| CI | [main run 45783913278](https://github.com/shinkureru/WorkPulse/actions/runs/45783913278) 全數成功；186/186 Node 測試、Chrome smoke、Pages 建置及部署；三檔案驗證通過 |
-| 已驗證發布包 | [workpulse-gas-unified-45783913278-1](https://github.com/shinkureru/WorkPulse/actions/runs/45783913278/artifacts/15098434968)，三檔，127345 bytes，2026-12-26 16:31 台北時間到期；過期查最新成功 main run 或本機 gas:build |
+| 本次儲存庫移轉修正前的 main | `1a414b1a49f6d3a38ab6f8cf2740d813dbf88397` |
+| 功能與交接 PR | #35 功能與 #36 交接已合併（#32、#33、#34 也已合併）；移轉修正前無開啟 PR |
+| CI | [main run 45932211369](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45932211369) 全數成功；186/186 Node 測試、Chrome smoke、Pages 建置及部署；三檔案驗證通過 |
+| 已驗證發布包 | [workpulse-gas-unified-45932211369-1](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45932211369/artifacts/15168054303)，三檔，127345 bytes，2026-12-27 11:06 台北時間到期；過期查最新成功 main run 或本機 gas:build |
 | GitHub Pages | 本機展示版，非正式雲端資料來源 |
+
+儲存庫已由原 shinkureru 帳號移轉；現行網址以表列新儲存庫為準。移轉修正批次僅更新文件與已核對的基準，不變更應用版本、程式或資料；不自動 Merge。最新 main CI 已核對 186/186、Chrome、Pages 與三檔驗證全數成功。
 
 **使用者已回報完成（未由 AI 直接登入查核）**：指定公司資料持有帳號已建立 `WorkPulse — Admin TEST`，Asia/Taipei、V8、顯示 manifest，已填入三項 Script Properties，已匯入 v0.24.0 unified 三檔並儲存。已依授權、唯讀檢查及初始化步驟操作；使用者起初看不到自動新增的兩項屬性，重新整理後回報「好，完成了」。以 TEST 初始化完成作為接手起點；部署前請其核對初始化成功記錄、兩個 ID 已存在且指向同一公司持有者的私人 WorkPulse 資料夾及 WorkPulse_Control，勿再次初始化或刪除/重填 ID。未取得實際 ID、登入或 Drive 證據；不將使用者回報等同獨立驗收。
 
@@ -69,7 +71,7 @@
 **新對話第一則可直接貼上：**
 
 ```text
-請接手 GitHub 專案 shinkureru/WorkPulse。先讀取最新 main 的 docs/PROJECT_HANDOFF.md（尤其頂部目前唯一有效的接手入口）、docs/ROADMAP.md、docs/INSTALL_V024.md 與 docs/ACCEPTANCE_V021.md，再核對 main SHA、開啟 PR、最新 CI 和相關原始碼。請以實際 repo 為準，不要憑歷史版本猜測。
+請接手 GitHub 專案 XiCloudPayComTw/WorkPulse。先讀取最新 main 的 docs/PROJECT_HANDOFF.md（尤其頂部目前唯一有效的接手入口）、docs/ROADMAP.md、docs/INSTALL_V024.md 與 docs/ACCEPTANCE_V021.md，再核對 main SHA、開啟 PR、最新 CI 和相關原始碼。請以實際 repo 為準，不要憑歷史版本猜測。
 
 我已完成 WorkPulse v0.24.0 三檔匯入、Google 授權及 TEST 資料庫初始化；重新整理後已確認自動新增的兩項指令碼屬性。尚未回報網頁部署或正式驗收。先引導我完成現有 TEST 專案的單一網頁應用程式部署，不重新初始化，之後逐項完成真實環境驗收。遇到缺陷再按獨立小批次開發、測試、提交 PR；不要新增未要求功能，不要替我 Merge。v1.0.0 只在正式環境與公司驗收完成後發布。
 
