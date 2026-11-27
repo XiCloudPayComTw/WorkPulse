@@ -6,18 +6,20 @@
 
 ### 0. 最新需求（優先於下方歷史方案 A）
 
-2026-11-27 使用者取消員工自助新增及自由切換。v0.25.1 候選：管理員透過 WORKPULSE_ADMIN_EMAIL 與 active/effective 雙驗證，統一建立人員；shared-code 員工首次從名單選擇、伺服器簽章固定人員、只回傳該人員日誌/出勤/報表，禁止自行新增及切換。舊 v0.25.0 憑證失效，重新輸入碼；正常瀏覽器保留原選擇。共用碼並非本人驗證，清除網站資料或新瀏覽器仍可重新選擇。管理員保留跨人員管理操作，domain 為舊相容/回退模式。實際 TEST 狀態尚待確認，不重初始化、不提前開放舊版。詳見 [固定人員規格](ACCESS_V0251.md)。
+使用者確認不開發 Android/iOS 原生 App，只使用正式 GAS 網頁與手機加入主畫面。v0.26.0 本批新增 [TEST 一鍵發布](DEPLOY_GAS_V026.md)：main 手動觸發、先 CI 再預檢/發布既有部署，不自動 Merge、不在 PR 或 push 時存取 Google。使用者需一次性設定 OAuth 與 gas-test 環境；尚未實際授權或部署。後續 v0.27.0 手機主畫面及連線最佳化、v0.28.0 完整驗收、v1.0.0 公司正式簽認。
+
+2026-11-27 使用者取消員工自助新增及自由切換。v0.25.1 PR #42 已合併：管理員透過 WORKPULSE_ADMIN_EMAIL 與 active/effective 雙驗證，統一建立人員；shared-code 員工首次從名單選擇、伺服器簽章固定人員、只回傳該人員日誌/出勤/報表，禁止自行新增及切換。舊 v0.25.0 憑證失效，重新輸入碼；正常瀏覽器保留原選擇。共用碼並非本人驗證，清除網站資料或新瀏覽器仍可重新選擇。管理員保留跨人員管理操作，domain 為舊相容/回退模式。實際 TEST 狀態尚待確認，不重初始化、不提前開放舊版。詳見 [固定人員規格](ACCESS_V0251.md)。
 
 ### 1. 可核對的基準與實際進度
 
 | 項目 | 最新確認 |
 |---|---|
 | Repository | [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse) |
-| 應用程式版本 | v0.24.1 TEST 啟動成功（使用者回報）；v0.25.0 前後端候選（第三批），現有 TEST 尚未更新 |
-| 本批開發基準 main | `935c3c291a45969991f9390eded86c448c0801fe`（PR #41 已合併） |
+| 應用程式版本 | v0.25.1 已合併且 main CI 成功；v0.26.0 TEST 發布流程候選，實際 GAS 更新狀態未確認 |
+| 本批開發基準 main | `a516415946e51fc9d327c72a6162e3e7142faf2d`（PR #42 已合併） |
 | 功能與交接 PR | #35 功能與 #36 交接已合併（#32、#33、#34 也已合併）；移轉修正前無開啟 PR |
-| CI | [main run 45966520654](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45966520654) 全數成功；206/206 Node、60/60 Chrome、7/7 GAS；v0.25.1 候選 CI 待確認 |
-| 已驗證發布包 | [v0.24.1 workpulse-gas-unified-45946301184-1](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45946301184/artifacts/15174414393)，2026-12-27 13:31 台北時間到期；過期查最新成功 main run 或本機 gas:build |
+| CI | [main run 45970817070](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45970817070) 全數成功；v0.26.0 候選 CI 待確認 |
+| 已驗證發布包 | [v0.25.1 workpulse-gas-unified-45970817070-1](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45970817070/artifacts/15184398066)；過期查最新成功 main run 或本機 gas:build |
 | GitHub Pages | 本機展示版，非正式雲端資料來源 |
 
 儲存庫已由原 shinkureru 帳號移轉；現行網址以表列新儲存庫為準。移轉修正批次僅更新文件與已核對的基準，不變更應用版本、程式或資料；不自動 Merge。本批基準 main CI #45963121694 全數成功。
@@ -28,8 +30,8 @@
 
 ### 2. 現行產品決策（不能被早期文件覆蓋）
 
-- 內部工作日誌及出勤工具；一名員工一天一筆日誌，可含多項工作。人員可由管理員建立及停用；shared-code 模式可自助新增普通啟用人員，無主管審核，保留歷史與稽核；不要重加審核工作流程。Google Drive/Sheets 是唯一正式雲端，Firebase 已取消；不用額外付費資料庫。
-- 原生 HTML/CSS/ES modules（非 React 或 Vite）；Node >=20，CI Node 22，無外部 runtime 依賴。柔和灰藍 Neumorphism、原風格果凍寫入浮層及骨架讀取、動畫 transform/opacity、減少動態支援。手機優先功能首頁，隱藏統計分析與系統設定，保留日誌/出勤/歷史及符合權限的管理入口；右上姓名最後兩字選單跨頁持續選擇，日期/人員草稿分開。保留鍵盤避讓、底部固定動作區、Bottom Sheet、日期欄位不溢出。
+- 內部工作日誌及出勤工具；一名員工一天一筆日誌，可含多項工作。人員僅由管理員建立及停用；shared-code 員工首次選定並固定，無主管審核，保留歷史與稽核；不要重加審核工作流程。Google Drive/Sheets 是唯一正式雲端，Firebase 已取消；不用額外付費資料庫。
+- 原生 HTML/CSS/ES modules（非 React 或 Vite）；Node >=20，CI Node 22，無外部 runtime 依賴。柔和灰藍 Neumorphism、原風格果凍寫入浮層及骨架讀取、動畫 transform/opacity、減少動態支援。手機優先功能首頁，隱藏統計分析與系統設定，保留日誌/出勤/歷史及符合權限的管理入口；shared-code 右上姓名靜態顯示並跨頁固定，日期/人員草稿分開。保留鍵盤避讓、底部固定動作區、Bottom Sheet、日期欄位不溢出。
 - v0.22 起正式推薦單一 Apps Script unified 三檔（Code.gs、Index.html、appsscript.json），透過 HTMLService 的 google.script.run。舊 public/admin 兩包及 legacy 原始碼僅回退/歷史，不混裝或同時寫入同一資料庫。GitHub Pages 仍是 localStorage 展示版、PWA 靜態外殼；正式 GAS 無離線冷啟動或 Service Worker 保證。
 - 正式模式明確選用 domain 或經驗收的 shared-code，執行身分為指定持有者；domain 拒絕外部與匿名，shared-code 須有效公司碼工作階段，兩者均拒絕錯誤 effective identity。不降級無驗證/legacy。主資料持有者 active/effective 雙驗證才允許管理 RPC，無委派管理員。一般已驗證公司同仁目前可選其他員工姓名及查閱相應工作/出勤，這是共用姓名流程而非個人資料隔離，**須公司明確接受**，若不接受先另行設計伺服器授權，不直接上線。UI 角色或隱藏按鈕不可作為安全邊界。
 - schema 4 控制表、month-1 分月檔，由 My Drive 持有者持有，首次寫入按月建檔；Shared Drive 未支援。控制表含 Employees、Departments、Projects、Journals、Tasks、Requests、Audit、Reviews、Meta、MonthIndex、AttendanceSettings，月檔含 Journals、Tasks、Requests、Audit、Meta、Attendance。不得自行重設、刪除歷史或任意重建索引。
