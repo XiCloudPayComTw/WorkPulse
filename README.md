@@ -7,7 +7,7 @@
 ## 開發接手（2026-11-27）
 
 - [完整開發交接與最新實際進度](docs/PROJECT_HANDOFF.md) — 跨 ChatGPT 帳號接手請先閱讀頂部現行規則與可直接貼上的開發指令。
-- 使用者已回報 TEST 授權、初始化及 /exec 部署；v0.24.0 實機停在 Logo，Console 顯示 HTMLService document.write SyntaxError。v0.24.1 為候選修正，須重新部署原 TEST 入口驗證，尚未正式營運。
+- 使用者已回報 v0.24.1 TEST 啟動成功，尚未完成正式驗收。已確認 [v0.25.0 免 Google 登入方案 A](docs/ACCESS_V025.md)，第一批僅私有安全基礎，維持 domain 部署，不提前開放匿名。
 
 ## 開始使用（v0.24.1）
 

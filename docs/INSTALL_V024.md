@@ -2,6 +2,8 @@
 
 適用單一公司網域 Apps Script 入口，取代舊版兩專案安裝教學。**先 TEST，通過公司驗收再部署正式環境。** 程式 CI 通過不代表已完成 Workspace 授權、登入、備份或上線驗收。
 
+> v0.25.0 方案 A 尚在分批開發（[規格](ACCESS_V025.md)），現有 v0.24.1 必須維持 domain；本批不需更新 TEST 或初始化，禁止提前改為匿名。
+
 ## 安裝前確認
 
 你需要指定的公司資料持有帳號、該帳號可使用的 Google Apps Script 及 My Drive、可登入 GitHub 的帳號。不需要本機 Node.js、Firebase、額外資料庫或每日備份排程。公司 Workspace 管理員若限制 Apps Script 或 OAuth，應請公司管理員核准，不可繞過限制。Shared Drive 所有權不在目前支援範圍。禁止提供密碼、OAuth token、正式 Drive ID 或私人網址給公開儲存庫。
