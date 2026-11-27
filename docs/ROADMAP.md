@@ -2,6 +2,9 @@
 
 ## 現行路線｜2026-11-27（優先於歷史版本）
 
+- PR #42 已合併，main CI #45970817070 成功。v0.26.0 [TEST 一鍵發布](DEPLOY_GAS_V026.md) 候選，手動觸發且先完整 CI，原部署與資料庫不變；OAuth 與實機預檢仍待使用者操作。
+- 使用者取消原生 Android/iOS App，僅正式網頁加入手機主畫面；不另外開發 native/獨立 API/商店。v0.27.0 主畫面圖示、手機操作與連線最佳化；v0.28.0 完整驗收；v1.0.0 公司簽認後正式營運。
+
 - PR #41 已合併，main CI #45966520654 全綠。新需求 v0.25.1 固定人員模式：[規格](ACCESS_V0251.md)，取消員工自助新增及切換，管理員建立名單。候選 PR 待 CI，完成後更新原 TEST 三檔，保留 ID。
 
 - 儲存庫現為 [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse)。移轉修正前 main `1a414b1a49f6d3a38ab6f8cf2740d813dbf88397`（#36 已合併），[CI #45932211369](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45932211369) 全數成功；本批僅文件修正，維持 v0.24.0、不改資料。
