@@ -3,10 +3,10 @@ export function resolvePerson(people,storedId){
  const list=Array.isArray(people)?people:[];
  return list.some(e=>e.id===storedId)?storedId:(list[0]?.id||'');
 }
-export function readSelectedPerson(storage,people){
+export function readSelectedPerson(storage,people,{fallback=true}={}){
  let id='';
  try{id=storage?.getItem(SELECTED_PERSON_KEY)||'';}catch{}
- return resolvePerson(people,id);
+ return fallback?resolvePerson(people,id):(Array.isArray(people)&&people.some(e=>e.id===id)?id:'');
 }
 export function writeSelectedPerson(storage,id){
  try{storage?.setItem(SELECTED_PERSON_KEY,id);return true;}catch{return false;}

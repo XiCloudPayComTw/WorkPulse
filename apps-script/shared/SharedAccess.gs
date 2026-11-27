@@ -62,6 +62,12 @@ function wpAccessStatus(){
  var mode=wpFieldMode_(),cfg=wpSharedExecution_();
  var owner=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase()===cfg.adminEmail;
  if(mode==='domain')wpFieldAccess_();
+ if(mode==='shared-code'){
+  wpCodeConfig_();
+  // Opaque database namespace, not an authorization credential or raw Drive ID.
+  var scope=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,'workpulse:browser:'+cfg.sheetId,Utilities.Charset.UTF_8)).replace(/=+$/,'');
+  return {mode:mode,owner:owner,scope:scope};
+ }
  return {mode:mode,owner:owner};
 }
 function wpAccessUnlock(code){

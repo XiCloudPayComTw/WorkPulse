@@ -723,7 +723,7 @@ test('shared-code shell and status expose no data; every employee endpoint denie
  const {h}=sharedCodeHarness(),s=h.scope;
  s.SpreadsheetApp.openById=()=>{throw Error('UNEXPECTED SHEETS READ');};
  assert.ok(s.doGet());
- assert.equal(JSON.stringify(s.wpAccessStatus()),JSON.stringify({mode:'shared-code',owner:false}));
+ const status=s.wpAccessStatus();assert.equal(status.mode,'shared-code');assert.equal(status.owner,false);assert.match(status.scope,/^[A-Za-z0-9_-]{43}$/);assert.ok(!JSON.stringify(status).includes(h.props.WORKPULSE_SHEET_ID));
  for(const email of ['','staff@example.com','external@elsewhere.com']){
   h.as(email);
   for(const name of sharedReadsAndWrites)for(const token of [undefined,'forged'])assert.throws(()=>s[name]({},token),/工作階段/,name);

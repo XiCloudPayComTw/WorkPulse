@@ -7,8 +7,9 @@ import {closeMobileSheet,openMobileSheet,enhanceMobileSelects,syncMobileDock,mob
 import {buildLocalMigrationPackage} from '../features/journals/migration-package.js';
 import { STORAGE_KEY, CATEGORIES, STATUSES, readState, writeState, saveJournal, journalFor, monthStats, csvExport, emptyState, validateState } from '../features/journals/data.js';
 import { currentMonth, localISODate, shiftDate, formatDate, formatHours, esc, uid, download } from '../shared/utils.js';
-import { cloudEnabled, cloudCall } from '../services/cloud.js';
-import {offlineVault,offlineScopeKey,offlineDraftStorage,offlineVaultStatus,flushOfflineVault} from '../services/offline-vault.js';
+import { cloudEnabled, cloudCall, setCloudCredential } from '../services/cloud.js';
+import {validAccessScope,accessSessionValid,accessStorage,loadAccessSession,rememberAccessSession,forgetAccessSession} from '../services/access-session.js';
+import {offlineVault,offlineScopeKey,offlineDraftStorage,offlineVaultStatus,flushOfflineVault,setSharedTabStorage} from '../services/offline-vault.js';
 import {fieldOnline,readFieldPending,fieldRecoveryBusy,fieldRecoveryDurable,fieldSave,retryFieldPending,removeFieldPending,resetFieldRecoveryMemory} from '../services/field-recovery.js';
 import {backupCenterState,renderBackupCenter,loadBackupPlan,prepareBackupFolder,setBackupPause,startBackupBatch,continueBackupBatch,downloadBackupReport,exportBackupValues,compareBackupCopies} from '../features/admin/backup-center.js';
 import { adminState, loadAdmin, setAdminTab, editAdmin, updateAdminDraft, resetAdminEditor, renderTeam, saveAdmin, maintenanceState, renderMaintenance, loadMaintenance, deploymentCheckState, renderDeploymentCheck, loadDeploymentCheck, integrityState, renderMonthIntegrity, loadMonthIntegrity, downloadMonthIntegrity, backupMaintenance, previewMaintenanceRecovery, downloadMaintenanceRecovery } from '../features/admin/admin.js';
@@ -32,6 +33,7 @@ const isCloud = cloudEnabled();
 const isUnifiedPortal=isCloud&&typeof window!=='undefined'&&window.WORKPULSE_UNIFIED_PORTAL===true;
 const isPrivatePortal=isCloud&&typeof window!=='undefined'&&window.WORKPULSE_ADMIN_PORTAL===true;
 let isOwnerPortal=isPrivatePortal;
+const wpAccess={phase:isUnifiedPortal?'checking':'ready',mode:'',scope:'',session:null,error:'',busy:false,remembered:true,request:null,timer:null};
 const state = {
   store:isCloud?emptyState():readState(),view:fromHash(),month:currentMonth(),
   filters:{query:'',employee:'all',status:'all'},localRename:null,selectedPersonId:'',
@@ -39,13 +41,17 @@ const state = {
   toast:null,cloud:{phase:isCloud?'loading':'local',user:null,error:'',saving:false,loadingMonth:false,monthToken:0},saveRequestId:null,
   report:{filters:{startDate:today.slice(0,7)+'-01',endDate:today,employeeId:'all',departmentId:'all',project:'all',category:'all',status:'all'},phase:'idle',error:'',payload:null,applied:null,token:0}
 };
-const permanentStorage=()=>{try{return globalThis.localStorage;}catch{return null;}};
+const rawLocalStorage=()=>{try{return globalThis.localStorage;}catch{return null;}};
+const rawTabStorage=()=>{try{return globalThis.sessionStorage;}catch{return null;}};
+const wpSharedGuest=()=>wpAccess.mode==='shared-code'&&!!wpAccess.session;
+const permanentStorage=()=>wpAccess.mode==='shared-code'&&wpAccess.scope?accessStorage(rawLocalStorage(),wpAccess.scope,'person'):rawLocalStorage();
+const descriptionStorage=()=>wpAccess.mode==='shared-code'&&wpAccess.scope?accessStorage(rawTabStorage(),wpAccess.scope,'tab'):permanentStorage();
 state.selectedPersonId=readSelectedPerson(permanentStorage(),state.store.employees);
 state.filters.employee=state.selectedPersonId;
 state.report.filters.employeeId=state.selectedPersonId;
 if(isMobileViewport()&&['settings','insights'].includes(state.view))state.view='overview';
 state.draft=makeDraft(today,state.selectedPersonId);
-const templateStorage = () => { try { return isCloud ? window.sessionStorage : window.localStorage; }catch { return null; } };
+const templateStorage = () => wpSharedGuest()?accessStorage(rawTabStorage(),wpAccess.scope,'tab'):isCloud?rawTabStorage():rawLocalStorage();
 const draftStorage = () => isCloud?offlineDraftStorage():templateStorage();
 const draftAccount = () => isCloud ? `selected:${state.draft?.employeeId||'none'}` : 'local-device';
 let draftTimer = null,historyQueryTimer=null;
@@ -162,14 +168,15 @@ function dismissToast(){clearTimeout(wpToastTimer);wpToastTimer=null;state.toast
 function focusPageContent(){const title=document.querySelector('.main .page-title');const target=title&&title.getClientRects().length?title:document.querySelector('.wp-field-hero h2')||document.querySelector('#page-content');target?.focus({preventScroll:true});}
 function renderShell(){
  closeMobileSheet(false);
+ if(isUnifiedPortal&&wpAccess.phase!=='ready'){renderAccessGate();return;}
  const head = {overview:['工作總覽','掌握每一天的工作節奏'],attendance:['出勤表','每月出勤、加班時數與請假紀錄'],entry:['填寫工作日誌','整理今天的付出，留下清晰紀錄'],history:['歷史工作紀錄','以日期為單位，快速找到每項工作'],insights:['統計分析','從工作日誌看見實際進展'],settings:['系統設定','管理員資料與系統操作'],team:['管理員控制台','管理員可新增使用者並管理日誌']}[state.view];
  root.innerHTML = `<div class="shell"><button type="button" class="wp-skip" data-action="skip-content">跳至主要內容</button>
    <aside class="sidebar" aria-label="側邊選單"><div class="brand"><div class="brand-symbol">W<small>·</small></div><div><div class="brand-title">WorkPulse</div><div class="brand-subtitle">WORK JOURNAL</div></div></div>
    <div><div class="sidebar-caption">WORKSPACE</div><nav class="nav-list" aria-label="主要選單">${visibleNav().map(n=>navButton(n)).join('')}</nav></div>
-   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.24.1</div></div></aside>
+   <div class="sidebar-bottom"><div class="mode-card"><div class="mode-title">${icon('database',16)} ${isCloud?'Google Sheets 雲端版':'本機展示版本'}</div><p>${isCloud?'選擇使用者即可填寫與查閱，所有雲端資料都由管理者 Google Drive 保存。':'目前資料儲存在這台裝置的瀏覽器，尚未與 Google Sheets 同步。'}</p></div><div class="sidebar-foot">WORKPULSE · v0.25.0</div></div></aside>
    <main class="main" aria-label="主要內容"><header class="topbar"><div><div class="eyebrow">WORKPULSE / ${esc(state.view.toUpperCase())}</div><h1 class="page-title" tabindex="-1">${head[0]}</h1><p class="page-desc">${head[1]}</p></div>
    <div class="top-actions"><span class="tiny-date">${formatDate(today)}<br/>${today.slice(0,4)} 年</span><button class="soft-button sm" data-action="new-journal">${icon('plus',15)} 新增日誌</button>${renderPersonMenu()}</div></header>
-   ${!isCloud?'<div class="wp-storage-banner" role="status"><strong>本機展示版</strong><span>資料只保存在此瀏覽器，尚未同步至公司 Google Drive。</span><button type="button" class="soft-button sm" data-action="export-migration">下載移轉封包</button></div>':''}${isUnifiedPortal?'<div class="wp-storage-banner"><strong>公司單一入口</strong><span>使用公司 Google 帳號驗證，管理功能僅資料持有者可操作。</span></div>':isCloud&&isOwnerPortal?'<div class="wp-storage-banner"><strong>私人管理入口</strong><span>正式模式的日誌與出勤儲存請使用公司員工入口。</span></div>':''}${pwaMarkup(isCloud)}${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash" tabindex="-1" aria-busy="${state.cloud.phase==='loading'||state.cloud.loadingMonth||state.cloud.saving}">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():state.cloud.loadingMonth?mobileSkeleton('正在讀取指定月份…'):renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.24.1</footer></main>
+   ${!isCloud?'<div class="wp-storage-banner" role="status"><strong>本機展示版</strong><span>資料只保存在此瀏覽器，尚未同步至公司 Google Drive。</span><button type="button" class="soft-button sm" data-action="export-migration">下載移轉封包</button></div>':''}${isUnifiedPortal?'<div class="wp-storage-banner"><strong>公司單一入口</strong><span>管理功能僅資料持有者可操作。'+(wpSharedGuest()?' 已通過公司存取碼驗證。':' 使用 Google 帳號驗證。')+'</span>'+(wpSharedGuest()?'<button type="button" class="soft-button mini" data-action="access-add-person">新增姓名</button><button type="button" class="soft-button mini" data-action="access-lock">登出</button>':'')+'</div>':isCloud&&isOwnerPortal?'<div class="wp-storage-banner"><strong>私人管理入口</strong><span>正式模式的日誌與出勤儲存請使用公司員工入口。</span></div>':''}${pwaMarkup(isCloud)}${isCloud?`<section id="wp-field-recovery" class="wp-recovery-panel" aria-label="連線與待同步">${fieldRecoveryMarkup()}</section>`:''}<div id="page-content" class="flash" tabindex="-1" aria-busy="${state.cloud.phase==='loading'||state.cloud.loadingMonth||state.cloud.saving}">${state.cloud.phase==='loading'?renderCloudWaiting():state.cloud.phase==='error'?renderCloudError():state.cloud.loadingMonth?mobileSkeleton('正在讀取指定月份…'):renderPage()}</div><footer class="footer">WorkPulse · Make every day count &nbsp; / &nbsp; v0.25.0</footer></main>
    <nav class="mobile-nav" style="--nav-count:${mobileNav().length}" aria-label="手機導覽">${mobileNav().map(n=>navButton(n,true)).join('')}</nav>
    ${mobileDockMarkup()}<div class="toast-stack" id="toast-stack" aria-label="操作通知"></div>
    <input id="import-file" type="file" accept=".json,application/json" aria-label="匯入工作日誌 JSON 備份" />
@@ -274,7 +281,7 @@ function updateDescriptionSuggestions(textarea,force=false){
  const index=Number(textarea.dataset.task);
  const target=document.querySelector('[data-description-suggestions="'+index+'"]');
  if(!target)return;
- const suggestions=descriptionSuggestions(permanentStorage(),state.selectedPersonId,force?'':textarea.value,state.store.journals);
+ const suggestions=descriptionSuggestions(descriptionStorage(),state.selectedPersonId,force?'':textarea.value,state.store.journals);
  target.innerHTML=suggestions.map((value,i)=>`<button type="button" class="wp-description-suggestion"
  data-action="description-use" data-index="${index}" data-suggestion="${i}" data-all="${force?'1':'0'}"
  title="${esc(value)}">${esc(value.slice(0,100))}</button>`).join('');
@@ -408,7 +415,7 @@ function activateAttendancePage(){
    onError:error=>{attendanceState.phase='error';attendanceState.error=error?.message||'出勤表讀取失敗';}
  });
 }
-function changeView(view){if(state.view==='attendance'&&view!=='attendance'&&(attendanceState.scheduleSaving||(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定離開？'))))return;if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
+function changeView(view){if(isUnifiedPortal&&wpAccess.phase!=='ready')return;if(state.view==='attendance'&&view!=='attendance'&&(attendanceState.scheduleSaving||(attendanceState.scheduleDirty&&!confirm('班表尚未儲存，確定離開？'))))return;if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view))return;state.view=view;location.hash=`/${view}`;window.scrollTo({top:0,behavior:'instant'});render();if(view==='team' && adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}
 async function refreshTeam(){if(!isCloud||state.cloud.user?.role!=='admin')return;if(!maintenanceState.month)maintenanceState.month=state.month;const promise=loadAdmin();render();await promise;render();}
 function notify(text,error=false){clearTimeout(wpToastTimer);state.toast={text,error};showToast(text,error);if(!error)wpToastTimer=setTimeout(dismissToast,6000);}
 function showToast(text,error=false){const container=document.querySelector('#toast-stack');if(!container)return;container.innerHTML=`<div class="toast ${error?'error':'wp-toast-success'}">${icon(error?'alert':'checkCircle',18)}<span class="wp-toast-text" role="${error?'alert':'status'}" aria-atomic="true">${esc(text)}</span><button type="button" class="wp-toast-close" data-action="dismiss-toast" aria-label="關閉通知">×</button></div>`;}
@@ -420,9 +427,102 @@ function downloadBackup(){download(`WorkPulse-backup-${today}.json`,JSON.stringi
 function persistChanges(){if(isCloud)return false;const next={...state.store,mode:'local'};return saveStore(next);}
 
 let cloudBootstrapSequence=0;
-async function initCloud(){
+
+function renderAccessGate(){
+ const choose=wpAccess.phase==='choose',locked=wpAccess.phase==='locked',failure=wpAccess.phase==='error';
+ const disabled=wpAccess.busy?'disabled':'';
+ const message=wpAccess.error?'<p class="wp-access-error" role="alert">'+esc(wpAccess.error)+'</p>':'';
+ const controls=choose?'<form id="wp-access-person"><label for="wp-existing-person">選擇自己的姓名</label><select class="input" id="wp-existing-person" required '+disabled+'><option value="">請選擇人員</option>'+state.store.employees.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select><button class="soft-button primary" type="submit" '+disabled+'>確認姓名</button></form><div class="divider"></div><form id="wp-access-create"><label for="wp-new-person">或新增我的姓名</label><input class="input" id="wp-new-person" type="text" maxlength="80" required autocomplete="off" placeholder="請輸入姓名" value="'+esc(wpAccess.request?.name||'')+'" '+disabled+'><button type="submit" class="soft-button" '+disabled+'>'+(wpAccess.busy?'處理中…':'新增並使用此姓名')+'</button></form>'+(state.selectedPersonId?'<button class="soft-button ghost" data-action="access-cancel-person" '+disabled+'>返回目前人員</button>':'')+'<button class="soft-button ghost" data-action="access-lock" '+disabled+'>登出</button>':locked?'<form id="wp-access-unlock"><label for="wp-company-code">公司存取碼</label><input class="input" id="wp-company-code" type="password" maxlength="128" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="輸入公司提供的存取碼" '+disabled+'><button type="submit" class="soft-button primary" '+disabled+'>'+(wpAccess.busy?'驗證中…':'進入 WorkPulse')+'</button></form><p class="small muted">同一瀏覽器最多記住 30 天；到期或管理員更換存取碼時須重新驗證。共用裝置使用後請登出。</p>':failure?'<button class="soft-button primary" data-action="access-retry">重新連線</button>':'<p role="status">正在安全連接 WorkPulse…</p>';
+ root.innerHTML='<div class="shell wp-access-shell"><main class="soft-card wp-access-card" aria-label="WorkPulse 存取驗證"><div class="brand-symbol">W<small>·</small></div><h1>WorkPulse</h1><h2>'+(choose?'選擇目前操作人員':locked?'輸入公司存取碼':failure?'無法連線':'安全連線中')+'</h2><p class="small muted">'+(choose?'首次使用請選擇或新增自己的姓名，日後可以從右上角切換。':locked?'不需要 Google 帳號，請使用公司提供的存取碼。':'請確認網路及公司部署設定。')+'</p>'+message+controls+'<p class="small muted">WorkPulse · v0.25.0</p></main></div>';
+}
+function scheduleAccessExpiry(){
+ clearTimeout(wpAccess.timer);
+ if(!wpAccess.session)return;
+ const remaining=wpAccess.session.expiresAt-Date.now();
+ if(remaining<=0){lockSharedAccess('公司存取工作階段已到期，請重新輸入存取碼。');return;}
+ wpAccess.timer=setTimeout(scheduleAccessExpiry,Math.min(remaining,2147483647));
+}
+function lockSharedAccess(message=''){
+ if(!wpAccess.session&&wpAccess.phase==='locked')return;
+ // Preserve the original tab draft; late RPC responses cannot reopen the locked UI.
+ if(state.dirty&&!flushQuickDraft())message+=' 草稿暫存未確認，請保留此分頁。';
+ clearTimeout(wpAccess.timer);wpAccess.timer=null;
+ const forgotten=forgetAccessSession(rawLocalStorage(),wpAccess.scope);
+ if(wpAccess.remembered&&!forgotten)message+=' 瀏覽器無法確認清除登入記憶，請在共用裝置清除網站資料。';
+ setCloudCredential(null);wpAccess.session=null;wpAccess.phase='locked';wpAccess.error=message;wpAccess.busy=false;
+ cloudBootstrapSequence++;state.cloud.monthToken++;state.report.token++;state.cloud.loadingMonth=false;state.cloud.phase='locked';state.cloud.user=null;isOwnerPortal=false;
+ render();
+}
+function useAccessSession(session){
+ if(!accessSessionValid(session))throw Error('公司存取回應格式無效');
+ wpAccess.session={token:session.token,expiresAt:session.expiresAt};
+ setCloudCredential(wpAccess.session);scheduleAccessExpiry();
+}
+async function startCloudAccess(){
+ if(!isUnifiedPortal){await initCloud();return;}
+ wpAccess.phase='checking';wpAccess.error='';render();
+ try{
+  const info=await cloudCall('wpAccessStatus');
+  if(!info||!['domain','shared-code'].includes(info.mode)||typeof info.owner!=='boolean')throw Error('公司存取模式回應無效');
+  if(info.mode==='shared-code'&&!validAccessScope(info.scope))throw Error('公司瀏覽器識別設定無效');
+  const previousScope=wpAccess.scope,previousSession=wpAccess.session;
+  wpAccess.mode=info.mode;wpAccess.scope=info.mode==='shared-code'?info.scope:'';
+  if(info.mode==='domain'||info.owner){
+   clearTimeout(wpAccess.timer);setCloudCredential(null);wpAccess.session=null;setSharedTabStorage(false);wpAccess.phase='ready';await initCloud();return;
+  }
+  setSharedTabStorage(true,accessStorage(rawTabStorage(),wpAccess.scope,'tab'));
+  const saved=previousScope===wpAccess.scope&&accessSessionValid(previousSession)?previousSession:loadAccessSession(rawLocalStorage(),wpAccess.scope);
+  if(!saved){setCloudCredential(null);wpAccess.session=null;wpAccess.phase='locked';render();return;}
+  useAccessSession(saved);await initCloud();
+ }catch(error){wpAccess.phase='error';wpAccess.error=error.message||'無法確認公司存取設定';render();}
+}
+async function unlockSharedAccess(code){
+ if(wpAccess.busy||wpAccess.phase!=='locked'||!code)return;
+ if(state.cloud.saving||attendanceState.saving||readFieldPending().some(x=>fieldRecoveryBusy(x.payload.requestId))){wpAccess.error='原請求仍在處理，請稍後再試。';render();return;}
+ if(state.dirty&&!flushQuickDraft()){wpAccess.error='草稿暫存未確認，請先保留資料，避免重新載入時遺失。';render();return;}
+ wpAccess.busy=true;wpAccess.error='';render();
+ try{
+  const session=await cloudCall('wpAccessUnlock',code);
+  useAccessSession(session);
+  wpAccess.remembered=rememberAccessSession(rawLocalStorage(),wpAccess.scope,session);
+  await initCloud();
+ }catch(error){wpAccess.phase='locked';wpAccess.error=error.message||'驗證失敗';}
+ finally{wpAccess.busy=false;render();}
+}
+function finishAccessPerson(id){
+ if(!selectPersonId(id))return;
+ state.draft=makeDraft(today,id);state.dirty=false;state.saveRequestId=null;restoreQuickDraft();
+ wpAccess.phase='ready';wpAccess.error='';state.view='overview';location.hash='/overview';render();
+ if(!wpAccess.remembered)notify('瀏覽器不允許記憶登入，下次可能需重新輸入存取碼。');
+}
+async function createAccessPerson(name){
+ if(wpAccess.busy||wpAccess.phase!=='choose'||!wpSharedGuest()||!name.trim())return;
+ if(!wpAccess.request||wpAccess.request.name!==name)wpAccess.request={name,requestId:uid()};
+ wpAccess.busy=true;wpAccess.error='';render();
+ try{
+  const result=await cloudCall('wpSelfCreateEmployee',wpAccess.request);
+  if(!result?.ok||!result.person?.id)throw Error('新增結果未確認，請使用相同姓名重試');
+  const id=result.person.id;writeSelectedPerson(permanentStorage(),id);wpAccess.request=null;
+  await initCloud(id);
+ }catch(error){wpAccess.error=error.message||'新增人員未確認，請使用相同姓名重試。';}
+ finally{wpAccess.busy=false;render();}
+}
+document.addEventListener('workpulse:access-expired',()=>lockSharedAccess('公司存取工作階段無效或已到期，請重新輸入存取碼。'));
+window.addEventListener('focus',()=>{if(wpAccess.session)scheduleAccessExpiry();});
+root.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!['wp-access-unlock','wp-access-person','wp-access-create'].includes(form.id))return;
+ event.preventDefault();if(wpAccess.busy)return;
+ if(form.id==='wp-access-unlock'){const input=form.querySelector('#wp-company-code'),code=input.value;input.value='';void unlockSharedAccess(code);}
+ else if(form.id==='wp-access-person'&&wpAccess.phase==='choose'&&wpSharedGuest())finishAccessPerson(form.querySelector('#wp-existing-person').value);
+ else if(form.id==='wp-access-create')void createAccessPerson(form.querySelector('#wp-new-person').value);
+});
+
+async function initCloud(preferredPerson=''){
  if(!isCloud)return;
  const sequence=++cloudBootstrapSequence;
+ if(isUnifiedPortal&&wpAccess.mode==='shared-code'&&!wpAccess.session&&wpAccess.phase!=='ready')return;
+ if(wpSharedGuest())wpAccess.phase='checking';
  state.cloud.phase='loading';state.cloud.error='';if(isUnifiedPortal){isOwnerPortal=false;state.cloud.user=null;}state.report.payload=null;state.report.applied=null;state.report.phase='idle';render();
  try{
   const payload=await cloudCall('wpSharedBootstrap',state.month);
@@ -441,14 +541,16 @@ async function initCloud(){
   await offlineVault.configure(scope);
   if(sequence!==cloudBootstrapSequence)return;
   state.cloud.user=payload.user;state.cloud.phase='ready';
-  state.selectedPersonId=readSelectedPerson(permanentStorage(),state.store.employees);
+  state.selectedPersonId=preferredPerson&&state.store.employees.some(p=>p.id===preferredPerson)?preferredPerson:readSelectedPerson(permanentStorage(),state.store.employees,{fallback:!wpSharedGuest()});
+  if(wpSharedGuest()&&!state.selectedPersonId){wpAccess.phase='choose';wpAccess.error='';render();return;}
+  if(wpSharedGuest())wpAccess.phase='ready';
   selectPersonId(state.selectedPersonId);
   state.draft=makeDraft(today,state.selectedPersonId);
   state.dirty=false;restoreQuickDraft();if(state.view==='team' && payload.user.role!=='admin')state.view='overview';render();
   if(state.view==='team'&&payload.user.role==='admin')refreshTeam();
   if(state.view==='insights'&&state.report.phase==='idle')loadCloudReport();
   if(state.view==='attendance')activateAttendancePage();
- }catch(e){if(sequence!==cloudBootstrapSequence)return;state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';render();}
+ }catch(e){if(sequence!==cloudBootstrapSequence)return;state.cloud.phase='error';state.cloud.error=e.message||'連線失敗';if(wpSharedGuest()){wpAccess.phase='error';wpAccess.error=state.cloud.error;}render();}
 }
 async function loadCloudMonth(month,focusDate=null,focusEmployee=null){
  if(!isCloud)return;
@@ -480,7 +582,7 @@ async function saveCloudJournal(){
   state.store={...state.store,journals:[...state.store.journals.filter(j=>!(j.date===result.journal.date && j.employeeId===result.journal.employeeId)),result.journal]};
   state.draft=makeDraft(result.journal.date,result.journal.employeeId,result.journal);
   state.report.payload=null;state.report.applied=null;state.report.phase='idle';
-  rememberDescriptions(permanentStorage(),result.journal.employeeId,result.journal.tasks);
+  rememberDescriptions(descriptionStorage(),result.journal.employeeId,result.journal.tasks);
   state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount(),state.draft.date,state.draft.employeeId);await flushOfflineVault();state.draftStatus='已正式儲存至 Google Sheets';
   notify(result.deduplicated?'已確認此筆工作日誌存在雲端':'工作日誌已成功儲存到 Google Sheets');
  }catch(e){
@@ -490,6 +592,11 @@ async function saveCloudJournal(){
 root.addEventListener('click', event=>{
  const button=event.target.closest('[data-action]');if(!button)return;
  const action=button.dataset.action;
+ if(action==='access-retry'){void startCloudAccess();return;}
+ if(action==='access-lock'&&wpSharedGuest()){if(state.cloud.saving||attendanceState.saving||wpAccess.busy||readFieldPending().some(x=>fieldRecoveryBusy(x.payload.requestId)))return;if(state.dirty&&!flushQuickDraft()){notify('草稿暫存失敗，請先保留內容',true);return;}if(confirm('登出此瀏覽器？未提交資料仍留在本分頁，重新驗證後才能查看。'))lockSharedAccess();return;}
+ if(action==='access-add-person'&&wpSharedGuest()&&state.cloud.phase==='ready'){if(state.cloud.saving||attendanceState.saving||!requireDiscard())return;wpAccess.phase='choose';wpAccess.error='';render();return;}
+ if(action==='access-cancel-person'&&wpSharedGuest()&&state.selectedPersonId&&wpAccess.phase==='choose'){wpAccess.phase='ready';render();return;}
+ if(isUnifiedPortal&&wpAccess.phase!=='ready')return;
  if(action==='dismiss-toast'){dismissToast();return;}
  if(action==='skip-content'){focusPageContent();return;}
  if(action==='pwa-install'||action==='pwa-help'){handlePwaAction(action);return;}
@@ -548,7 +655,7 @@ root.addEventListener('click', event=>{
  if(action==='description-use'){
   const index=Number(button.dataset.index);
   const textarea=document.querySelector('textarea[data-task="'+index+'"][data-field="description"]');
-  const suggestions=descriptionSuggestions(permanentStorage(),state.selectedPersonId,
+  const suggestions=descriptionSuggestions(descriptionStorage(),state.selectedPersonId,
     button.dataset.all==='1'?'':textarea?.value||'',state.store.journals);
   const value=suggestions[Number(button.dataset.suggestion)];
   if(textarea&&value){
@@ -746,7 +853,7 @@ root.addEventListener('click', event=>{
    try{
     const base=state.store.mode==='demo'?{...state.store,journals:[],mode:'local'}:state.store;
     const next=saveJournal(base,state.draft);
-    if(saveStore(next)){rememberDescriptions(permanentStorage(),state.draft.employeeId,state.draft.tasks);state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount(),state.draft.date,state.draft.employeeId);state.draftStatus='已存於本機 · 未同步 Drive';render();notify('工作日誌已儲存至目前瀏覽器');}
+    if(saveStore(next)){rememberDescriptions(descriptionStorage(),state.draft.employeeId,state.draft.tasks);state.draft=makeDraft(state.draft.date,state.draft.employeeId);state.dirty=false;clearTimeout(draftTimer);clearQuickDraft(draftStorage(),draftAccount(),state.draft.date,state.draft.employeeId);state.draftStatus='已存於本機 · 未同步 Drive';render();notify('工作日誌已儲存至目前瀏覽器');}
     updateDraftSummary();
    }catch(e){notify(e.message||'無法儲存日誌',true);}return;
  }
@@ -877,7 +984,7 @@ root.addEventListener('change',async event=>{
    if(saveStore(payload)){selectPersonId(readSelectedPerson(permanentStorage(),state.store.employees));state.draft=makeDraft(today,state.selectedPersonId);state.dirty=false;state.filters={query:'',employee:state.selectedPersonId,status:'all'};render();notify('備份資料匯入成功');}
  }catch(e){notify(`匯入失敗：${e.message}`,true);}finally{event.target.value='';}
 });
-window.addEventListener('hashchange',()=>{const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
+window.addEventListener('hashchange',()=>{if(isUnifiedPortal&&wpAccess.phase!=='ready')return;const view=fromHash();if(view!==state.view){if(!visibleNav().some(n=>n.id===view)||!allowedMobileView(view)){changeView('overview');return;}state.view=view;render();if(view==='team'&&adminState.phase==='idle')refreshTeam();if(view==='attendance')activateAttendancePage();if(view==='insights'&&isCloud&&state.cloud.phase==='ready'&&state.report.phase==='idle')loadCloudReport();}});
 document.addEventListener('workpulse:select-person',event=>{
  if(!changeSelectedPerson(event.detail?.id,{fromAttendance:true}))event.preventDefault();
 });
@@ -894,7 +1001,7 @@ root.addEventListener('change',event=>{
  const node=event.target;
  if(node.matches?.('[data-field="description"][data-task]')){
   const entry=state.draft.tasks[Number(node.dataset.task)];
-  if(entry)rememberDescriptions(permanentStorage(),state.selectedPersonId,[entry]);
+  if(entry)rememberDescriptions(descriptionStorage(),state.selectedPersonId,[entry]);
  }
 });
 root.addEventListener('focusin',event=>{
@@ -913,5 +1020,5 @@ window.addEventListener('pagehide',()=>{if(state.dirty)flushQuickDraft();});
 window.addEventListener('beforeunload',event=>{if(state.dirty)flushQuickDraft();if(state.dirty||adminState.dirty||attendanceState.scheduleDirty||(attendanceState.dirty&&!attendanceState.draftStored)||!fieldRecoveryDurable()){event.preventDefault();event.returnValue='';}});
 initMobileWorkflow();initPwa(isCloud);render();
  const overviewMedia=window.matchMedia?.('(max-width:900px)');overviewMedia?.addEventListener?.('change',()=>{if(state.view==='overview')render();});
-if(isCloud)initCloud();
+if(isCloud)startCloudAccess();
 else activateAttendancePage();
