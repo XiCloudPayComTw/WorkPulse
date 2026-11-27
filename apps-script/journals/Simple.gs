@@ -39,19 +39,19 @@ function wsMonth_(control,month){
   var tasks=wsTaskIndex_(wpRows_(wpSheet_(book,'Tasks')));
   return rows.map(function(j){return wsRecord_(j,tasks.get(String(j.journalId))||[]);});
 }
-function wpSharedBootstrap(month){
-  var verified=wpFieldAccess_();
+function wpSharedBootstrap(month,token){
+  var verified=wpFieldAccess_(token),shared=/^shared:[a-f0-9]{32}$/.test(verified);
   var offlineScope=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_OFFLINE_SCOPE')||'');
-  if(!verified||!/^[A-Za-z0-9_-]{16,80}$/.test(offlineScope))offlineScope='';
+  if(shared||!verified||!/^[A-Za-z0-9_-]{16,80}$/.test(offlineScope))offlineScope='';
   var book=wsBook_(),m=wpMonth_(month),people=wsPeople_(book,false),admin=wpUnified_()&&verified===wpConfig_().adminEmail;
   return {month:m,offlineScope:offlineScope,store:{version:1,mode:'cloud',
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
       .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m)},
-    user:{id:admin?'admin':'guest',name:admin?'管理員':'共用填寫',role:admin?'admin':'guest',email:verified,
+    user:{id:admin?'admin':'guest',name:admin?'管理員':'共用填寫',role:admin?'admin':'guest',email:shared?'':verified,
       canWriteIds:people.map(function(p){return p.id;})}};
 }
-function wpSharedLoadMonth(month){wpFieldAccess_();var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}
+function wpSharedLoadMonth(month,token){wpFieldAccess_(token);var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}
 function wsValidated_(input,book){
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('工作資料格式無效');
   var employeeId=String(input.employeeId||'');
@@ -118,10 +118,10 @@ function wsValidated_(input,book){
   return {date:date,employeeId:employeeId,requestId:requestId,expectedRevision:revision,
     tasks:tasks,note:wpText_(input.note,2000),tomorrow:wpText_(input.tomorrow,2000)};
 }
-function wpSharedSaveJournal(payload){
-  wpFieldAccess_();var lock=LockService.getScriptLock();lock.waitLock(20000);
+function wpSharedSaveJournal(payload,token){
+  wpFieldAccess_(token);var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
-    var control=wsBook_();wpFieldWriteGuard_(control);var p=wsValidated_(payload,control);
+    var verified=wpFieldAccess_(token),control=wsBook_();wpFieldWriteGuard_(control,token);var p=wsValidated_(payload,control);
     var book=wpMonthFile_(control,p.date.slice(0,7),true),deleted=wsDeleted_(book);
     var sheet=wpSheet_(book,'Journals'),rows=wpRows_(sheet),allRequests=wpRows_(wpSheet_(book,'Requests'));
     var previous=allRequests.find(function(r){return String(r.requestId)===p.requestId;});
@@ -141,7 +141,7 @@ function wpSharedSaveJournal(payload){
     var values=[journalId,p.date,p.employeeId,next,now,'selected:'+p.employeeId,p.requestId,p.note,p.tomorrow];
     if(existing)sheet.getRange(existing.__row,1,1,values.length).setValues([values]);else sheet.appendRow(values);
     wpSheet_(book,'Requests').appendRow([p.requestId,'selected:'+p.employeeId,journalId,next,now]);
-    wpSheet_(book,'Audit').appendRow([Utilities.getUuid(),now,'selected:'+p.employeeId,
+    wpSheet_(book,'Audit').appendRow([Utilities.getUuid(),now,wpFieldAuditActor_(verified,'selected:'+p.employeeId),
       existing?'journal.updated':'journal.created',journalId,next,p.requestId]);
     SpreadsheetApp.flush();
     return {ok:true,deduplicated:false,journal:wsRecord_(
@@ -151,8 +151,8 @@ function wpSharedSaveJournal(payload){
         status:t.status,hours:t.hours};}))};
   }finally{lock.releaseLock();}
 }
-function wpSharedQueryReport(criteria){
-  wpFieldAccess_();var book=wsBook_();
+function wpSharedQueryReport(criteria,token){
+  wpFieldAccess_(token);var book=wsBook_();
   if(!criteria||typeof criteria!=='object')throw Error('報表條件無效');
   var start=wpDate_(criteria.startDate),end=wpDate_(criteria.endDate);
   var span=(Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000;

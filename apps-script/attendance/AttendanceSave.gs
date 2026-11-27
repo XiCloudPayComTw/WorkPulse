@@ -1,6 +1,6 @@
 /** Attendance write endpoint. Separate file to keep public APIs auditable. */
-function wpAttendanceSave(input){
- wpFieldAccess_();
+function wpAttendanceSave(input,token){
+ wpFieldAccess_(token);
  if(!input||typeof input!=='object')throw Error('出勤資料錯誤');
  if(Object.prototype.hasOwnProperty.call(input,'monthlyWage')||Object.prototype.hasOwnProperty.call(input,'overtimePay'))
   throw Error('薪資及試算金額只在本機 Excel 處理，禁止上傳');
@@ -15,7 +15,7 @@ function wpAttendanceSave(input){
  if(!worked&&!leaveMinutes)throw Error('請填寫出勤時間或請假');
  var lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
-  var control=wsBook_();wpFieldWriteGuard_(control);wpAttEmployee_(control,id);
+  var verified=wpFieldAccess_(token),control=wsBook_();wpFieldWriteGuard_(control,token);wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,month,true);wpInitializeSheet_(file,'Attendance');
   var sheet=wpSheet_(file,'Attendance'),rows=wpRows_(sheet);
   var oldRequest=wpRows_(wpSheet_(file,'Requests')).find(function(x){return x.requestId===request;});
@@ -33,7 +33,7 @@ function wpAttendanceSave(input){
    wpAttExtra_(day,worked),leave,leaveMinutes,'',notes,oldVersion+1,now,request];
   if(existing)sheet.getRange(existing.__row,1,1,values.length).setValues([values]);else sheet.appendRow(values);
   wpSheet_(file,'Requests').appendRow([request,'attendance:'+id,newId,oldVersion+1,now]);
-  wpSheet_(file,'Audit').appendRow([Utilities.getUuid(),now,'attendance:'+id,
+  wpSheet_(file,'Audit').appendRow([Utilities.getUuid(),now,wpFieldAuditActor_(verified,'attendance:'+id),
    existing?'attendance.updated':'attendance.created',newId,oldVersion+1,request]);
   SpreadsheetApp.flush();
   var obj={};WP_HEADERS.Attendance.forEach(function(key,i){obj[key]=values[i];});

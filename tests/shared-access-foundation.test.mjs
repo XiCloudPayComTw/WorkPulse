@@ -40,7 +40,7 @@ test('fail closed for wrong execution identity, weak secrets, corrupt rate state
   const h=harness();change(h);assert.throws(()=>h.scope.wpCodeSessionIssue_(h.props.WORKPULSE_SHARED_ACCESS_CODE));assert.equal(h.isLocked(),false);
  }
 });
-test('existing public guard still rejects shared-code; deployment remains domain-only',()=>{
- const h=harness();assert.throws(()=>h.scope.wpFieldMode_(),/domain/);
+test('shared-code guard rejects missing token and preserves domain behavior',()=>{
+ const h=harness();assert.equal(h.scope.wpFieldMode_(),'shared-code');assert.throws(()=>h.scope.wpFieldAccess_(),/工作階段/);
  h.props.WORKPULSE_ACCESS_MODE='domain';assert.equal(h.scope.wpFieldMode_(),'domain');assert.throws(()=>h.scope.wpFieldAccess_(),/Google/);
 });

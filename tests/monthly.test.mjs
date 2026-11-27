@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-const serverFileNames={"Core.gs":"shared/Core.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","OwnerProjects.gs":"admin/OwnerProjects.gs","OwnerCategories.gs":"admin/OwnerCategories.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
+import {createHmac,createHash,randomUUID} from 'node:crypto';
+const serverFileNames={"Core.gs":"shared/Core.gs","SharedAccess.gs":"shared/SharedAccess.gs","Monthly.gs":"shared/Monthly.gs","Simple.gs":"journals/Simple.gs","Owner.gs":"admin/Owner.gs","OwnerProjects.gs":"admin/OwnerProjects.gs","OwnerCategories.gs":"admin/OwnerCategories.gs","Attendance.gs":"attendance/Attendance.gs","AttendanceSave.gs":"attendance/AttendanceSave.gs","AttendanceRange.gs":"attendance/AttendanceRange.gs","OwnerAttendance.gs":"admin/OwnerAttendance.gs","Code.gs":"legacy/Code.gs","Review.gs":"legacy/Review.gs"};
 const read=n=>readFileSync(new URL('../apps-script/'+(serverFileNames[n]||n),import.meta.url),'utf8');
-const source=['Core.gs','Monthly.gs','Simple.gs','Owner.gs','OwnerProjects.gs','OwnerCategories.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
+const source=['Core.gs','SharedAccess.gs','Monthly.gs','Simple.gs','Owner.gs','OwnerProjects.gs','OwnerCategories.gs','Attendance.gs','AttendanceSave.gs','OwnerAttendance.gs','AttendanceRange.gs'].map(read).join('\n');
 function harness(){
  let current='admin@example.com',effective='admin@example.com',counter=1,locked=false;
  const books=new Map(),files=new Map(),folders=new Map();
@@ -50,7 +51,7 @@ function harness(){
       folders.set(id,folder);return folder;}},
   LockService:{getScriptLock:()=>({waitLock:()=>{if(locked)throw Error('already locked');locked=true;},
     releaseLock:()=>{locked=false;}})},
-  Utilities:{getUuid:()=> 'uuid-'+(counter++)},
+  Utilities:{getUuid:()=> 'uuid-'+(counter++),computeHmacSha256Signature:(v,k)=>createHmac('sha256',k).update(v).digest(),base64EncodeWebSafe:v=>Buffer.from(v).toString('base64url'),computeDigest:(_alg,v)=>createHash('sha256').update(v).digest(),DigestAlgorithm:{SHA_256:'SHA_256'},Charset:{UTF_8:'UTF_8'}},
   HtmlService:{createHtmlOutputFromFile:()=>({setTitle(){return this;},addMetaTag(){return this;}})},
   console
  };
@@ -708,4 +709,80 @@ test('unified initialization editor prints safe summary without revealing config
  assert.ok(output.checks.every(x=>Object.keys(x).sort().join(',')==='key,ok,required'));
  assert.ok(!logs[0].includes(h.props.WORKPULSE_ADMIN_EMAIL));assert.ok(!logs[0].includes(h.props.WORKPULSE_SHEET_ID));
  h.scope.workPulseInitialize();assert.match(logs.at(-1),/初始化完成/);
+});
+
+function sharedCodeHarness(){
+ const h=harness();h.setup();const p=h.employee();
+ h.scope.WP_PORTAL_KIND='unified';Object.assign(h.props,{WORKPULSE_ACCESS_MODE:'shared-code',WORKPULSE_SHARED_ACCESS_CODE:'fixture-shared-code-123456789',WORKPULSE_SESSION_SIGNING_KEY:'fixture-signing-key-123456789012345678901234567890'});
+ h.scope.Utilities.getUuid=randomUUID;
+ h.as('');
+ return {h,p,token:()=>h.scope.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE).token};
+}
+const sharedReadsAndWrites=['wpSharedBootstrap','wpSharedLoadMonth','wpSharedSaveJournal','wpSharedQueryReport','wpAttendanceLoad','wpAttendanceSave','wpAttendanceRange','wpSelfCreateEmployee'];
+test('shared-code shell and status expose no data; every employee endpoint denies absent or forged sessions before opening Sheets',()=>{
+ const {h}=sharedCodeHarness(),s=h.scope;
+ s.SpreadsheetApp.openById=()=>{throw Error('UNEXPECTED SHEETS READ');};
+ assert.ok(s.doGet());
+ assert.equal(JSON.stringify(s.wpAccessStatus()),JSON.stringify({mode:'shared-code',owner:false}));
+ for(const email of ['','staff@example.com','external@elsewhere.com']){
+  h.as(email);
+  for(const name of sharedReadsAndWrites)for(const token of [undefined,'forged'])assert.throws(()=>s[name]({},token),/工作階段/,name);
+ }
+ h.effective('external@elsewhere.com');assert.throws(()=>s.doGet(),/持有者身分/);
+ assert.throws(()=>s.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE),/執行身分/);
+});
+test('shared-code authenticated journal and attendance flows preserve request deduplication, conflicts and integrity',()=>{
+ const {h,p,token}=sharedCodeHarness(),s=h.scope,t=token();
+ const boot=s.wpSharedBootstrap('2026-11',t);assert.equal(boot.user.role,'guest');assert.equal(boot.user.email,'');assert.equal(boot.offlineScope,'');
+ const j=h.entry(p);assert.equal(s.wpSharedSaveJournal(j,t).journal.revision,1);
+ assert.equal(s.wpSharedSaveJournal(j,t).deduplicated,true);
+ assert.throws(()=>s.wpSharedSaveJournal({...j,requestId:'shared-conflict-123'},t),/CONFLICT/);
+ assert.equal(s.wpSharedLoadMonth('2026-11',t).journals.length,1);
+ assert.equal(s.wpSharedQueryReport({startDate:'2026-11-01',endDate:'2026-11-30'},t).journals.length,1);
+ const a={date:j.date,employeeId:p.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,expectedRevision:0,requestId:'shared-attendance-123'};
+ assert.equal(s.wpAttendanceSave(a,t).row.workedMinutes,480);
+ assert.equal(s.wpAttendanceSave(a,t).deduplicated,true);
+ assert.throws(()=>s.wpAttendanceSave({...a,requestId:'shared-att-conflict'},t),/CONFLICT/);
+ assert.equal(s.wpAttendanceLoad({month:'2026-11',employeeId:p.id},t).rows.length,1);
+ assert.equal(s.wpAttendanceRange({startDate:'2026-11-01',endDate:'2026-11-30',employeeId:p.id},t).rows.length,1);
+ assert.throws(()=>s.wpAttendanceSave({...a,monthlyWage:123},t),/薪資/);
+ const m=h.books.get(s.wpMonthIndex_(h.control)['2026-11']);
+ assert.ok(m.getSheetByName('Audit').rows.slice(1).every(row=>/^shared:[a-f0-9]{32}$/.test(row[2])));
+ assert.ok(!JSON.stringify([...h.books.values()].map(b=>b.sheets.map(x=>x.rows))).includes(t));
+ h.as('admin@example.com');assert.equal(s.wpSharedBootstrap('2026-11').user.role,'admin');
+ assert.equal(s.wpSharedBootstrap('2026-11',t).user.role,'guest');
+ assert.equal(s.wpOwnerMonthIntegrity({month:'2026-11'}).status,'passed');
+});
+test('shared-code cannot invoke any privileged endpoint even with a valid token or spoofed owner payload',()=>{
+ const {h,token}=sharedCodeHarness(),s=h.scope,t=token();
+ const ownerMethods=['wpOwnerBootstrap','wpOwnerSaveEmployee','wpOwnerDeleteJournal','workPulseInitialize','workPulseMigrateLegacy','wpOwnerMaintenance','wpOwnerBackupWorkbook','wpOwnerBackupPlan','wpOwnerPrepareBackupFolder','wpOwnerExportBackupJson','wpOwnerCompareBackupCopies','wpOwnerRecoveryPreview','workPulseInstallDailyBackup','workPulseRemoveDailyBackup','workPulsePauseFieldWrites','workPulseResumeFieldWrites','workPulseDeploymentCheck','workPulseVerifyMonthFiles','wpOwnerMigrationPreflight','workPulseInitializationCheck','wpOwnerMonthIntegrity','workPulseCompareRestoredMonth','wpOwnerSaveCategories','wpOwnerSaveProject','wpOwnerAttendanceConfig','wpOwnerSaveAttendanceConfig','workPulseUpgradeAttendance','wpOwnerSaveAttendanceSchedule'];
+ s.SpreadsheetApp.openById=()=>{throw Error('UNEXPECTED SHEETS READ');};
+ for(const email of ['','staff@example.com','external@elsewhere.com']){h.as(email);for(const name of ownerMethods)assert.throws(()=>s[name]({email:'admin@example.com',role:'admin',token:t},t),/持有帳號/,name);}
+});
+test('self-service creates ordinary active people, normalizes names, deduplicates and rejects privileged or duplicate input',()=>{
+ const {h,token}=sharedCodeHarness(),s=h.scope,t=token(),input={name:'  Ａlice   Chen ',requestId:'self-create-00001'};
+ const created=s.wpSelfCreateEmployee(input,t);assert.equal(created.person.name,'Alice Chen');assert.equal(created.deduplicated,false);
+ assert.equal(s.wpSelfCreateEmployee(input,t).person.id,created.person.id);assert.equal(s.wpSelfCreateEmployee(input,t).deduplicated,true);
+ for(const bad of [{...input,name:'other'},{name:'alice chen',requestId:'self-create-00002'},{name:'=SUM(1)',requestId:'self-create-00003'},{name:'New',requestId:'self-create-00004',role:'admin'},{name:'New',requestId:'self-create-00005',id:'admin'}])assert.throws(()=>s.wpSelfCreateEmployee(bad,t));
+ const row=h.control.getSheetByName('Employees').rows.find(r=>r[0]===created.person.id);
+ assert.equal(row[1],'');assert.equal(row[3],'staff');assert.equal(row[5],true);
+ assert.equal(s.wpSharedBootstrap('2026-11',t).store.employees.length,2);
+});
+test('shared-code pause blocks every write and rotating the code revokes sessions; delete still requires maintenance window',()=>{
+ const {h,p,token}=sharedCodeHarness(),s=h.scope,t=token(),j=h.entry(p);
+ const saved=s.wpSharedSaveJournal(j,t).journal;
+ h.as('admin@example.com');assert.throws(()=>s.wpOwnerDeleteJournal({journalId:saved.id,date:saved.date,expectedRevision:1,requestId:'self-delete-00001'}),/停寫/);
+ s.workPulsePauseFieldWrites();h.as('');
+ assert.throws(()=>s.wpSharedSaveJournal({...j,requestId:'paused-journal-123'},t),/暫停/);
+ assert.throws(()=>s.wpAttendanceSave({date:j.date,employeeId:p.id,dayType:'workday',startTime:'09:00',endTime:'18:00',breakMinutes:60,leaveType:'none',leaveMinutes:0,expectedRevision:0,requestId:'paused-attendance-123'},t),/暫停/);
+ assert.throws(()=>s.wpSelfCreateEmployee({name:'New',requestId:'paused-person-123'},t),/暫停/);
+ h.as('admin@example.com');s.workPulseResumeFieldWrites();h.as('');
+ h.props.WORKPULSE_SHARED_ACCESS_CODE+='x';for(const name of sharedReadsAndWrites)assert.throws(()=>s[name]({},t),/工作階段/,name);
+});
+test('domain remains compatible and new self-service endpoints cannot activate access in domain mode',()=>{
+ const {h,token}=sharedCodeHarness(),s=h.scope,t=token();h.props.WORKPULSE_ACCESS_MODE='domain';h.as('staff@example.com');
+ assert.equal(s.wpSharedBootstrap('2026-11').user.role,'guest');assert.equal(s.wpAccessStatus().mode,'domain');
+ assert.throws(()=>s.wpAccessUnlock(h.props.WORKPULSE_SHARED_ACCESS_CODE),/未啟用/);
+ assert.throws(()=>s.wpSelfCreateEmployee({name:'New',requestId:'self-create-12345'},t),/未啟用/);
+ h.as('');assert.throws(()=>s.wpSharedBootstrap('2026-11',t),/公司網域/);
 });

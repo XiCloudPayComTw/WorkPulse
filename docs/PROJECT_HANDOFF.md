@@ -2,25 +2,25 @@
 
 ## 目前唯一有效的接手入口｜2026-11-27
 
-> 以下是 v0.24.1 修正批次目前進度及待辦，優先於本文件下方歷史紀錄與舊版架構說明。歷史段落完整保留，不能把其中過時的規則、未合併狀態或待辦當作現況。接手時仍須重新查最新 main、PR、CI 及使用者實際環境。
+> 以下是 v0.24.1 TEST 與 v0.25.0 方案 A 目前進度及待辦，優先於本文件下方歷史紀錄與舊版架構說明。歷史段落完整保留，不能把其中過時的規則、未合併狀態或待辦當作現況。接手時仍須重新查最新 main、PR、CI 及使用者實際環境。
 
 ### 1. 可核對的基準與實際進度
 
 | 項目 | 最新確認 |
 |---|---|
 | Repository | [XiCloudPayComTw/WorkPulse](https://github.com/XiCloudPayComTw/WorkPulse) |
-| 應用程式版本 | v0.24.1 TEST 啟動成功（使用者回報）；v0.25.0 方案 A 開發中，第一批不提升版本 |
-| 本批開發基準 main | `50fbcbe81f33951ba0b2159fc76959838171adba`（PR #38 已合併） |
+| 應用程式版本 | v0.24.1 TEST 啟動成功（使用者回報）；v0.25.0 方案 A 開發中，第二批後端候選，不提升版本 |
+| 本批開發基準 main | `fd4888c5d9f37c298c6ffe41f7e7f297fea78e94`（PR #39 已合併） |
 | 功能與交接 PR | #35 功能與 #36 交接已合併（#32、#33、#34 也已合併）；移轉修正前無開啟 PR |
-| CI | [main run 45946301184](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45946301184) 全數成功；188/188 Node、60/60 Chrome、4/4 GAS iframe 模擬、Pages 及三檔驗證 |
+| CI | [main run 45960253370](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45960253370) 全數成功；194/194 Node、Chrome、GAS 及 Pages |
 | 已驗證發布包 | [v0.24.1 workpulse-gas-unified-45946301184-1](https://github.com/XiCloudPayComTw/WorkPulse/actions/runs/45946301184/artifacts/15174414393)，2026-12-27 13:31 台北時間到期；過期查最新成功 main run 或本機 gas:build |
 | GitHub Pages | 本機展示版，非正式雲端資料來源 |
 
-儲存庫已由原 shinkureru 帳號移轉；現行網址以表列新儲存庫為準。移轉修正批次僅更新文件與已核對的基準，不變更應用版本、程式或資料；不自動 Merge。本批基準 main CI 已核對 188/188、Chrome 60/60、GAS 4/4、Pages 與三檔驗證全數成功。
+儲存庫已由原 shinkureru 帳號移轉；現行網址以表列新儲存庫為準。移轉修正批次僅更新文件與已核對的基準，不變更應用版本、程式或資料；不自動 Merge。本批基準 main CI 已核對 194/194、Chrome、GAS、Pages 全數成功。
 
 **使用者已回報完成（未由 AI 直接登入查核）**：指定公司資料持有帳號已建立 `WorkPulse — Admin TEST`，Asia/Taipei、V8、顯示 manifest，已填入三項 Script Properties，已匯入 v0.24.0 unified 三檔並儲存。已依授權、唯讀檢查及初始化步驟操作；使用者起初看不到自動新增的兩項屬性，重新整理後回報「好，完成了」。以 TEST 初始化完成作為接手起點；部署前請其核對初始化成功記錄、兩個 ID 已存在且指向同一公司持有者的私人 WorkPulse 資料夾及 WorkPulse_Control，勿再次初始化或刪除/重填 ID。未取得實際 ID、登入或 Drive 證據；不將使用者回報等同獨立驗收。
 
-**下一步是 v0.25.0 免 Google 登入方案 A**。使用者回報 v0.24.1 TEST 網站已成功開啟，其他 A01–A17 尚無完整驗收證據。已明確選擇員工首次輸入共用存取碼、可自行建立及記憶姓名、右上角切換；管理員僅指定持有者。依 [方案 A 安全規格及批次](ACCESS_V025.md)。本批僅私有驗證基礎及測試，維持 domain、v0.24.1，無新 RPC，CI 待確認；下一批整合所有員工 RPC、再前端及實際 TEST；不改部署、不初始化。
+**下一步是 v0.25.0 免 Google 登入方案 A**。使用者回報 v0.24.1 TEST 網站已成功開啟，其他 A01–A17 尚無完整驗收證據。已明確選擇員工首次輸入共用存取碼、可自行建立及記憶姓名、右上角切換；管理員僅指定持有者。依 [方案 A 安全規格及批次](ACCESS_V025.md)。第一批 #39 已合併；本批整合後端員工 RPC、存取碼狀態/換取及自助人員、維護守衛與稽核，新增 6 項整合測試，CI 待確認。實際 TEST 保持 domain、v0.24.1，不部署中間版本。下一批前端接入並完成 v0.25.0，再實測；不初始化。
 
 ### 2. 現行產品決策（不能被早期文件覆蓋）
 
