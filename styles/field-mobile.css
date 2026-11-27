@@ -199,3 +199,6 @@ button:focus-visible,a:focus-visible,.input:focus-visible,.wp-sheet-option:focus
 @media(max-width:900px) and (max-height:500px){.wp-mobile-dock button{min-height:44px}}
 @media(hover:none){.soft-button:hover,.nav-link:hover,.wp-field-tile:hover{transform:none}.soft-card:hover,.task-card:hover{box-shadow:var(--shadow-sm)}}
 @media(prefers-reduced-motion:reduce){.wp-jelly-orb,.wp-jelly-orb span,.wp-read-skeleton span,.wp-overlay-skeleton span,.flash,.toast{animation:none!important}.wp-skip,.wp-sheet-option{transition:none!important}}
+
+/* Shared-code gate: same soft card vocabulary, no normal navigation until authorized. */
+.shell.wp-access-shell{display:grid;grid-template-columns:minmax(0,1fr);place-items:center;min-height:100vh;min-height:100dvh;padding:24px 16px;box-sizing:border-box}.wp-access-card{width:min(100%,420px);padding:28px;display:grid;gap:14px;box-sizing:border-box}.wp-access-card h1,.wp-access-card h2,.wp-access-card p{margin:0}.wp-access-card form{display:grid;gap:9px;min-width:0}.wp-access-card .input{width:100%;min-width:0;box-sizing:border-box;font-size:16px}.wp-access-card .soft-button{width:100%;min-height:44px}.wp-access-error{color:#a23b44;overflow-wrap:anywhere}.wp-access-card .brand-symbol{margin-bottom:3px}

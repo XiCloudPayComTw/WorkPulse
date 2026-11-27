@@ -5,7 +5,7 @@ import {addWorkCategory,renameWorkCategory} from '../journals/categories.js';
 
 export const adminState={phase:'idle',data:null,tab:'employees',draft:null,dirty:false,saving:false,error:'',requestId:null};
 export const deploymentCheckState={busy:false,data:null,error:''};
-const wpDeploymentLabels={domainMode:'公司網域存取',dataFolder:'日常資料夾',controller:'控制試算表',headers:'控制表結構',monthIndex:'分月索引',backupFolder:'獨立備份資料夾',backupRegistration:'備份觸發器與執行紀錄'};
+const wpDeploymentLabels={domainMode:'公司存取驗證',dataFolder:'日常資料夾',controller:'控制試算表',headers:'控制表結構',monthIndex:'分月索引',backupFolder:'獨立備份資料夾',backupRegistration:'備份觸發器與執行紀錄'};
 export async function loadDeploymentCheck(){
  const a=deploymentCheckState;if(a.busy)return;a.busy=true;a.error='';a.data=null;
  try{const d=await cloudCall('workPulseDeploymentCheck');if(d?.readOnly!==true||d.productionVerified!==false||typeof d.configurationPassed!=='boolean'||!Array.isArray(d.checks)||!d.checks.length||d.checks.some(x=>typeof x.key!=='string'||typeof x.ok!=='boolean'||typeof x.detail!=='string'))throw Error('部署檢查回應格式異常，請確認私人發布包版本');a.data=d;}
