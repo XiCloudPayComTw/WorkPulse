@@ -436,7 +436,7 @@ function renderAccessGate(){
  const choose=wpAccess.phase==='choose',locked=wpAccess.phase==='locked',failure=wpAccess.phase==='error';
  const disabled=wpAccess.busy?'disabled':'';
  const message=wpAccess.error?'<p class="wp-access-error" role="alert">'+esc(wpAccess.error)+'</p>':'';
- const controls=choose?'<form id="wp-access-person"><label for="wp-existing-person">選擇自己的姓名</label><select class="input" id="wp-existing-person" required '+disabled+'><option value="">請選擇人員</option>'+wpAccess.people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select><button class="soft-button primary" type="submit" '+disabled+'>確認姓名</button></form><p class="small muted">確認後固定使用此姓名。如選錯請聯絡管理員。</p>':locked?'<form id="wp-access-unlock"><label for="wp-company-code">公司存取碼</label><input class="input" id="wp-company-code" type="password" maxlength="128" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="輸入公司提供的存取碼" '+disabled+'><button type="submit" class="soft-button primary" '+disabled+'>'+(wpAccess.busy?'驗證中…':'進入 WorkPulse')+'</button></form><p class="small muted">同一瀏覽器最多記住 30 天；到期或管理員更換存取碼時須重新驗證。共用裝置使用後請登出。</p>':failure?'<button class="soft-button primary" data-action="access-retry">重新連線</button>':'<p role="status">正在安全連接 WorkPulse…</p>';
+ const controls=choose?'<form id="wp-access-person"><label for="wp-existing-person">選擇自己的姓名</label><select class="input" id="wp-existing-person" required '+disabled+'><option value="">請選擇人員</option>'+wpAccess.people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select><button class="soft-button primary" type="submit" '+disabled+'>確認姓名</button></form><p class="small muted">確認後固定使用此姓名。如選錯請聯絡管理員。</p><button type="button" class="soft-button ghost" data-action="access-reset-grant" '+disabled+'>重新驗證公司存取碼</button>':locked?'<form id="wp-access-unlock"><label for="wp-company-code">公司存取碼</label><input class="input" id="wp-company-code" type="password" maxlength="128" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="輸入公司提供的存取碼" '+disabled+'><button type="submit" class="soft-button primary" '+disabled+'>'+(wpAccess.busy?'驗證中…':'進入 WorkPulse')+'</button></form><p class="small muted">同一瀏覽器最多記住 30 天；到期或管理員更換存取碼時須重新驗證。共用裝置使用後請登出。</p>':failure?'<button class="soft-button primary" data-action="access-retry">重新連線</button>':'<p role="status">正在安全連接 WorkPulse…</p>';
  root.innerHTML='<div class="shell wp-access-shell"><main class="soft-card wp-access-card" aria-label="WorkPulse 存取驗證"><div class="brand-symbol">W<small>·</small></div><h1>WorkPulse</h1><h2>'+(choose?'選擇目前操作人員':locked?'輸入公司存取碼':failure?'無法連線':'安全連線中')+'</h2><p class="small muted">'+(choose?'首次使用請選擇管理員建立的本人姓名，之後不可切換。':locked?'不需要 Google 帳號，請使用公司提供的存取碼。':'請確認網路及公司部署設定。')+'</p>'+message+controls+'<p class="small muted">WorkPulse · v0.25.1</p></main></div>';
 }
 function scheduleAccessExpiry(){
@@ -491,8 +491,10 @@ async function unlockSharedAccess(code){
   wpAccess.grant={token:grant.token,expiresAt:grant.expiresAt};wpAccess.people=grant.people;
   setCloudCredential(wpAccess.grant);
   const remembered=readSelectedPerson(permanentStorage(),grant.people,{fallback:false});
+  let stored='';try{stored=permanentStorage()?.getItem('workpulse:selected-person:v1')||'';}catch{}
+  if(stored&&!remembered){lockSharedAccess('原固定人員已停用或不存在，請聯絡管理員。');return;}
   wpAccess.phase='choose';
-  if(remembered){wpAccess.busy=false;await finishAccessPerson(remembered);}
+  if(remembered){wpAccess.busy=false;await finishAccessPerson(remembered);if(wpAccess.phase==='choose'){lockSharedAccess(wpAccess.error||'原固定人員未確認，請聯絡管理員。');}}
   else if(!grant.people.length)wpAccess.error='尚無可用人員，請聯絡管理員建立名單。';
  }catch(error){wpAccess.phase='locked';wpAccess.error=error.message||'驗證失敗';}
  finally{wpAccess.busy=false;render();}
@@ -595,6 +597,7 @@ root.addEventListener('click', event=>{
  const button=event.target.closest('[data-action]');if(!button)return;
  const action=button.dataset.action;
  if(action==='access-retry'){void startCloudAccess();return;}
+ if(action==='access-reset-grant'&&wpAccess.phase==='choose'&&!wpAccess.busy){lockSharedAccess();return;}
  if(action==='access-lock'&&wpSharedGuest()){if(state.cloud.saving||attendanceState.saving||wpAccess.busy||readFieldPending().some(x=>fieldRecoveryBusy(x.payload.requestId)))return;if(state.dirty&&!flushQuickDraft()){notify('草稿暫存失敗，請先保留內容',true);return;}if(confirm('登出此瀏覽器？未提交資料仍留在本分頁，重新驗證後才能查看。'))lockSharedAccess();return;}
  if(isUnifiedPortal&&wpAccess.phase!=='ready')return;
  if(action==='dismiss-toast'){dismissToast();return;}

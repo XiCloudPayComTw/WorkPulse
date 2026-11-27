@@ -1,5 +1,7 @@
 # WorkPulse v0.25.0｜共用存取碼 TEST 更新
 
+> v0.25.1 固定人員模式請先讀 [最新規格及更新步驟](ACCESS_V0251.md)。不再使用舊自助新增流程。
+
 先確認本版本 PR 已由使用者合併且 main CI 全數通過，下載該次 unified ZIP。現有 TEST 保留原五項 Script Properties、schema 4、私人 Drive、原 ID；不要重初始化。
 
 1. 核對現有 TEST 私人控制表及資料夾、備份、無進行中的寫入，保留已知可用 v0.24.1 版本。在原 Apps Script 專案替換新版三檔 Code.gs、Index.html、appsscript.json（manifest scope 未預期改變），儲存。管理部署作業 → 編輯原部署 → 新版本，先保持原 domain/執行者設定，驗證持有者管理控制台正常。
