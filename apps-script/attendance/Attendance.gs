@@ -61,7 +61,7 @@ function wpAttEmployee_(control,id){
 function wpAttendanceLoad(payload,token){
   wpFieldAccess_(token);
   var m=wpMonth_(payload&&payload.month),control=wsBook_(),id=String(payload&&payload.employeeId||'');
-  wpAttEmployee_(control,id);
+  wpFixedTarget_(token,control,id);wpAttEmployee_(control,id);
   var file=wpMonthFile_(control,m,false),settings=wpAttConfig_(control,id,m);
   var schedule=wpAttSchedule_(control,id,m);
   return {month:m,employeeId:id,rows:wpAttRows_(file,id),expectedDays:settings.expectedDays,schedule:{days:schedule.days,revision:schedule.revision}};

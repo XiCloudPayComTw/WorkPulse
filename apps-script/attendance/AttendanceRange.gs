@@ -15,7 +15,7 @@ function wpAttendanceRange(input,token){
  var span=Math.round((end.getTime()-start.getTime())/86400000)+1;
  if(span<1||span>366)throw Error('單次查詢範圍不得超過 366 天');
  var id=String(input.employeeId||''),control=wsBook_();
- wpAttEmployee_(control,id);
+ wpFixedTarget_(token,control,id);wpAttEmployee_(control,id);
  var months=wpMonthRange_(a,b),output=[],scheduleByMonth={};
  months.forEach(function(month){
   var file=wpMonthFile_(control,month,false),schedule=wpAttSchedule_(control,id,month);

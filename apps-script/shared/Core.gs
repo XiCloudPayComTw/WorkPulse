@@ -132,7 +132,9 @@ function wpFieldAccess_(token){
  if(mode==='shared-code'){
   var cfg=wpSharedExecution_(),active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
   if((token===undefined||token===null||token==='')&&active===cfg.adminEmail)return active;
-  return wpCodeSessionVerify_(token).actor;
+  var session=wpCodeSessionVerify_(token);
+  if(!session.personId)throw Error('請先確認固定操作人員');
+  return session.actor;
  }
  if(mode!=='domain')return '';
  var cfg=wpConfig_(),active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase(),

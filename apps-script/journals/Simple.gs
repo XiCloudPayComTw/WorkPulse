@@ -28,12 +28,12 @@ function wsRecord_(j,tasks){
 function wsTaskIndex_(tasks){
   var result=new Map();tasks.forEach(function(task){var key=String(task.journalId),list=result.get(key);if(!list){list=[];result.set(key,list);}list.push(task);});return result;
 }
-function wsMonth_(control,month){
+function wsMonth_(control,month,fixed){
   var m=wpMonth_(month),book=wpMonthFile_(control,m,false);
   if(!book)return [];
   var deleted=wsDeleted_(book);
   var rows=wpRows_(wpSheet_(book,'Journals')).filter(function(j){
-    return String(j.date).slice(0,7)===m&&!deleted[String(j.journalId)];
+    return String(j.date).slice(0,7)===m&&!deleted[String(j.journalId)]&&(!fixed||String(j.employeeId)===fixed);
   });
   if(rows.length>1500)throw Error('月份日誌過多，請縮小範圍');
   var tasks=wsTaskIndex_(wpRows_(wpSheet_(book,'Tasks')));
@@ -43,15 +43,15 @@ function wpSharedBootstrap(month,token){
   var verified=wpFieldAccess_(token),shared=/^shared:[a-f0-9]{32}$/.test(verified);
   var offlineScope=String(PropertiesService.getScriptProperties().getProperty('WORKPULSE_OFFLINE_SCOPE')||'');
   if(shared||!verified||!/^[A-Za-z0-9_-]{16,80}$/.test(offlineScope))offlineScope='';
-  var book=wsBook_(),m=wpMonth_(month),people=wsPeople_(book,false),admin=wpUnified_()&&verified===wpConfig_().adminEmail;
+  var book=wsBook_(),m=wpMonth_(month),fixed=wpFixedPerson_(token,book),people=wsPeople_(book,false).filter(function(p){return !fixed||p.id===fixed;}),admin=wpUnified_()&&verified===wpConfig_().adminEmail;
   return {month:m,offlineScope:offlineScope,store:{version:1,mode:'cloud',
     employees:people.map(function(p){return {id:p.id,name:p.name};}),
     projects:wpRows_(wpSheet_(book,'Projects')).filter(function(p){return wpActive_(p.active);})
-      .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m)},
+      .map(function(p){return wpPlainText_(p.name);}),categories:wsCategories_(book),journals:wsMonth_(book,m,fixed)},
     user:{id:admin?'admin':'guest',name:admin?'管理員':'共用填寫',role:admin?'admin':'guest',email:shared?'':verified,
       canWriteIds:people.map(function(p){return p.id;})}};
 }
-function wpSharedLoadMonth(month,token){wpFieldAccess_(token);var book=wsBook_();return {month:wpMonth_(month),journals:wsMonth_(book,month)};}
+function wpSharedLoadMonth(month,token){wpFieldAccess_(token);var book=wsBook_(),fixed=wpFixedPerson_(token,book);return {month:wpMonth_(month),journals:wsMonth_(book,month,fixed)};}
 function wsValidated_(input,book){
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('工作資料格式無效');
   var employeeId=String(input.employeeId||'');
@@ -121,7 +121,7 @@ function wsValidated_(input,book){
 function wpSharedSaveJournal(payload,token){
   wpFieldAccess_(token);var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
-    var verified=wpFieldAccess_(token),control=wsBook_();wpFieldWriteGuard_(control,token);var p=wsValidated_(payload,control);
+    var verified=wpFieldAccess_(token),control=wsBook_();wpFieldWriteGuard_(control,token);wpFixedTarget_(token,control,payload&&payload.employeeId);var p=wsValidated_(payload,control);
     var book=wpMonthFile_(control,p.date.slice(0,7),true),deleted=wsDeleted_(book);
     var sheet=wpSheet_(book,'Journals'),rows=wpRows_(sheet),allRequests=wpRows_(wpSheet_(book,'Requests'));
     var previous=allRequests.find(function(r){return String(r.requestId)===p.requestId;});
@@ -159,7 +159,9 @@ function wpSharedQueryReport(criteria,token){
   if(span<0||span>365)throw Error('報表查詢不能超過 366 天');
   var employeeId=String(criteria.employeeId||'all'),project=String(criteria.project||'all'),
       category=String(criteria.category||'all'),status=String(criteria.status||'all');
-  var people=wsPeople_(book,true),ids={};people.forEach(function(p){ids[p.id]=true;});
+  var fixed=wpFixedPerson_(token,book);
+  if(fixed&&employeeId!=='all'&&employeeId!==fixed)throw Error('只能操作固定人員的資料');
+  var people=wsPeople_(book,true).filter(function(p){return !fixed||p.id===fixed;}),ids=Object.create(null);people.forEach(function(p){ids[p.id]=true;});
   if(employeeId!=='all'&&!ids[employeeId])throw Error('找不到選取的使用者');
   if(project.length>100||category.length>100
     ||WP_STATUS.indexOf(status)<0&&status!=='all')throw Error('報表篩選格式錯誤');
